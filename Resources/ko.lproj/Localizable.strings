@@ -50,6 +50,11 @@
 "Send to app" = "앱으로";
 "Esc finishes the word and goes to the app. ⇧Esc changes the language." = "Esc는 단어를 확정한 뒤 앱으로 갑니다. 언어는 ⇧Esc로 바꿉니다.";
 "Esc changes the word you're typing, or the one just typed, to another language. The app doesn't get that Esc." = "Esc로 치는 중이거나 방금 친 단어를 다른 언어로 바꿉니다. 이때 Esc는 앱에 가지 않습니다.";
+"After Space" = "Space 뒤";
+"Finish the word" = "단어 확정";
+"Keep it underlined" = "밑줄 유지";
+"Space finishes the word, and the app types the space, so its text replacements work." = "Space가 단어를 확정하고 공백은 앱이 칩니다. 텍스트 대치가 동작합니다.";
+"The word and its space stay underlined until the next word, so Esc can still change it and Delete takes back just the space. For terminals, where a finished word can't be changed." = "다음 단어를 칠 때까지 단어와 공백이 밑줄 상태로 남아, Esc로 바꾸거나 Delete로 공백만 되돌릴 수 있습니다. 확정된 단어를 고칠 수 없는 터미널용입니다.";
 "Convert words" = "단어 변환";
 "Off: keys go to the app as typed, as with the ABC layout." = "끄면 키가 친 그대로 앱에 갑니다(ABC 자판처럼).";
 "App" = "앱";
@@ -99,6 +104,7 @@
 "Conversion: Normal" = "변환 기준: 보통";
 "Conversion: Strict" = "변환 기준: 엄격하게";
 "Esc Key: Send to App (⇧Esc switches)" = "Esc 키: 앱으로 (⇧Esc로 언어 바꾸기)";
+"Hold the Word After Space (Esc still changes it)" = "Space 뒤에도 단어 유지 (Esc로 고치기)";
 "Use Default Settings in This App" = "이 앱에서 기본 설정 따르기";
 "Pause in This Text Field (right ⌘)" = "이 입력창에서 일시정지 (오른쪽 ⌘)";
 "Pause in This Text Field" = "이 입력창에서 일시정지";

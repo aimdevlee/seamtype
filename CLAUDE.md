@@ -76,6 +76,13 @@ tests use `FakeTextField`). It owns the preview and hysteresis, commits, Esc rea
 - After a word ends with Space or punctuation, only the word is inserted and `handle` returns
   false, so the app types the key itself, as the system Korean IME does. Inserting "word + space"
   left a stray character in Ghostty. Test harnesses must insert the passed-on key themselves.
+- In an app set to `holdSpace`, Space doesn't commit: the word stays composed with `heldSpace` set
+  and is shown with its space (`show`), rendered as the whole word's decision (`pinned`) so what's
+  underlined is what will go in. Esc cycles it and Delete only clears `heldSpace`; the next letter,
+  Return, Tab, punctuation, a shortcut or a focus change commits the word and its space in one
+  `insertText`. Ghostty sends text committed on a letter key as text and encodes nothing for a key
+  the IME consumed while composing, which is what makes this work there; it reports its mouse
+  selection as the caret, so the post-commit flip window can't.
 
 **`Runtime`** (`Sources/Seamtype`) is a process-wide singleton holding settings, engine and
 converter, plus a `generation` counter. Controllers swap in a fresh session when the generation

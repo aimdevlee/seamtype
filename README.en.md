@@ -125,6 +125,13 @@ and pressing it again keeps cycling (⇧Esc where Esc goes to the app). Any othe
 chance. This needs the caret still right after the word and an app that lets Seamtype read the text
 there; otherwise the key goes to the app.
 
+In an app that can't hand a committed word back, such as a terminal, turn on **Hold the word after
+Space** for that app (`holdSpace` in `apps.json`). The word then stays underlined with its space
+until the first letter of the next word, so Esc (or ⇧Esc) still switches its reading and Delete takes
+back just the space: Space pressed before looking, then Delete and ⇧Esc, still changes the word.
+Return, Tab, punctuation and shortcuts finish the word as before. The app never gets the Space key,
+so its text replacements don't fire there.
+
 A correction changes only that word, so a stray Esc doesn't stick. Correct the same keys the same
 way a second time and Seamtype remembers it; switching a word back to Seamtype's own guess forgets
 it.
@@ -183,8 +190,8 @@ quits, words are decided again at the shell.
 From the input menu (the menu bar, while Seamtype is selected) you can:
 - pause Seamtype in this text field (like right ⌘)
 - turn word conversion on or off for the app in front, set its conversion threshold
-  (Normal/Strict) and whether Esc goes to the app, or drop its settings. The threshold and Esc are
-  greyed while conversion is off
+  (Normal/Strict), whether Esc goes to the app and whether the word is held after Space, or drop
+  its settings. Those are greyed while conversion is off
 - turn Japanese Input and Live Conversion on or off
 - undo the last learned word, and open Try Typing, the remembered words or the settings window
 
@@ -229,6 +236,7 @@ from it. No app is listed unless you list it.
 | `enabled` | `true` | `false` passes every key through (plain English). |
 | `conversionThreshold` | `0.5` | Convert away from the typed letters only when at least this sure. `0.97` (Strict) keeps short shell commands from turning into Hangul in a terminal; `0.5` converts more Korean when you write prose. |
 | `escapeToApp` | `false` | Esc goes to the app, and ⇧Esc switches readings (for editors). |
+| `holdSpace` | `false` | Space doesn't finish the word: it stays underlined with its space until the next word starts, so Esc still switches it and Delete takes back just the space. For terminals, which can't give a finished word back; the app never sees the Space key, so text replacements don't fire. |
 
 After editing these files by hand, restart the input method: `pkill -x Seamtype`.
 
@@ -306,7 +314,8 @@ Exact match counts kana/kanji style differences (ひとまとめ vs 一まとめ
 ## Known limits
 
 - Never tested end to end in every app. Secure fields (passwords) bypass input methods, and undo
-  after commit needs apps that report their caret and text.
+  after commit needs apps that report their caret and text; in a terminal, set `"holdSpace": true`
+  to keep the word underlined after Space instead.
 - Where Esc doesn't go to the app, Esc right after a word (e.g. to close a popup) changes that word
   first. It isn't learned unless repeated; list such apps with `"escapeToApp": true`.
 - Japanese: only the first clause is resized with ←/→ (Return commits it and moves on to the

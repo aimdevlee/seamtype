@@ -55,7 +55,7 @@ final class InputController: IMKInputController {
             session.replacements = Runtime.shared.textReplacements
             if let last = Runtime.shared.lastVim { vimChanged(to: last.signal, from: last.app) }
             let policy = session.policy
-            log.info("activate \(app ?? "?", privacy: .public) enabled=\(policy.enabled) threshold=\(policy.conversionThreshold) escapeToApp=\(policy.escapeToApp) replacements=\(self.session.replacements.count)")
+            log.info("activate \(app ?? "?", privacy: .public) enabled=\(policy.enabled) threshold=\(policy.conversionThreshold) escapeToApp=\(policy.escapeToApp) holdSpace=\(policy.holdSpace) replacements=\(self.session.replacements.count)")
         }
     }
 
@@ -266,6 +266,8 @@ final class InputController: IMKInputController {
                     on: policy.conversionThreshold >= AppPolicy.strictThreshold, enabled: policy.enabled, indent: 2, value: app)
                 add(L("Esc Key: Send to App (⇧Esc switches)"), #selector(toggleEscapeToApp(_:)), on: policy.escapeToApp,
                     enabled: policy.enabled, indent: 2, value: app)
+                add(L("Hold the Word After Space (Esc still changes it)"), #selector(toggleHoldSpace(_:)), on: policy.holdSpace,
+                    enabled: policy.enabled, indent: 2, value: app)
                 if listed {
                     add(L("Use Default Settings in This App"), #selector(removeAppEntry(_:)), indent: 1, value: app)
                 }
@@ -319,6 +321,13 @@ final class InputController: IMKInputController {
         guard let app = appOf(sender) else { return }
         MainActor.assumeIsolated {
             Runtime.shared.updatePolicy(for: app) { $0.escapeToApp.toggle() }
+        }
+    }
+
+    @objc func toggleHoldSpace(_ sender: Any?) {
+        guard let app = appOf(sender) else { return }
+        MainActor.assumeIsolated {
+            Runtime.shared.updatePolicy(for: app) { $0.holdSpace.toggle() }
         }
     }
 

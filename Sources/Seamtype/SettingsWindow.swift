@@ -282,6 +282,14 @@ private func escapeExplanation(_ toApp: Bool) -> String {
           : L("Esc changes the word you're typing, or the one just typed, to another language. The app doesn't get that Esc.")
 }
 
+private func holdSpaceName(_ holds: Bool) -> String { holds ? L("Keep it underlined") : L("Finish the word") }
+
+/// What the Space choice does, shown under the picker.
+private func holdSpaceExplanation(_ holds: Bool) -> String {
+    holds ? L("The word and its space stay underlined until the next word, so Esc can still change it and Delete takes back just the space. For terminals, where a finished word can't be changed.")
+          : L("Space finishes the word, and the app types the space, so its text replacements work.")
+}
+
 private func strictnessExplanation(_ threshold: Double) -> String {
     threshold >= AppPolicy.strictThreshold
         ? L("Converts only words that are clearly Korean or Japanese, so short commands stay as typed (gst stays gst). For terminals.")
@@ -564,6 +572,14 @@ private struct AppsPane: View {
                             Text(L("Send to app")).tag(true)
                         }
                     }
+                    ChoiceRow(title: L("After Space"), explanation: holdSpaceExplanation(model.defaultPolicy.holdSpace)) {
+                        Picker(L("After Space"), selection: Binding(
+                            get: { model.defaultPolicy.holdSpace },
+                            set: { value in model.setDefault { $0.holdSpace = value } })) {
+                            Text(L("Finish the word")).tag(false)
+                            Text(L("Keep it underlined")).tag(true)
+                        }
+                    }
                 }
                 // Only matter while words are converted.
                 .padding(.leading, 18)
@@ -646,6 +662,12 @@ private struct AppRowView: View {
                     model.setEntry(for: row.id) { $0.escapeToApp = value }
                 }
                 .frame(width: AppColumns.escape, alignment: .leading)
+                FieldMenu(own: row.entry.holdSpace.map(holdSpaceName),
+                          inherited: holdSpaceName(defaultPolicy.holdSpace),
+                          choices: [(L("Finish the word"), false), (L("Keep it underlined"), true)]) { value in
+                    model.setEntry(for: row.id) { $0.holdSpace = value }
+                }
+                .frame(width: AppColumns.space, alignment: .leading)
             }
             .disabled(!(row.entry.enabled ?? defaultPolicy.enabled))
         }
@@ -679,9 +701,10 @@ private struct ChoiceRow<Choice: View>: View {
 
 /// Column widths shared by the exceptions' header and rows.
 private enum AppColumns {
-    static let conversion: CGFloat = 140
-    static let escape: CGFloat = 190
-    static let enabled: CGFloat = 100
+    static let conversion: CGFloat = 120
+    static let escape: CGFloat = 170
+    static let space: CGFloat = 160
+    static let enabled: CGFloat = 90
 }
 
 /// Names the exceptions' columns after the default settings above them.
@@ -692,6 +715,7 @@ private struct AppColumnsHeader: View {
             Text(L("Convert words")).frame(width: AppColumns.enabled, alignment: .leading)
             Text(L("Conversion")).frame(width: AppColumns.conversion, alignment: .leading)
             Text(L("Esc key")).frame(width: AppColumns.escape, alignment: .leading)
+            Text(L("After Space")).frame(width: AppColumns.space, alignment: .leading)
         }
         .font(.caption).foregroundStyle(.secondary).lineLimit(1)
         .accessibilityHidden(true)

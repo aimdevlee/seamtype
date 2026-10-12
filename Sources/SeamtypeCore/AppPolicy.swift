@@ -13,11 +13,18 @@ public struct AppPolicy: Codable, Equatable, Sendable {
     /// ⇧Esc switches the word's language instead. (Inside a vim that reports its modes, Esc is
     /// vim's whatever this says.)
     public var escapeToApp: Bool
+    /// Space doesn't finish the word: the word and its space stay underlined until the next word
+    /// starts (Return, Tab, punctuation and shortcuts finish it too). Esc still changes it, and
+    /// Delete takes back just the space. For terminals, which can't hand a finished word back for
+    /// a change. The app then never sees the Space key, so its text replacements don't fire.
+    public var holdSpace: Bool
 
-    public init(enabled: Bool = true, conversionThreshold: Double = 0.5, escapeToApp: Bool = false) {
+    public init(enabled: Bool = true, conversionThreshold: Double = 0.5, escapeToApp: Bool = false,
+                holdSpace: Bool = false) {
         self.enabled = enabled
         self.conversionThreshold = conversionThreshold
         self.escapeToApp = escapeToApp
+        self.holdSpace = holdSpace
     }
 
     public static let standard = AppPolicy()
@@ -31,24 +38,29 @@ public struct AppPolicy: Codable, Equatable, Sendable {
         public var enabled: Bool?
         public var conversionThreshold: Double?
         public var escapeToApp: Bool?
+        public var holdSpace: Bool?
 
-        public init(enabled: Bool? = nil, conversionThreshold: Double? = nil, escapeToApp: Bool? = nil) {
+        public init(enabled: Bool? = nil, conversionThreshold: Double? = nil, escapeToApp: Bool? = nil,
+                    holdSpace: Bool? = nil) {
             self.enabled = enabled
             self.conversionThreshold = conversionThreshold
             self.escapeToApp = escapeToApp
+            self.holdSpace = holdSpace
         }
 
         /// The keys of `policy` that differ from `base`.
         init(difference policy: AppPolicy, from base: AppPolicy) {
             self.init(enabled: policy.enabled == base.enabled ? nil : policy.enabled,
                       conversionThreshold: policy.conversionThreshold == base.conversionThreshold ? nil : policy.conversionThreshold,
-                      escapeToApp: policy.escapeToApp == base.escapeToApp ? nil : policy.escapeToApp)
+                      escapeToApp: policy.escapeToApp == base.escapeToApp ? nil : policy.escapeToApp,
+                      holdSpace: policy.holdSpace == base.holdSpace ? nil : policy.holdSpace)
         }
 
         func applied(to base: AppPolicy) -> AppPolicy {
             AppPolicy(enabled: enabled ?? base.enabled,
                       conversionThreshold: conversionThreshold ?? base.conversionThreshold,
-                      escapeToApp: escapeToApp ?? base.escapeToApp)
+                      escapeToApp: escapeToApp ?? base.escapeToApp,
+                      holdSpace: holdSpace ?? base.holdSpace)
         }
     }
 }
