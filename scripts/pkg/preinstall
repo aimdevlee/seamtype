@@ -1,4 +1,15 @@
 #!/bin/sh
+# Do not create a second input method beside a user's terminal installation.
+user=$(stat -f %Su /dev/console)
+if [ -n "$user" ] && [ "$user" != root ] && [ "$user" != loginwindow ]; then
+  user_home=$(dscl . -read "/Users/$user" NFSHomeDirectory) || exit 1
+  user_home=${user_home#NFSHomeDirectory: }
+  case "$user_home" in /*) ;; *) exit 1 ;; esac
+  if [ -d "$user_home/Library/Input Methods/Seamtype.app" ]; then
+    echo "Seamtype is already installed in $user_home/Library/Input Methods. Uninstall it before installing Seamtype.pkg." >&2
+    exit 1
+  fi
+fi
 # Stop a running Seamtype so the new one is launched on the next keystroke.
 pkill -x Seamtype 2>/dev/null || true
 exit 0

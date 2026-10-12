@@ -29,13 +29,26 @@ if let flag = CommandLine.arguments.firstIndex(of: "--settings") {
 // for the user running it (the installer package runs it as the logged-in user). Recent macOS
 // may still want the user to add it in System Settings → Keyboard → Input Sources.
 if CommandLine.arguments.contains("--register") {
-    let status = TISRegisterInputSource(Bundle.main.bundleURL as CFURL)
     let filter = [kTISPropertyInputSourceID as String: Bundle.main.bundleIdentifier ?? ""] as CFDictionary
-    if status == noErr, let source = (TISCreateInputSourceList(filter, true)?.takeRetainedValue() as? [TISInputSource])?.first {
-        TISEnableInputSource(source)
+    let existing = (TISCreateInputSourceList(filter, true)?.takeRetainedValue() as? [TISInputSource])?.first
+    // Repeated installs should enable the existing source, rather than register it again.
+    let status = existing == nil ? TISRegisterInputSource(Bundle.main.bundleURL as CFURL) : noErr
+    guard status == noErr else {
+        print("could not register (\(status))")
+        exit(1)
     }
-    print(status == noErr ? "registered \(Bundle.main.bundlePath)" : "could not register (\(status))")
-    exit(status == noErr ? 0 : 1)
+    let source = existing ?? (TISCreateInputSourceList(filter, true)?.takeRetainedValue() as? [TISInputSource])?.first
+    if let source {
+        let enabled = TISEnableInputSource(source)
+        if enabled != noErr { print("could not enable input source (\(enabled))") }
+    }
+    print("registered \(Bundle.main.bundlePath)")
+    let enabledSources = TISCreateInputSourceList(filter, false)?.takeRetainedValue() as? [TISInputSource] ?? []
+    if enabledSources.isEmpty {
+        print("Add Seamtype in System Settings → Keyboard → Input Sources → Edit… → + → Korean, then select it from the input menu.")
+    }
+    print("For Japanese, turn on Japanese Input in Seamtype's input menu; it is off by default.")
+    exit(0)
 }
 
 // `Seamtype --selftest`: load every model from the bundle and exit (used by build-app.sh).

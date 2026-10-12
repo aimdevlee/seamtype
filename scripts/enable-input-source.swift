@@ -28,7 +28,11 @@ func list(includeDisabled: Bool) -> [TISInputSource] {
 
 if args[1] == "--check" { exit(list(includeDisabled: false).isEmpty ? 3 : 0) }
 
-let registered = TISRegisterInputSource(URL(fileURLWithPath: args[1]) as CFURL)
+let existing = list(includeDisabled: true).first
+let registered = existing == nil ? TISRegisterInputSource(URL(fileURLWithPath: args[1]) as CFURL) : noErr
 guard registered == noErr else { print("could not register \(args[1]) (\(registered))"); exit(1) }
-if let source = list(includeDisabled: true).first { TISEnableInputSource(source) }
+if let source = existing ?? list(includeDisabled: true).first {
+    let enabled = TISEnableInputSource(source)
+    guard enabled == noErr else { print("could not enable input source (\(enabled))"); exit(1) }
+}
 exit(list(includeDisabled: false).isEmpty ? 3 : 0)

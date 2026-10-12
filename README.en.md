@@ -58,6 +58,8 @@ administrator rights.
   builds, self-tests and installs it.
 
 Using the pkg together with another way gives you two copies of the input method; use only one.
+The installation scripts and pkg stop if a copy is installed in the other location. Uninstall
+the existing copy before switching installation methods.
 
 Seamtype takes ~50 MB of memory (plus the ~35 MB Japanese dictionary when Japanese is on) and
 ~47 MB on disk, with nothing else running. Keystrokes never leave the input method.

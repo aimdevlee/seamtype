@@ -22,7 +22,7 @@
 "Korean · English" = "한국어 · 영어";
 "Always on" = "항상 켜짐";
 "Japanese" = "일본어";
-"Romaji becomes kana; Space converts to kanji." = "로마자로 치면 가나로, Space로 한자 변환.";
+"Off by default. Turn on to type Japanese with romaji; Space converts to kanji." = "기본값은 꺼짐입니다. 켜면 로마자로 일본어를 입력하고 Space로 한자를 변환합니다.";
 "Live conversion" = "라이브 변환";
 "Shows the top kanji candidate as you type." = "입력하면서 가장 앞선 한자 후보를 바로 보여 줍니다.";
 "Kanji candidate order" = "한자 후보 순서";

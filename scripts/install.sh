@@ -4,6 +4,10 @@
 set -euo pipefail
 cd "${0:A:h}/.."
 
+if [[ -d "/Library/Input Methods/Seamtype.app" ]]; then
+  echo "Seamtype is already installed in /Library/Input Methods. Uninstall it before installing a development build." >&2
+  exit 1
+fi
 scripts/build-app.sh
 dest="$HOME/Library/Input Methods"
 mkdir -p "$dest"
@@ -11,8 +15,6 @@ pkill -x Seamtype 2>/dev/null || true
 rm -rf "$dest/Seamtype.app"
 cp -R build/Seamtype.app "$dest/"
 echo "installed $dest/Seamtype.app"
-[[ -d "/Library/Input Methods/Seamtype.app" ]] &&
-  echo "warning: a release copy is also in /Library/Input Methods; remove one of them"
 
 id=com.aimdevlee.inputmethod.Seamtype
 enabled=false
@@ -33,4 +35,5 @@ cat <<'EOF'
 
 Next: pick "Seamtype" from the input menu. If it isn't there, add it in
 System Settings → Keyboard → Input Sources → Edit… → + → Korean, or log out and back in once.
+For Japanese, turn on Japanese Input in Seamtype's input menu; it is off by default.
 EOF

@@ -456,7 +456,9 @@ private struct GeneralPane: View {
                     HStack(spacing: 8) {
                         Example(keys: "dkssud githubdp", output: "안녕 github에")
                         Example(keys: "hello TextEditdptj", output: "hello TextEdit에서")
-                        Example(keys: "kyouha ␣", output: "今日は")
+                        if model.settings.japanese {
+                            Example(keys: "kyouha ␣", output: "今日は")
+                        }
                     }
                 }
                 .padding(.vertical, 4)
@@ -465,7 +467,7 @@ private struct GeneralPane: View {
                 LabeledContent(L("Korean · English")) { Text(L("Always on")).foregroundStyle(.secondary) }
                 Toggle(isOn: binding(\.japanese)) {
                     Text(L("Japanese"))
-                    Text(L("Romaji becomes kana; Space converts to kanji."))
+                    Text(L("Off by default. Turn on to type Japanese with romaji; Space converts to kanji."))
                 }
                 Group {
                     Toggle(isOn: binding(\.liveConversion)) {
