@@ -116,9 +116,10 @@ for きょうはいいてんきですね) commits that part and keeps converting
 ### Undo after commit, and learning
 
 Right after a word is committed with Space or punctuation, **Esc** switches it to its next reading,
-and pressing it again keeps cycling (⇧Esc where Esc goes to the app). Any other key ends the
-chance. This needs the caret still right after the word and an app that lets Seamtype read the text
-there; otherwise the key goes to the app.
+and pressing it again keeps cycling (⇧Esc where Esc goes to the app). Deleting the space or
+punctuation first keeps that chance; any other key ends it. This needs the caret still right after
+the word and an app that lets Seamtype read the text there; otherwise Esc goes to the app. ⇧Esc with
+nothing to change does nothing and never reaches the app.
 
 A correction changes only that word, so a stray Esc doesn't stick. Correct the same keys the same
 way a second time and Seamtype remembers it; switching a word back to Seamtype's own guess forgets

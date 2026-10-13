@@ -42,6 +42,8 @@ public protocol TextClient: AnyObject {
 /// Right after a word was committed with space/punctuation:
 ///   Esc / ⇧Esc     cycle that committed word the same way (Esc where it switches languages,
 ///                  ⇧Esc everywhere).
+///   Delete         the app deletes the space or punctuation; Esc can still change the word.
+/// ⇧Esc with nothing to change is dropped, never passed to the app.
 ///                  The same correction made twice is learned for good.
 @MainActor
 public final class InputSession {
@@ -96,6 +98,13 @@ public final class InputSession {
         let boundary: String
         let location: Int
         let previous: Language?
+
+        /// The same word after Delete took back its boundary character.
+        var withoutBoundary: Committed {
+            Committed(keys: keys, decided: decided, committedAs: committedAs, language: language,
+                      text: String(text.dropLast(boundary.count)), boundary: "", location: location,
+                      previous: previous)
+        }
     }
 
     public let engine: LearningEngine
@@ -233,6 +242,12 @@ public final class InputSession {
                 return true
             }
         }
+        // Delete right after the commit: the app takes back the space or punctuation, and the
+        // word itself can still be changed (Space before looking, then Delete and Esc).
+        if key == .delete, keys.isEmpty, let pending, !pending.boundary.isEmpty {
+            lastCommit = pending.withoutBoundary
+            return false
+        }
         if let pending { finalize(pending) }
 
         switch key {
@@ -261,7 +276,9 @@ public final class InputSession {
             return true
 
         case .escape, .cycle:
-            guard !keys.isEmpty else { return false }
+            // ⇧Esc is Seamtype's own: with nothing to change it goes nowhere, rather than reaching
+            // the app as an Esc (in a terminal, Claude Code's "cancel the draft").
+            guard !keys.isEmpty else { return key == .cycle }
             guard switchesLanguage else {
                 // The app's Esc: the word goes in as shown, then the app gets the key.
                 commit(client: client)

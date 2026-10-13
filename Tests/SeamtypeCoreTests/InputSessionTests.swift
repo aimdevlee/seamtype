@@ -110,6 +110,52 @@ final class FakeTextField: TextClient {
         #expect(field.text == "안녕 ")
     }
 
+    /// The app's own Delete: the character before the caret.
+    func appDelete() {
+        if !session.handle(.delete, client: field) {
+            field.insertText("", replacing: NSRange(location: field.cursor - 1, length: 1))
+        }
+    }
+
+    /// Space before looking, then Delete and Esc: the word still changes.
+    @Test func deleteAfterCommitKeepsTheWordChangeable() {
+        type("dkssud ")
+        appDelete()
+        #expect(field.text == "안녕")
+        #expect(session.handle(.escape, client: field))
+        #expect(field.text == "dkssud" && field.cursor == 6)
+        type(" ")
+        #expect(field.text == "dkssud ")
+    }
+
+    @Test func deleteAfterPunctuationKeepsTheWordChangeable() {
+        type("hello.")
+        appDelete()
+        #expect(session.handle(.cycle, client: field))
+        #expect(field.text == "ㅗ디ㅣㅐ")
+    }
+
+    /// Only the boundary: a second Delete takes a letter of the word and ends the chance.
+    @Test func secondDeleteEndsTheFlipWindow() {
+        type("dkssud ")
+        appDelete()
+        appDelete()
+        #expect(field.text == "안")
+        #expect(!session.handle(.escape, client: field))
+        #expect(field.text == "안")
+    }
+
+    /// ⇧Esc is Seamtype's key: when there is nothing to change it is dropped, not sent to the
+    /// app as an Esc (Claude Code clears its draft on Esc).
+    @Test func shiftEscWithNothingToChangeNeverReachesTheApp() {
+        #expect(session.handle(.cycle, client: field))
+        field.readable = false
+        type("dkssud ")
+        #expect(session.handle(.cycle, client: field))
+        #expect(field.text == "안녕 ")
+        #expect(!session.handle(.escape, client: field)) // plain Esc still goes on
+    }
+
     @Test func escWhileComposingFlipsThePreview() {
         type("dkssud")
         #expect(field.text == "안녕")
