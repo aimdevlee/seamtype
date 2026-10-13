@@ -164,6 +164,7 @@
 "Check for updates automatically" = "업데이트 자동 확인";
 "Once a day, and each time this window opens. Only the latest version number is asked of GitHub; nothing you type is sent." = "하루 한 번, 그리고 이 창을 열 때마다 확인합니다. GitHub에 최신 버전 번호만 물어보며, 입력한 내용은 보내지 않습니다.";
 "Seamtype %@ is available" = "Seamtype %@이 나왔습니다";
+"Full Release Notes" = "전체 릴리스 노트";
 "Checking for updates…" = "업데이트 확인 중…";
 "Seamtype is up to date" = "최신 버전입니다";
 "Version %@" = "버전 %@";

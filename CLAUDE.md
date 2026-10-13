@@ -152,7 +152,9 @@ runtime.
   (and the settings window on open and on Check Now); the result is shared through the bundle's
   user defaults. Install downloads `Seamtype.pkg`, requires `pkgutil --check-signature` to show
   the Developer ID Installer of team 2UZ65T3U82 and notarization, then opens it in Installer. So
-  a release must keep the `Seamtype.pkg` asset name and a `v<version>` tag.
+  a release must keep the `Seamtype.pkg` asset name and a `v<version>` tag. About lists the items of
+  the notes' first `## ` section (`## 바뀐 것`) as what changed, so keep that section first and a
+  `- ` list, with the install text after it.
   To try an update before publishing (drafts aren't visible to it), point the check at a file in
   GitHub's format: `defaults write com.aimdevlee.inputmethod.Seamtype updateFeed file:///…/latest.json`
   (its `browser_download_url` may be a file URL to a signed pkg); `defaults delete … updateFeed` after.

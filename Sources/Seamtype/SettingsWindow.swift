@@ -890,6 +890,22 @@ private struct AboutPane: View {
                     Text(updateTitle)
                     if let detail = updateDetail { Text(detail) }
                 }
+                if let release = updater.available, !release.notes.isEmpty || release.page != nil {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(Array(release.notes.enumerated()), id: \.offset) { _, note in
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                Text(verbatim: "•")
+                                Text((try? AttributedString(markdown: note)) ?? AttributedString(note))
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        if let page = release.page {
+                            Link(L("Full Release Notes"), destination: page)
+                        }
+                    }
+                    .font(.callout)
+                    .textSelection(.enabled)
+                }
                 Toggle(isOn: Binding(get: { model.settings.checkForUpdates }, set: { model.set(\.checkForUpdates, $0) })) {
                     Text(L("Check for updates automatically"))
                     Text(L("Once a day, and each time this window opens. Only the latest version number is asked of GitHub; nothing you type is sent."))

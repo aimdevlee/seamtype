@@ -46,7 +46,7 @@ If Seamtype isn't in the input menu, add it in **System Settings → Keyboard �
 Edit… → + → Korean → Seamtype**. If it isn't listed there either, log out and back in once.
 
 When a new version is out, the input menu shows **Update to Seamtype …** and **About** in the
-settings window installs it (**Check Now** checks by hand). It downloads the installer, checks its
+settings window lists what changed and installs it (**Check Now** checks by hand). It downloads the installer, checks its
 signature and opens it, so you only enter your password. Checks happen once a day and when the
 settings window opens; they ask GitHub only for the latest version number, and nothing you type
 is sent. Turn them off with **Check for updates automatically** in About.

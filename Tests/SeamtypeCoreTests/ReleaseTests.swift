@@ -21,6 +21,32 @@ import Testing
         #expect(Release(gitHubJSON: Data(#"{ "message": "Not Found" }"#.utf8)) == nil)
     }
 
+    @Test func readsWhatChangedFromTheNotes() throws {
+        let body = """
+        ## 바뀐 것
+
+        - **입력 중 지우기**: 가나 한 글자씩(`かんこく` → `かんこ`).
+        - **텍스트 대치**: 약어를
+          두 줄에 걸쳐 씁니다.
+
+        ## 설치·업데이트
+
+        - 설치 파일을 받아 여세요.
+        """
+        #expect(Release.changes(in: body) == [
+            "**입력 중 지우기**: 가나 한 글자씩(`かんこく` → `かんこ`).",
+            "**텍스트 대치**: 약어를 두 줄에 걸쳐 씁니다.",
+        ])
+        #expect(Release.changes(in: "") == [])
+        #expect(Release.changes(in: "## Changes\n\nOne paragraph.\n") == ["One paragraph."])
+
+        let json = #"""
+        { "tag_name": "v0.2.0", "body": "## 바뀐 것\r\n\r\n- 하나\r\n- 둘\r\n",
+          "assets": [ { "name": "Seamtype.pkg", "browser_download_url": "https://example.com/Seamtype.pkg" } ] }
+        """#
+        #expect(try #require(Release(gitHubJSON: Data(json.utf8))).notes == ["하나", "둘"])
+    }
+
     @Test func comparesVersionsByNumber() {
         #expect(Release.isNewer("0.1.10", than: "0.1.9"))
         #expect(Release.isNewer("0.2", than: "0.1.9"))
