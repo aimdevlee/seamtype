@@ -169,9 +169,10 @@ final class InputController: IMKInputController {
             return
         }
         if event.modifierFlags.contains(flag) {
-            // Other modifiers may come with it: a right ⌥ remapped as a Hyper key (Karabiner)
-            // reports ⌃⌥⇧⌘ at once. A key pressed with it still makes it a shortcut (keyDown).
-            switchTapDown = Date()
+            // Only on its own: a key remapped as a Hyper key (Karabiner) reports ⌃⌥⇧⌘ at once,
+            // and its tap belongs to whatever the user bound it to.
+            let others = event.modifierFlags.intersection([.command, .control, .option, .shift]).subtracting(flag)
+            switchTapDown = others.isEmpty ? Date() : nil
             return
         }
         guard let down = switchTapDown, Date().timeIntervalSince(down) < 0.5 else { return }
