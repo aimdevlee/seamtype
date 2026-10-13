@@ -903,6 +903,7 @@ private struct AboutPane: View {
                                     if let detail = line.detail {
                                         Text(Self.markdown(detail))
                                             .font(.callout).foregroundStyle(.secondary)
+                                            .lineLimit(2).truncationMode(.tail)
                                             .fixedSize(horizontal: false, vertical: true)
                                     }
                                 }
