@@ -26,6 +26,15 @@ import Testing
         #expect(!Settings.load(from: url).returnConfirmsOnly)
     }
 
+    @Test func rightOptionSwitchesIsOnUnlessTurnedOff() throws {
+        let url = dir.appendingPathComponent("settings.json")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try Data(#"{ "japanese": true }"#.utf8).write(to: url)
+        #expect(Settings.load(from: url).rightOptionSwitches)
+        try Settings(rightOptionSwitches: false).save(to: url)
+        #expect(!Settings.load(from: url).rightOptionSwitches)
+    }
+
     @Test func settingsSaveKeepsUnknownKeys() throws {
         let url = dir.appendingPathComponent("settings.json")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

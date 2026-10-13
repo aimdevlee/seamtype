@@ -13,6 +13,9 @@ public struct Settings: Codable, Equatable, Sendable {
     public var liveConversion: Bool = false
     /// A right ⌘ tap pauses Seamtype in the text field (keys go through as typed).
     public var rightCommandPause: Bool = true
+    /// A right ⌥ tap switches the word being typed, or the one just committed, to its next
+    /// reading, like ⇧Esc. Unlike Esc, no app acts on it.
+    public var rightOptionSwitches: Bool = true
     /// Return on an underlined word only confirms it, like a Japanese IME; off, the app gets the
     /// Return too (a Japanese phrase is still only confirmed).
     public var returnConfirmsOnly: Bool = true
@@ -28,6 +31,7 @@ public struct Settings: Codable, Equatable, Sendable {
     public var fullWidthSpace: Bool = false
 
     public init(japanese: Bool = false, liveConversion: Bool = false, rightCommandPause: Bool = true,
+                rightOptionSwitches: Bool = true,
                 returnConfirmsOnly: Bool = true, checkForUpdates: Bool = true, japaneseEngine: String = "apple",
                 fullWidthDigits: Bool = false, fullWidthSpace: Bool = false) {
         self.fullWidthDigits = fullWidthDigits
@@ -35,6 +39,7 @@ public struct Settings: Codable, Equatable, Sendable {
         self.japanese = japanese
         self.liveConversion = liveConversion
         self.rightCommandPause = rightCommandPause
+        self.rightOptionSwitches = rightOptionSwitches
         self.returnConfirmsOnly = returnConfirmsOnly
         self.checkForUpdates = checkForUpdates
         self.japaneseEngine = japaneseEngine
@@ -45,6 +50,7 @@ public struct Settings: Codable, Equatable, Sendable {
         japanese = try c.decodeIfPresent(Bool.self, forKey: .japanese) ?? false
         liveConversion = try c.decodeIfPresent(Bool.self, forKey: .liveConversion) ?? false
         rightCommandPause = try c.decodeIfPresent(Bool.self, forKey: .rightCommandPause) ?? true
+        rightOptionSwitches = try c.decodeIfPresent(Bool.self, forKey: .rightOptionSwitches) ?? true
         returnConfirmsOnly = try c.decodeIfPresent(Bool.self, forKey: .returnConfirmsOnly) ?? true
         checkForUpdates = try c.decodeIfPresent(Bool.self, forKey: .checkForUpdates) ?? true
         japaneseEngine = try c.decodeIfPresent(String.self, forKey: .japaneseEngine) ?? "apple"

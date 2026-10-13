@@ -512,6 +512,10 @@ private struct GeneralPane: View {
                     Text(L("Return only confirms"))
                     Text(L("Return on an underlined English or Korean word confirms it; press it again for a new line or to send. Off, the app gets that Return too. Japanese is always only confirmed."))
                 }
+                Toggle(isOn: binding(\.rightOptionSwitches)) {
+                    Text(L("Right ⌥ changes the language"))
+                    Text(L("Tap right ⌥ on its own to switch the word you're typing, or the one just typed, like ⇧Esc. Apps ignore it, so it never closes a window or clears what you wrote."))
+                }
                 Toggle(isOn: binding(\.rightCommandPause)) {
                     Text(L("Right ⌘ pauses"))
                     Text(L("Tap right ⌘ on its own and keys go through as typed in that text field, for hjkl in terminal programs. Tap again, or move to another field, to resume."))

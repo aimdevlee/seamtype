@@ -16,6 +16,9 @@ final class InputController: IMKInputController {
     private var current: (session: InputSession, generation: Int)?
     /// When right ⌘ went down, while no other key has been pressed with it: a tap pauses.
     private var rightCommandDown: Date?
+    /// When right ⌥ went down, while no other key has been pressed with it: a tap switches the
+    /// word's language, like ⇧Esc, without a key any app acts on.
+    private var rightOptionDown: Date?
 
     /// This client's session, rebuilt (after committing what was being typed) when a setting changed.
     @MainActor private var session: InputSession {
@@ -42,6 +45,7 @@ final class InputController: IMKInputController {
         static let f6: UInt16 = 97
         static let f7: UInt16 = 98
         static let rightCommand: UInt16 = 54
+        static let rightOption: UInt16 = 61
     }
 
     override func activateServer(_ sender: Any!) {
@@ -98,7 +102,10 @@ final class InputController: IMKInputController {
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
         guard let event, let input = sender as? IMKTextInput else { return false }
         if event.type == .flagsChanged {
-            MainActor.assumeIsolated { rightCommandChanged(event, client: input) }
+            MainActor.assumeIsolated {
+                rightCommandChanged(event, client: input)
+                rightOptionChanged(event, client: input)
+            }
             return false
         }
         guard event.type == .keyDown else {
@@ -106,6 +113,7 @@ final class InputController: IMKInputController {
             return false
         }
         rightCommandDown = nil // ⌘ with a key is a shortcut, not a tap
+        rightOptionDown = nil // ⌥ with a key types a character, not a tap
         return MainActor.assumeIsolated {
             let key = key(for: event)
             let handled = session.handle(key, client: IMKClient(input))
@@ -135,6 +143,29 @@ final class InputController: IMKInputController {
         guard let down = rightCommandDown, Date().timeIntervalSince(down) < 0.5 else { return }
         rightCommandDown = nil
         togglePause(client: client)
+    }
+
+    /// Right ⌥ pressed and released on its own, within a moment: switch the word being typed, or
+    /// the one just committed, to its next reading (as ⇧Esc does). The app still gets the ⌥
+    /// events, and a lone ⌥ does nothing there, so nothing leaks the way an Esc can (Chromium
+    /// apps see an Esc the input method took and close their window).
+    @MainActor private func rightOptionChanged(_ event: NSEvent, client: IMKTextInput) {
+        guard Runtime.shared.settings.rightOptionSwitches else { return }
+        guard event.keyCode == KeyCode.rightOption else {
+            rightOptionDown = nil // another modifier joined in
+            return
+        }
+        if event.modifierFlags.contains(.option) {
+            let others = event.modifierFlags.intersection([.command, .control, .shift])
+            rightOptionDown = others.isEmpty ? Date() : nil
+            return
+        }
+        guard let down = rightOptionDown, Date().timeIntervalSince(down) < 0.5 else { return }
+        rightOptionDown = nil
+        guard !session.inVimNormalMode else { return } // vim's own keys; ⇧Esc is the way out there
+        let handled = session.handle(.cycle, client: IMKClient(client))
+        syncCandidates()
+        log.debug("handle rightOption handled=\(handled) app=\(self.session.app ?? "?", privacy: .public)")
     }
 
     /// Pauses or resumes this text field, and says so under the caret.
