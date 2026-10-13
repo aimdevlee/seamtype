@@ -100,6 +100,10 @@ final class InputController: IMKInputController {
     }
 
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
+        if let event, event.type == .flagsChanged {
+            // Which modifier key and which modifiers are down: no typed text.
+            log.debug("flagsChanged key=\(event.keyCode) flags=\(event.modifierFlags.intersection(.deviceIndependentFlagsMask).rawValue, format: .hex) client=\(sender is IMKTextInput)")
+        }
         guard let event, let input = sender as? IMKTextInput else { return false }
         if event.type == .flagsChanged {
             MainActor.assumeIsolated {
