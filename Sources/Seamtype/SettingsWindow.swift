@@ -891,19 +891,28 @@ private struct AboutPane: View {
                     if let detail = updateDetail { Text(detail) }
                 }
                 if let release = updater.available, !release.notes.isEmpty || release.page != nil {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(Array(release.notes.enumerated()), id: \.offset) { _, note in
-                            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                                Text(verbatim: "•")
-                                Text((try? AttributedString(markdown: note)) ?? AttributedString(note))
-                                    .fixedSize(horizontal: false, vertical: true)
+                    VStack(alignment: .leading, spacing: 8) {
+                        if !release.notes.isEmpty {
+                            Text(L("What's changed")).font(.caption).foregroundStyle(.secondary)
+                        }
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(Array(release.notes.enumerated()), id: \.offset) { _, note in
+                                let line = Release.headline(of: note)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(Self.markdown(line.title))
+                                    if let detail = line.detail {
+                                        Text(Self.markdown(detail))
+                                            .font(.callout).foregroundStyle(.secondary)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                }
+                            }
+                            if let page = release.page {
+                                Link(L("Full Release Notes"), destination: page)
                             }
                         }
-                        if let page = release.page {
-                            Link(L("Full Release Notes"), destination: page)
-                        }
+                        .padding(.leading, 16)
                     }
-                    .font(.callout)
                     .textSelection(.enabled)
                 }
                 Toggle(isOn: Binding(get: { model.settings.checkForUpdates }, set: { model.set(\.checkForUpdates, $0) })) {
@@ -924,6 +933,10 @@ private struct AboutPane: View {
         }
         .formStyle(.grouped)
     }
+    private static func markdown(_ text: String) -> AttributedString {
+        (try? AttributedString(markdown: text)) ?? AttributedString(text)
+    }
+
     private var updateTitle: String {
         if let release = updater.available { return L("Seamtype %@ is available", release.version) }
         switch updater.state {

@@ -38,6 +38,16 @@ public struct Release: Equatable, Sendable {
         notes = Self.changes(in: answer.body ?? "")
     }
 
+    /// A note split into its bold lead and the rest: `**텍스트 대치**: 약어를…` → ("텍스트 대치",
+    /// "약어를…"). A note without a bold lead is all title.
+    public static func headline(of note: String) -> (title: String, detail: String?) {
+        guard note.hasPrefix("**"), let end = note.range(of: "**", range: note.index(note.startIndex, offsetBy: 2)..<note.endIndex)
+        else { return (note, nil) }
+        let title = String(note[note.index(note.startIndex, offsetBy: 2)..<end.lowerBound])
+        let rest = note[end.upperBound...].drop { $0 == ":" || $0 == " " }
+        return (title, rest.isEmpty ? nil : String(rest))
+    }
+
     /// The list items of the first `## ` section of release notes; a line that isn't an item
     /// joins the item before it (or stands alone when there is none yet).
     public static func changes(in body: String) -> [String] {

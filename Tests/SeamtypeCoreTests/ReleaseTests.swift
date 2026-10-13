@@ -47,6 +47,12 @@ import Testing
         #expect(try #require(Release(gitHubJSON: Data(json.utf8))).notes == ["하나", "둘"])
     }
 
+    @Test func splitsANoteIntoTitleAndDetail() {
+        #expect(Release.headline(of: "**텍스트 대치**: 약어를 `ㅈㅅ`처럼") == ("텍스트 대치", "약어를 `ㅈㅅ`처럼"))
+        #expect(Release.headline(of: "**짧은 것**") == ("짧은 것", nil))
+        #expect(Release.headline(of: "그냥 문장입니다.") == ("그냥 문장입니다.", nil))
+    }
+
     @Test func comparesVersionsByNumber() {
         #expect(Release.isNewer("0.1.10", than: "0.1.9"))
         #expect(Release.isNewer("0.2", than: "0.1.9"))
