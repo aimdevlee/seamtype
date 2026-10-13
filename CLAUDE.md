@@ -128,7 +128,16 @@ runtime.
   names for `releases/latest/download/`, plus the versioned copies.
   Pushing a `v<version>` tag that matches `Resources/Info.plist` runs `.github/workflows/release.yml`,
   which does the same with the certificates and notary credentials from the repo secrets and leaves
-  a draft release with the four assets; write the notes and publish it by hand.
+  a draft release with the four assets and `.github/release-notes.md` as its notes; fill them in
+  and publish it by hand.
+- **Release notes** are in Korean, and About shows their first section in the app
+  (`Release.changes`, `Release.headline`), so write them to these rules:
+  - `## 바뀐 것` first, as a list of `- **제목**: 설명`, then the fixed `## 설치·업데이트` text
+    from the template. About shows each bold lead as a title and the rest under it.
+  - 제목: a short noun phrase, about 10 characters, no period (`입력 중 지우기`, `텍스트 대치`).
+  - 설명: About cuts it at two lines (about 70–80 Korean characters), so the first sentence says
+    what changed; examples, exceptions and setting keys come after it.
+  - What a user notices, not how it was built; a fix says what works now. 3–5 items, biggest first.
   `SEAMTYPE_ZIP=build/release/Seamtype.zip sh scripts/get.sh` tries the zip locally. The pkg installs
   into `/Library/Input Methods` and is not relocatable. Its payload lands in
   `/Library/Application Support/Seamtype/Install` and the postinstall rsyncs it into the existing
@@ -153,8 +162,7 @@ runtime.
   user defaults. Install downloads `Seamtype.pkg`, requires `pkgutil --check-signature` to show
   the Developer ID Installer of team 2UZ65T3U82 and notarization, then opens it in Installer. So
   a release must keep the `Seamtype.pkg` asset name and a `v<version>` tag. About lists the items of
-  the notes' first `## ` section (`## 바뀐 것`) as what changed, so keep that section first and a
-  `- ` list, with the install text after it.
+  the notes' first `## ` section as what changed (see Release notes).
   To try an update before publishing (drafts aren't visible to it), point the check at a file in
   GitHub's format: `defaults write com.aimdevlee.inputmethod.Seamtype updateFeed file:///…/latest.json`
   (its `browser_download_url` may be a file URL to a signed pkg); `defaults delete … updateFeed` after.

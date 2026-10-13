@@ -1,5 +1,6 @@
 # On a v<version> tag: scripts/release.sh with the Developer ID (signed, notarized, stapled), then
-# a draft release with Seamtype{,-<version>}.{zip,pkg}. Write the notes and publish it by hand;
+# a draft release with Seamtype{,-<version>}.{zip,pkg} and .github/release-notes.md as its notes.
+# Fill in the notes and publish it by hand;
 # the updater only sees published releases.
 #
 # Secrets:
@@ -74,7 +75,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version=${GITHUB_REF_NAME#v}
-          gh release create "$GITHUB_REF_NAME" --draft --title "Seamtype $version" --notes "" \
+          gh release create "$GITHUB_REF_NAME" --draft --title "Seamtype $version" --notes-file .github/release-notes.md \
             build/release/Seamtype.pkg build/release/Seamtype.zip \
             build/release/Seamtype-$version.pkg build/release/Seamtype-$version.zip
 
