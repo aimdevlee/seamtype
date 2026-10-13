@@ -25,6 +25,10 @@
 "Romaji becomes kana; Space converts to kanji." = "로마자로 치면 가나로, Space로 한자 변환.";
 "Live conversion" = "라이브 변환";
 "Shows the top kanji candidate as you type." = "입력하면서 가장 앞선 한자 후보를 바로 보여 줍니다.";
+"Full-width numbers" = "전각 숫자";
+"After Japanese, numbers come out full-width (１２３); Space offers 123." = "일본어 뒤의 숫자를 전각(１２３)으로 씁니다. Space로 123을 고를 수 있습니다.";
+"Full-width space" = "전각 공백";
+"After Japanese, Space types a full-width space. ⇧Space types the other width." = "일본어 뒤의 Space를 전각 공백으로 씁니다. ⇧Space는 반대 폭의 공백입니다.";
 "Kanji candidate order" = "한자 후보 순서";
 "Kanji you pick in the candidate window come first next time." = "후보 창에서 고른 한자가 다음부터 앞에 나옵니다.";
 "Reset…" = "처음으로…";
@@ -111,6 +115,12 @@
 "Keys" = "키";
 "Return only confirms" = "Return은 확정만";
 "Return on an underlined English or Korean word confirms it; press it again for a new line or to send. Off, the app gets that Return too. Japanese is always only confirmed." = "밑줄 친 영어·한국어 단어에서 누른 Return은 확정만 합니다. 줄바꿈이나 전송은 한 번 더 누르세요. 끄면 그 Return도 앱에 갑니다. 일본어는 항상 확정만 합니다.";
+"Language switch key" = "언어 바꾸기 키";
+"Switches the word you're typing, or the one just typed, like ⇧Esc. Apps ignore it, so unlike Esc it never closes a window or clears what you wrote." = "치는 중이거나 방금 친 단어를 ⇧Esc처럼 다른 언어로 바꿉니다. 앱은 이 키를 무시하므로 Esc와 달리 창이 닫히거나 쓰던 글이 지워지지 않습니다.";
+"Right ⌥ tap" = "오른쪽 ⌥ 단독";
+"⌥Space" = "⌥Space";
+"Right ⇧ tap" = "오른쪽 ⇧ 단독";
+"None (Esc only)" = "없음 (Esc만)";
 "Right ⌘ pauses" = "오른쪽 ⌘로 일시정지";
 "Tap right ⌘ on its own and keys go through as typed in that text field, for hjkl in terminal programs. Tap again, or move to another field, to resume." = "오른쪽 ⌘만 눌렀다 떼면 그 입력창에서는 키가 친 그대로 갑니다. 터미널 프로그램의 hjkl 같은 곳에 씁니다. 한 번 더 누르거나 다른 입력창으로 가면 다시 켜집니다.";
 "Undo Last Learned (%@)" = "마지막 학습 취소 (%@)";
@@ -151,3 +161,20 @@
 "Couldn't uninstall Seamtype" = "Seamtype을 제거하지 못했습니다";
 "Seamtype was uninstalled." = "Seamtype을 제거했습니다.";
 "Seamtype wants to remove itself from /Library/Input Methods." = "Seamtype을 /Library/Input Methods에서 제거하려고 합니다.";
+
+/* Updates */
+"Update to Seamtype %@…" = "Seamtype %@로 업데이트…";
+"Updates" = "업데이트";
+"Install %@…" = "%@ 설치…";
+"Check Now" = "지금 확인";
+"Check for updates automatically" = "업데이트 자동 확인";
+"Once a day, and each time this window opens. Only the latest version number is asked of GitHub; nothing you type is sent." = "하루 한 번, 그리고 이 창을 열 때마다 확인합니다. GitHub에 최신 버전 번호만 물어보며, 입력한 내용은 보내지 않습니다.";
+"Seamtype %@ is available" = "Seamtype %@이 나왔습니다";
+"Checking for updates…" = "업데이트 확인 중…";
+"Seamtype is up to date" = "최신 버전입니다";
+"Version %@" = "버전 %@";
+"Downloading… Installer opens when it's done; macOS asks for your password." = "내려받는 중… 다 받으면 설치 프로그램이 열리고, macOS가 암호를 묻습니다.";
+"Installer opens and macOS asks for your password. Settings and learned words stay." = "설치 프로그램이 열리고 macOS가 암호를 묻습니다. 설정과 학습한 단어는 그대로 남습니다.";
+"Couldn't reach GitHub. Try again later." = "GitHub에 연결하지 못했습니다. 잠시 뒤 다시 시도하세요.";
+"Couldn't download the update. Try again later." = "업데이트를 내려받지 못했습니다. 잠시 뒤 다시 시도하세요.";
+"The downloaded installer isn't signed by Seamtype's developer, so it was deleted." = "내려받은 설치 파일이 Seamtype 개발자의 서명이 아니어서 지웠습니다.";

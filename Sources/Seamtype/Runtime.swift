@@ -10,7 +10,7 @@ final class Runtime {
 
     private(set) var settings: Settings
     private(set) var engine: LearningEngine
-    private(set) var converter: AzooKeyConverter?
+    private(set) var converter: JapaneseConverter?
     private(set) var generation = 0
     /// The controller of the text field in front, which a vim mode change is about.
     weak var active: InputController?
@@ -22,7 +22,7 @@ final class Runtime {
     private init() {
         settings = Settings.load()
         engine = Self.makeEngine(japanese: settings.japanese)
-        converter = settings.japanese ? AzooKeyConverter() : nil
+        converter = settings.japanese ? Self.makeConverter(settings) : nil
         let center = DistributedNotificationCenter.default()
         center.addObserver(forName: SettingsNotice.changed, object: nil, queue: .main) { note in
             let kanjiReset = note.object as? String == SettingsNotice.kanjiReset
@@ -46,18 +46,26 @@ final class Runtime {
                                                     japanese: heuristic.segmenter))
     }
 
+    /// macOS's Japanese engine unless the user chose AzooKey; AzooKey also where macOS's can't be loaded.
+    private static func makeConverter(_ settings: Settings) -> JapaneseConverter? {
+        if settings.japaneseEngine != "azooKey", let apple = AppleJapaneseConverter() { return apple }
+        return AzooKeyConverter()
+    }
+
     func makeSession() -> InputSession {
         let session = InputSession(engine: engine, policies: AppPolicies.load(),
                                    converter: settings.japanese ? converter : nil,
                                    japaneseEnabled: settings.japanese, liveConversion: settings.liveConversion,
                                    returnConfirmsOnly: settings.returnConfirmsOnly)
         session.replacements = textReplacements
+        session.fullWidthDigits = settings.fullWidthDigits
+        session.fullWidthSpace = settings.fullWidthSpace
         return session
     }
 
     /// The user's text replacements, read again whenever a text field becomes active, so an edit
     /// in System Settings applies without a restart.
-    var textReplacements: [String: String] { TextReplacements.shared.entries }
+    var textReplacements: [String: [String]] { TextReplacements.shared.entries }
 
     /// Saves a settings change and applies it.
     func update(_ change: (inout Settings) -> Void) {
@@ -94,7 +102,10 @@ final class Runtime {
     private func apply(_ new: Settings) {
         if new.japanese != settings.japanese {
             engine = Self.makeEngine(japanese: new.japanese)
-            if new.japanese, converter == nil { converter = AzooKeyConverter() }
+        }
+        if new.japanese, converter == nil || new.japaneseEngine != settings.japaneseEngine {
+            converter?.save()
+            converter = Self.makeConverter(new)
         }
         settings = new
         generation += 1
@@ -105,7 +116,7 @@ final class Runtime {
         if kanjiReset {
             // Drop the converter without saving, so its memory doesn't come back.
             converter = nil
-            if settings.japanese { converter = AzooKeyConverter() }
+            if settings.japanese { converter = Self.makeConverter(settings) }
         }
         engine.reload()
         apply(Settings.load())

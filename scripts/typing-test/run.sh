@@ -1,31 +1,31 @@
 #!/bin/zsh
-# Types test cases into a new TextEdit document with real key events, through the installed
-# Seamtype (selected for the run; the previous input source comes back after), and compares
-# the text. Needs Seamtype enabled in Input Sources and Accessibility permission for the
-# terminal. TextEdit takes the focus for about a minute.
+# Types test cases with real key events into the typing pane of Seamtype's settings window,
+# through the installed Seamtype, and compares the text. The pane switches to Seamtype itself when
+# another input source is in use. Needs Accessibility permission for the terminal. The settings
+# window takes the focus for about a minute.
 #
 # Each suite runs with its own settings.json: cases.tsv with Japanese on, live.tsv with live
-# conversion too. The user's settings and learning files (the cases' Esc corrections would
-# be learned like any other; so would its kanji choices) are backed up first and restored
-# afterwards, and Seamtype restarts so it reads them again.
+# conversion too, fullwidth.tsv with full-width numbers and spaces. The user's settings and
+# learning files (the cases' Esc corrections would be learned like any other; so would its kanji
+# choices) are backed up first and restored afterwards. Seamtype keeps running: it reads changed
+# files when told, as from the settings window.
 #
 #   scripts/typing-test/run.sh
 set -euo pipefail
 here="${0:A:h}"
 support="$HOME/Library/Application Support/Seamtype"
-app="$HOME/Library/Input Methods/Seamtype.app"
-files=(settings.json lexicon.json)
+files=(settings.json lexicon.json apple-learning.json)
+app=""
+for candidate in "$HOME/Library/Input Methods/Seamtype.app" "/Library/Input Methods/Seamtype.app"; do
+  [[ -d "$candidate" ]] && { app=$candidate; break; }
+done
+[[ -n "$app" ]] || { echo "Seamtype isn't installed"; exit 1; }
 dirs=(azooKey)  # AzooKey's kanji learning
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
-# Stop before touching any settings if there is no Seamtype input source to type through.
-swift "$here/../enable-input-source.swift" --check com.aimdevlee.inputmethod.Seamtype || {
-  echo "Seamtype isn't an enabled input source: add it in System Settings → Keyboard → Input Sources"
-  exit 1
-}
-
 swiftc -O -o "$work/typer" "$here/typer.swift"
+swiftc -O -o "$work/notify" "$here/notify.swift"
 mkdir -p "$support"
 for f in $files; do
   [[ -f "$support/$f" ]] && cp "$support/$f" "$work/$f"
@@ -34,30 +34,32 @@ for d in $dirs; do
   [[ -d "$support/$d" ]] && cp -R "$support/$d" "$work/$d"
 done
 restore() {
-  pkill -x Seamtype || true  # first, so it can't save its learning over the restored copy
+  # Drop what the run learned in memory first, so nothing saves it over the restored copies,
+  # then put them back and have Seamtype read them.
+  "$work/notify" kanjiReset
   sleep 1
   for f in $files; do
-    if [[ -f "$work/$f" ]]; then cp "$work/$f" "$support/$f"; else rm -f "$support/$f"; fi
+    if [[ -f "$work/$f" ]]; then cp "$work/$f" "$support/$f"; else rm -f "$support/${f:?}"; fi
   done
   for d in $dirs; do
-    rm -rf "$support/$d"
+    rm -rf "$support/${d:?}"
     if [[ -d "$work/$d" ]]; then cp -R "$work/$d" "$support/$d"; fi
   done
+  "$work/notify" kanjiReset
 }
 trap 'restore; rm -rf "$work"' EXIT
 
 suite() {
   echo "== $1"
   print -r -- "$2" > "$support/settings.json"
-  pkill -x Seamtype || true
+  "$work/notify"
   sleep 1
-  # macOS starts it again, with these settings, when the next app needs it. Starting it
-  # ourselves (open) gives a process apps don't connect to.
   # A failing suite must not end the script here: zsh skips the EXIT trap (the restore) when
   # errexit fires inside a function.
-  "$work/typer" "$here/$1" || failed=1
+  "$work/typer" "$here/$1" "$app" || failed=1
 }
 failed=0
 suite cases.tsv '{ "japanese": true }'
 suite live.tsv '{ "japanese": true, "liveConversion": true }'
+suite fullwidth.tsv '{ "japanese": true, "fullWidthDigits": true, "fullWidthSpace": true }'
 exit $failed

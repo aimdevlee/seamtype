@@ -7,14 +7,19 @@ public struct ConversionCandidate: Equatable, Sendable {
     /// How many kana from the start this candidate covers. Less than the whole
     /// reading means choosing it converts the first clause and keeps converting the rest.
     public let kanaCount: Int
+    /// A completion of the reading (ゆーちゅ → YouTube) rather than a conversion of it: offered
+    /// in the candidate list, never shown by live conversion.
+    public var isPrediction = false
 
-    public init(text: String, kanaCount: Int) {
+    public init(text: String, kanaCount: Int, isPrediction: Bool = false) {
         self.text = text
         self.kanaCount = kanaCount
+        self.isPrediction = isPrediction
     }
 }
 
-/// Kana → kanji conversion. `AzooKeyConverter` in the app; fakes in tests.
+/// Kana → kanji conversion. `AppleJapaneseConverter` in the app (`AzooKeyConverter` where macOS's
+/// engine can't be loaded, or by choice); fakes in tests.
 @MainActor
 public protocol JapaneseConverter: AnyObject {
     func candidates(for kana: String) -> [ConversionCandidate]
@@ -87,12 +92,16 @@ public final class AzooKeyConverter: JapaneseConverter {
     /// whole-reading candidates (log-probability per rank step). Tuned on sentences
     /// held out from the text model; nil disables reranking.
     public var rerankWeight: Double? = 1.0
-    private let textModel = JapaneseModel.text
 
     /// Reorders the candidates that cover the whole reading by text-model probability
     /// plus a prior for AzooKey's rank; partial (first-clause) candidates keep their order after them.
     private func rerank(_ candidates: [ConversionCandidate], kanaCount: Int) -> [ConversionCandidate] {
-        guard let weight = rerankWeight, let model = textModel else { return candidates }
+        Self.rerank(candidates, kanaCount: kanaCount, weight: rerankWeight)
+    }
+
+    /// The same reranking for any converter's candidates.
+    static func rerank(_ candidates: [ConversionCandidate], kanaCount: Int, weight: Double?) -> [ConversionCandidate] {
+        guard let weight, let model = JapaneseModel.text else { return candidates }
         let full = candidates.enumerated().filter { $0.element.kanaCount == kanaCount }
         let scored = full.map { (rank, c) in
             (c, model.logProbability(kana: c.text, partial: false) - weight * Double(rank))

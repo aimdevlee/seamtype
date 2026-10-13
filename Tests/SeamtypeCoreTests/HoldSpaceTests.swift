@@ -125,6 +125,24 @@ import Testing
         #expect(learning.pending == ["hello": .korean])
     }
 
+    /// A held word is still the word being typed: switched to Japanese, Space converts it.
+    @Test func spaceOnAHeldWordSwitchedToJapaneseConverts() {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("seamtype-hold-ja-\(UUID().uuidString).json")
+        let engine = LearningEngine(base: SplittingEngine(base: trilingual, english: trilingual.english, japanese: trilingual.segmenter), storeURL: url)
+        let japanese = InputSession(engine: engine, policies: AppPolicies(overrides: ["test.hold": .init(holdSpace: true)]),
+                                    converter: FakeConverter(), japaneseEnabled: true)
+        japanese.activate(app: "test.hold")
+        let field = FakeTextField()
+        for ch in "hello" { japanese.handle(.letter(ch), client: field) }
+        japanese.handle(.printable(" "), client: field)
+        #expect(field.text == "hello ")
+        japanese.handle(.cycle, client: field)
+        #expect(field.text == "へっぉ ")
+        #expect(japanese.handle(.printable(" "), client: field))
+        #expect(japanese.conversion != nil)
+        #expect(field.text == "へっぉ")
+    }
+
     @Test func otherAppsFinishTheWordOnSpace() {
         session.activate(app: "com.example.editor")
         #expect(type("dkssud ").last == false)

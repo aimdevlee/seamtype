@@ -1,4 +1,0 @@
-#!/bin/sh
-# Stop a running Seamtype so the new one is launched on the next keystroke.
-pkill -x Seamtype 2>/dev/null || true
-exit 0

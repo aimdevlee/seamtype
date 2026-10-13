@@ -18,13 +18,17 @@ public struct AppPolicy: Codable, Equatable, Sendable {
     /// Delete takes back just the space. For terminals, which can't hand a finished word back for
     /// a change. The app then never sees the Space key, so its text replacements don't fire.
     public var holdSpace: Bool
+    /// Full-width digits and spaces after Japanese (when turned on in the settings) apply here;
+    /// false keeps them half-width in this app (a terminal, a code editor).
+    public var fullWidth: Bool
 
     public init(enabled: Bool = true, conversionThreshold: Double = 0.5, escapeToApp: Bool = false,
-                holdSpace: Bool = false) {
+                holdSpace: Bool = false, fullWidth: Bool = true) {
         self.enabled = enabled
         self.conversionThreshold = conversionThreshold
         self.escapeToApp = escapeToApp
         self.holdSpace = holdSpace
+        self.fullWidth = fullWidth
     }
 
     public static let standard = AppPolicy()
@@ -39,13 +43,15 @@ public struct AppPolicy: Codable, Equatable, Sendable {
         public var conversionThreshold: Double?
         public var escapeToApp: Bool?
         public var holdSpace: Bool?
+        public var fullWidth: Bool?
 
         public init(enabled: Bool? = nil, conversionThreshold: Double? = nil, escapeToApp: Bool? = nil,
-                    holdSpace: Bool? = nil) {
+                    holdSpace: Bool? = nil, fullWidth: Bool? = nil) {
             self.enabled = enabled
             self.conversionThreshold = conversionThreshold
             self.escapeToApp = escapeToApp
             self.holdSpace = holdSpace
+            self.fullWidth = fullWidth
         }
 
         /// The keys of `policy` that differ from `base`.
@@ -53,14 +59,16 @@ public struct AppPolicy: Codable, Equatable, Sendable {
             self.init(enabled: policy.enabled == base.enabled ? nil : policy.enabled,
                       conversionThreshold: policy.conversionThreshold == base.conversionThreshold ? nil : policy.conversionThreshold,
                       escapeToApp: policy.escapeToApp == base.escapeToApp ? nil : policy.escapeToApp,
-                      holdSpace: policy.holdSpace == base.holdSpace ? nil : policy.holdSpace)
+                      holdSpace: policy.holdSpace == base.holdSpace ? nil : policy.holdSpace,
+                      fullWidth: policy.fullWidth == base.fullWidth ? nil : policy.fullWidth)
         }
 
         func applied(to base: AppPolicy) -> AppPolicy {
             AppPolicy(enabled: enabled ?? base.enabled,
                       conversionThreshold: conversionThreshold ?? base.conversionThreshold,
                       escapeToApp: escapeToApp ?? base.escapeToApp,
-                      holdSpace: holdSpace ?? base.holdSpace)
+                      holdSpace: holdSpace ?? base.holdSpace,
+                      fullWidth: fullWidth ?? base.fullWidth)
         }
     }
 }

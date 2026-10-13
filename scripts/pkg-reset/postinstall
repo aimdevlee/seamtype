@@ -1,0 +1,13 @@
+#!/bin/sh
+# The installer's optional "Reset settings and learned words" (Customize): a clean reinstall.
+# Runs after Seamtype's own postinstall has stopped the old process; stops one started since,
+# then deletes the logged-in user's ~/Library/Application Support/Seamtype. Never fails the install.
+pkill -x Seamtype 2>/dev/null || true
+i=0; while pgrep -x Seamtype >/dev/null && [ $i -lt 30 ]; do sleep 0.1; i=$((i+1)); done
+pkill -9 -x Seamtype 2>/dev/null || true
+user=$(stat -f %Su /dev/console)
+if [ -n "$user" ] && [ "$user" != root ]; then
+  home=$(dscl . -read "/Users/$user" NFSHomeDirectory 2>/dev/null | awk '{print $2}')
+  [ -n "$home" ] && rm -rf "$home/Library/Application Support/Seamtype"
+fi
+exit 0

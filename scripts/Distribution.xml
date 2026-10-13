@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- release.sh fills in @VERSION@. Customize offers a clean reinstall: the optional reset package
+     runs after Seamtype's and deletes the settings and learned words. -->
+<installer-gui-script minSpecVersion="2">
+    <title>Seamtype</title>
+    <options customize="allow" require-scripts="false" hostArchitectures="x86_64,arm64"/>
+    <domains enable_localSystem="true"/>
+    <choices-outline>
+        <line choice="seamtype"/>
+        <line choice="reset"/>
+    </choices-outline>
+    <choice id="seamtype" title="Seamtype" enabled="false" selected="true"
+            description="Installs Seamtype into /Library/Input Methods, replacing any earlier copy (also one in ~/Library/Input Methods). Settings and learned words stay. 설정과 학습한 단어는 그대로 남습니다.">
+        <pkg-ref id="com.aimdevlee.inputmethod.Seamtype.pkg"/>
+    </choice>
+    <choice id="reset" title="Reset settings and learned words · 설정과 학습한 단어 초기화" start_selected="false"
+            description="Deletes ~/Library/Application Support/Seamtype for a clean reinstall. 깨끗이 다시 설치하려면 체크하세요. ~/Library/Application Support/Seamtype을 지웁니다.">
+        <pkg-ref id="com.aimdevlee.inputmethod.Seamtype.reset"/>
+    </choice>
+    <pkg-ref id="com.aimdevlee.inputmethod.Seamtype.pkg" version="@VERSION@" onConclusion="none">Seamtype-component.pkg</pkg-ref>
+    <pkg-ref id="com.aimdevlee.inputmethod.Seamtype.reset" version="@VERSION@" onConclusion="none">Seamtype-reset.pkg</pkg-ref>
+</installer-gui-script>

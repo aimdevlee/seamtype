@@ -45,19 +45,15 @@ Input** in the input menu.
 If Seamtype isn't in the input menu, add it in **System Settings → Keyboard → Input Sources →
 Edit… → + → Korean → Seamtype**. If it isn't listed there either, log out and back in once.
 
-There are other ways too. They all install into `~/Library/Input Methods` and need no
-administrator rights.
+When a new version is out, the input menu shows **Update to Seamtype …** and **About** in the
+settings window installs it (**Check Now** checks by hand). It downloads the installer, checks its
+signature and opens it, so you only enter your password. Checks happen once a day and when the
+settings window opens; they ask GitHub only for the latest version number, and nothing you type
+is sent. Turn them off with **Check for updates automatically** in About.
 
-- One line in Terminal:
-  ```sh
-  curl -fsSL https://raw.githubusercontent.com/aimdevlee/seamtype/main/scripts/get.sh | sh
-  ```
-- Download `Seamtype.zip` (notarized) from [Releases](https://github.com/aimdevlee/seamtype/releases),
-  unzip it and move it into `~/Library/Input Methods`.
-- Build from source (Xcode or the Command Line Tools, Swift 6.1 or later): `scripts/install.sh`
-  builds, self-tests and installs it.
-
-Using the pkg together with another way gives you two copies of the input method; use only one.
+To update by hand, download the new `Seamtype.pkg` and install it the same way. It replaces the app and
+keeps your settings and learned words, with no logout or restart. For a clean reinstall, tick
+**Reset settings and learned words** under **Customize** in the installer.
 
 Seamtype takes ~50 MB of memory (plus the ~35 MB Japanese dictionary when Japanese is on) and
 ~47 MB on disk, with nothing else running. Keystrokes never leave the input method.
@@ -68,19 +64,18 @@ In the settings window, click **About → Uninstall Seamtype → Uninstall…**.
 from both Input Methods folders (macOS asks for your password if you used the pkg) and switches to
 another input source. Settings and learned words go only if you tick that in the confirmation.
 
+If Seamtype still shows in the input source list in System Settings after uninstalling, log
+out and back in once. If you reinstall and it isn't in the input menu, remove it from that list
+with − and add it again with +.
+
 <details>
 <summary>Uninstall in Terminal</summary>
 
-Remove Seamtype from the input sources, then:
+Does what the settings window does (`--delete-data` only to drop settings and learned words too):
 
 ```sh
-pkill -x Seamtype
-rm -rf ~/Library/Input\ Methods/Seamtype.app
-rm -rf ~/Library/Application\ Support/Seamtype   # only to drop settings and learned words
+"/Library/Input Methods/Seamtype.app/Contents/MacOS/Seamtype" --uninstall --delete-data
 ```
-
-If you installed the pkg, the app is in `/Library/Input Methods/Seamtype.app`. Remove it with
-`sudo rm -rf`, and its receipt with `sudo pkgutil --forget com.aimdevlee.inputmethod.Seamtype.pkg`.
 
 </details>
 
@@ -93,6 +88,7 @@ While a word is being typed it is underlined and shows the language Seamtype exp
 | letters | extend the word | extend the phrase (kana preview) |
 | **Esc** | switch reading: English → English+particle → Korean → Japanese | same |
 | **⇧Esc** | switch reading, in every app (where Esc is set to go to the app) | same |
+| **Right ⌥** (tapped on its own) | same as ⇧Esc; apps ignore it, so it never closes a window or clears input the way an Esc can (a setting can make it ⌥Space or right ⇧) | same |
 | Delete | English: the last letter. Korean: the syllable being typed jamo by jamo, earlier ones whole (한국 → 한구 → 한ㄱ → 한 → gone, as the system's 2-set does) | one kana at a time (かんこく → かんこ) |
 | **Space** | commit, then a space | **convert to kanji** (candidate window) |
 | `, . ? !` and other symbols | commit, then the key | join the phrase, full-width: 、。？！ （）＿ 「」(`[ ]`) ・(`/`) 〜(`~`) |
@@ -121,16 +117,21 @@ for きょうはいいてんきですね) commits that part and keeps converting
 ### Undo after commit, and learning
 
 Right after a word is committed with Space or punctuation, **Esc** switches it to its next reading,
-and pressing it again keeps cycling (⇧Esc where Esc goes to the app). Any other key ends the
-chance. This needs the caret still right after the word and an app that lets Seamtype read the text
-there; otherwise the key goes to the app.
+and pressing it again keeps cycling (⇧Esc where Esc goes to the app). Deleting the space or
+punctuation first keeps that chance; any other key ends it. This needs the caret still right after
+the word and an app that lets Seamtype read the text there; otherwise Esc goes to the app. ⇧Esc with
+nothing to change does nothing and never reaches the app.
 
-In an app that can't hand a committed word back, such as a terminal, turn on **Hold the word after
-Space** for that app (`holdSpace` in `apps.json`). The word then stays underlined with its space
-until the first letter of the next word, so Esc (or ⇧Esc) still switches its reading and Delete takes
-back just the space: Space pressed before looking, then Delete and ⇧Esc, still changes the word.
-Return, Tab, punctuation and shortcuts finish the word as before. The app never gets the Space key,
-so its text replacements don't fire there.
+Chromium-based apps such as Claude's desktop app or Slack also see an Esc the input method took, so
+they may close their window or cancel the input while the word changes. There, tap **right ⌥** on its
+own instead (or ⌥Space or right ⇧, chosen as the language switch key in settings): it changes the word exactly as Esc does, and apps don't react to it.
+
+In an app that doesn't report the text at the caret, so a committed word can't be changed (a
+terminal), turn on **Hold the word after Space** for that app (`holdSpace` in `apps.json`). Space
+then doesn't end the word but puts the space inside the underline too. While underlined it is the
+word being typed: Esc (⇧Esc) changes it, Delete deletes (the space first), and starting the next
+word puts it in with its space. Return only confirms it, as on any underlined word, so press it
+again to run a command; the app never gets the Space key, so its text replacements don't fire.
 
 A correction changes only that word, so a stray Esc doesn't stick. Correct the same keys the same
 way a second time and Seamtype remembers it; switching a word back to Seamtype's own guess forgets
@@ -141,7 +142,7 @@ it.
 A shortcut in System Settings → Keyboard → Text Replacements that reads as Korean or Japanese
 (`주소`, `ㅈㅅ`, `よろ`) shows in that language whatever the guess, so the app replaces it on Space as
 it does with the system's input. English shortcuts are decided as usual. A Japanese shortcut's
-phrase is the first candidate on Space. The app does the replacing, so apps without text
+phrase is the first candidate on Space, and a shortcut entered more than once offers every phrase in turn. The app does the replacing, so apps without text
 replacement (terminals, Chrome…) only get the Japanese candidate. Edits to the list apply the next
 time a text field becomes active. Enter a Japanese shortcut as its hiragana reading (`よろ`, `ぐー`).
 
@@ -213,11 +214,15 @@ You can edit it by hand; missing keys keep the default.
 | `japanese` | **off** | Detect romaji Japanese and convert it. |
 | `liveConversion` | off | While you type a Japanese phrase, show its top kanji candidate (`今日はいい天気でs`); Return commits it as shown. Like macOS Live Conversion. |
 | `returnConfirmsOnly` | on | Return on an underlined word only confirms it. Off, the app gets that Return too (a Japanese phrase is still only confirmed). |
+| `switchKey` | `"rightOption"` | The key that switches the reading of the word being typed or just typed, like ⇧Esc: `"rightOption"` (right ⌥ tapped alone), `"optionSpace"` (⌥Space), `"rightShift"` (right ⇧ tapped alone) or `"off"` (Esc and ⇧Esc only). |
 | `rightCommandPause` | on | A right ⌘ tap pauses Seamtype in the text field (see [Pause](#pause)). |
+| `fullWidthDigits` | off | Numbers after Japanese come out full-width (`１２３`, `０３－１２３４` in addresses and phone numbers), underlined, with Space offering `123` (half-width) or conversions like `三月`. |
+| `fullWidthSpace` | off | Space after Japanese types a full-width space (`　`). ⇧Space types the other width (full-width while this is off). |
+| `japaneseEngine` | `"apple"` | Kanji conversion: `"apple"` uses the engine of macOS's Japanese input, `"azooKey"` the AzooKey converter in the app. |
 
 With live conversion, Space opens the candidate window at the next candidate, and Esc shows the
 kana (Esc again switches language). Short readings only change into kanji (`と` stays `と`, `私`
-converts). The top candidate is right for about 4 in 5 short phrases and 2 in 3 whole sentences
+converts). The top candidate is right for about 4 in 5 short phrases and 3 in 4 whole sentences
 ([held-out results](#held-out-results)), so glance before Return. Conversion takes 8–21 ms a
 keystroke.
 
@@ -236,7 +241,8 @@ from it. No app is listed unless you list it.
 | `enabled` | `true` | `false` passes every key through (plain English). |
 | `conversionThreshold` | `0.5` | Convert away from the typed letters only when at least this sure. `0.97` (Strict) keeps short shell commands from turning into Hangul in a terminal; `0.5` converts more Korean when you write prose. |
 | `escapeToApp` | `false` | Esc goes to the app, and ⇧Esc switches readings (for editors). |
-| `holdSpace` | `false` | Space doesn't finish the word: it stays underlined with its space until the next word starts, so Esc still switches it and Delete takes back just the space. For terminals, which can't give a finished word back; the app never sees the Space key, so text replacements don't fire. |
+| `holdSpace` | `false` | Space puts the space inside the underline instead of ending the word. Like a word being typed, Esc changes it and Delete deletes; the next word puts it in with its space. For terminals, which can't change a committed word; Return only confirms it, and text replacements don't fire. |
+| `fullWidth` | `true` | `false` keeps numbers and spaces half-width in this app whatever the full-width settings say (terminals, code editors). |
 
 After editing these files by hand, restart the input method: `pkill -x Seamtype`.
 
@@ -275,9 +281,13 @@ Locally, in this order. A keystroke's preview takes at most ~3 ms and a word's f
      which is someone switching language.
    - A known English word needs a clear Japanese win before it turns into kana.
 
-Kanji come from [AzooKey](https://github.com/azooKey/AzooKeyKanaKanjiConverter)'s dictionary
-converter, reranked by a character trigram model of written Japanese. AzooKey also learns from
-what you pick.
+Kanji come from the conversion engine of macOS's Japanese input (libmecabra), with the top
+candidate re-picked by a character trigram model of written Japanese. So variant kanji like `髙`
+(`たか`, `たかはし` → `髙橋`), English spellings of names (`とぅいっち` → `Twitch`) and completions
+of a partial reading (`ゆーちゅ` → `YouTube`, after the top candidate) come up as in the system's
+input. Seamtype remembers what you pick for each reading and puts it first next time. The engine is
+private to macOS, so where it can't be loaded the app's own
+[AzooKey](https://github.com/azooKey/AzooKeyKanaKanjiConverter) dictionary converter stands in.
 
 ### Held-out results
 
@@ -304,10 +314,10 @@ held-out score. Many remaining misses are genuinely ambiguous keys: `so`/내, `g
 
 Kanji conversion, top candidate exactly matching the original text (held-out Tatoeba):
 
-| | AzooKey alone | + reranking | correct one in the list |
-| --- | --- | --- | --- |
-| 2–3 word phrases | 69.5% | **81.0%** | 96.2% |
-| whole sentences | 56.0% | **66.0%** | 82.2% |
+| | macOS engine | + reranking | correct one in the list | AzooKey + reranking |
+| --- | --- | --- | --- | --- |
+| 2–3 word phrases | 74.5% | **81.0%** | 96.2% | 81.0% |
+| whole sentences | 71.2% | **74.0%** | 91.5% | 67.2% |
 
 Exact match counts kana/kanji style differences (ひとまとめ vs 一まとめ) as misses.
 
@@ -325,8 +335,8 @@ Exact match counts kana/kanji style differences (ひとまとめ vs 一まとめ
 
 ```sh
 swift test                     # tests: composers, engines, sessions, settings, end to end
-scripts/install.sh             # build, self-test and install into ~/Library/Input Methods
-scripts/typing-test/run.sh     # real key events into TextEdit through the installed Seamtype
+scripts/install.sh             # build, self-test and install into ~/Library/Input Methods (development; stops if the pkg's copy is there)
+scripts/typing-test/run.sh     # real key events into the settings window's typing pane through the installed Seamtype
 swift scripts/make-readme-logo.swift docs/media  # the README logo (animated SVG)
 scripts/release.sh             # universal (arm64 + x86_64) zip and pkg for a release; with a Developer ID also signed and notarized (app and pkg)
 tools/prepare.sh               # accuracy (downloads word lists, Tatoeba and SCOWL once)
@@ -350,7 +360,8 @@ Seamtype is MIT licensed ([LICENSE](LICENSE)). The app carries the licenses of e
 or copied into it in `Contents/Resources/ThirdPartyNotices.txt`, collected by
 `scripts/build-app.sh`.
 
-- AzooKey Kana-Kanji Converter: MIT; its dictionary: Apache-2.0.
+- Kanji conversion: the Japanese engine that ships with macOS, loaded at runtime (not bundled).
+- AzooKey Kana-Kanji Converter (the stand-in): MIT; its dictionary: Apache-2.0.
 - Tatoeba sentences (kana and written-Japanese models, Korean syllable and word counts;
   evaluation): CC-BY 2.0 FR, https://tatoeba.org.
 - English words and how common they are: [SCOWL](http://wordlist.aspell.net) (permissive,

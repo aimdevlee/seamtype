@@ -43,18 +43,14 @@ Hello, worldhasaishonopuroguramudesu␣.           →  Hello, worldは最初の
 입력 메뉴에 Seamtype이 없으면 **시스템 설정 → 키보드 → 입력 소스 → 편집… → + → 한국어 → Seamtype**을
 추가하세요. 그래도 없으면 한 번 로그아웃했다가 다시 로그인하세요.
 
-다른 방법도 있습니다. 모두 `~/Library/Input Methods`에 설치하고, 관리자 권한이 필요 없습니다.
+새 버전이 나오면 입력 메뉴에 **Seamtype … 로 업데이트…**가 생기고, 설정 창의 **정보**에서 설치할 수
+있습니다(**지금 확인**으로 직접 확인도 됩니다). 설치 파일을 받아 서명을 확인한 뒤 설치 프로그램을 열어 주므로
+암호만 넣으면 됩니다. 확인은 하루 한 번과 설정 창을 열 때 하며, GitHub에 최신 버전 번호만 물어볼 뿐 입력한
+내용은 보내지 않습니다. 정보의 **업데이트 자동 확인**으로 끌 수 있습니다.
 
-- 터미널에서 한 줄로:
-  ```sh
-  curl -fsSL https://raw.githubusercontent.com/aimdevlee/seamtype/main/scripts/get.sh | sh
-  ```
-- [Releases](https://github.com/aimdevlee/seamtype/releases)의 `Seamtype.zip`(공증됨)을 받아 압축을 풀고
-  `~/Library/Input Methods`에 넣기
-- 소스에서 빌드(Xcode 또는 Command Line Tools, Swift 6.1 이상): `scripts/install.sh`가 빌드하고 자체
-  점검한 뒤 설치합니다.
-
-pkg와 다른 방법을 함께 쓰면 같은 입력기가 두 개 생깁니다. 하나만 쓰세요.
+업데이트할 때도 새 `Seamtype.pkg`를 받아 그대로 설치하면 됩니다. 앱만 바꾸고 설정과 학습한 단어는
+남기며, 로그아웃이나 재시동은 필요 없습니다. 깨끗이 다시 설치하려면 설치 프로그램의 **사용자화**에서
+**설정과 학습한 단어 초기화**를 체크하세요.
 
 메모리는 ~50 MB(일본어를 켜면 일본어 사전 ~35 MB 추가), 앱 크기는 ~47 MB이고, 따로 실행되는 프로그램은
 없습니다. 입력한 키는 입력기 밖으로 나가지 않습니다.
@@ -65,19 +61,18 @@ pkg와 다른 방법을 함께 쓰면 같은 입력기가 두 개 생깁니다. 
 (pkg로 설치했다면 macOS가 암호를 묻습니다), 다른 입력 소스로 바꿉니다. 설정과 학습한 단어는 확인 창에서
 체크했을 때만 지웁니다.
 
+제거한 뒤 시스템 설정의 입력 소스 목록에 Seamtype이 남아 보이면, 한 번 로그아웃했다가 다시 로그인하면
+사라집니다. 제거한 뒤 다시 설치했는데 입력 메뉴에 없으면 그 목록에서 Seamtype을 −로 뺐다가 +로 다시
+추가하세요.
+
 <details>
 <summary>터미널에서 지우기</summary>
 
-입력 소스 목록에서 Seamtype을 뺀 뒤:
+설정 창과 같은 일을 합니다(`--delete-data`는 설정과 학습한 단어까지 지울 때만):
 
 ```sh
-pkill -x Seamtype
-rm -rf ~/Library/Input\ Methods/Seamtype.app
-rm -rf ~/Library/Application\ Support/Seamtype   # 설정과 학습한 단어까지 지울 때만
+"/Library/Input Methods/Seamtype.app/Contents/MacOS/Seamtype" --uninstall --delete-data
 ```
-
-pkg로 설치했다면 앱은 `/Library/Input Methods/Seamtype.app`에 있습니다. `sudo rm -rf`로 지우고,
-`sudo pkgutil --forget com.aimdevlee.inputmethod.Seamtype.pkg`로 설치 기록도 지우세요.
 
 </details>
 
@@ -90,6 +85,7 @@ pkg로 설치했다면 앱은 `/Library/Input Methods/Seamtype.app`에 있습니
 | 글자 | 단어를 이어서 침 | 구절을 이어서 침 (가나로 미리 보기) |
 | **Esc** | 읽기 바꾸기: 영어 → 영어+조사 → 한국어 → 일본어 | 같음 |
 | **⇧Esc** | 읽기 바꾸기, 모든 앱에서 (Esc를 앱에 넘기도록 한 앱에서도) | 같음 |
+| **오른쪽 ⌥** (단독으로 눌렀다 떼기) | ⇧Esc와 같음. 앱은 이 키를 무시하므로 Esc처럼 창을 닫거나 입력을 지우지 않음 (설정에서 ⌥Space나 오른쪽 ⇧로 바꿀 수 있음) | 같음 |
 | Delete | 영어: 마지막 글자 지우기. 한국어: 치고 있는 글자는 자모 하나씩, 그 앞 글자는 한 글자씩 (한국 → 한구 → 한ㄱ → 한 → 지움, 시스템 두벌식과 같음) | 가나 한 글자씩 (かんこく → かんこ) |
 | **Space** | 확정, 그리고 띄어쓰기 | **한자로 변환** (후보 창) |
 | `, . ? !` 등 기호 | 확정, 그리고 그 키 | 구절에 붙어 전각으로: 、。？！ （）＿ 「」(`[ ]`) ・(`/`) 〜(`~`) |
@@ -118,14 +114,20 @@ pkg로 설치했다면 앱은 `/Library/Input Methods/Seamtype.app`에 있습니
 ### 확정한 뒤에 고치기와 학습
 
 Space나 문장부호로 단어를 확정한 직후 **Esc**를 누르면 그 단어가 다음 읽기로 바뀌고, 더 누르면 계속
-돌아갑니다(Esc를 앱에 넘기는 앱에서는 ⇧Esc). 다른 키를 하나라도 누르면 고칠 수 없습니다. 커서가 그 단어
-바로 뒤에 있고 앱이 그 자리의 글자를 알려 줄 때만 되며, 아니면 키가 앱으로 갑니다.
+돌아갑니다(Esc를 앱에 넘기는 앱에서는 ⇧Esc). Delete로 공백이나 문장부호를 지운 뒤에도 바꿀 수 있지만, 그 밖의
+키를 하나라도 누르면 고칠 수 없습니다. 커서가 그 단어 바로 뒤에 있고 앱이 그 자리의 글자를 알려 줄 때만
+되며, 아니면 Esc는 앱으로 갑니다. ⇧Esc는 바꿀 단어가 없으면 아무 일도 하지 않고 앱에 가지 않습니다.
 
-터미널처럼 확정한 단어를 되돌릴 수 없는 앱에서는 앱별 설정에서 **Space 뒤에도 단어 유지**를 켜세요
-(`apps.json`의 `holdSpace`). Space를 눌러도 단어가 공백과 함께 밑줄 상태로 남아 있다가 다음 단어의 첫
-글자에서 들어가므로, 그동안 Esc(또는 ⇧Esc)로 읽기를 바꿀 수 있고 Delete는 공백만 되돌립니다. 보지 않고
-Space를 눌렀다가 Delete, ⇧Esc를 눌러도 단어가 바뀝니다. Return·Tab·문장부호·단축키는 지금처럼 단어를
-확정합니다. 앱이 Space 키를 받지 않으므로 그 앱에서는 텍스트 대치가 동작하지 않습니다.
+Claude 데스크톱이나 Slack 같은 Chromium 기반 앱은 입력기가 가져간 Esc도 따로 받아서, 단어를 바꾸는 동시에
+창을 닫거나 입력을 취소하기도 합니다. 이런 앱에서는 **오른쪽 ⌥**를 단독으로 눌렀다 떼세요(설정의 언어 바꾸기 키에서 ⌥Space나 오른쪽 ⇧로 바꿀 수 있습니다). Esc와 똑같이
+단어를 바꾸고, 앱은 이 키에 반응하지 않습니다.
+
+터미널처럼 커서 자리의 글자를 알려 주지 않아 확정한 단어를 고칠 수 없는 앱에서는 앱별 설정에서
+**Space 뒤에도 단어 유지**를 켜세요(`apps.json`의 `holdSpace`). Space가 단어를 끝내지 않고 공백까지 밑줄
+안에 넣습니다. 밑줄 친 동안은 치는 중인 단어와 같아서 Esc(⇧Esc)로 바꾸고 Delete로 지울 수 있으며(먼저
+공백이 지워집니다), 다음 단어를 치기 시작하면 공백과 함께 들어갑니다. Return은 다른 밑줄 친 단어처럼 확정만
+하므로 명령을 실행하려면 한 번 더 누르고, 앱이 Space 키를 받지 않으므로 그 앱에서는 텍스트 대치가 동작하지
+않습니다.
 
 한 번 고친 것은 그 단어에만 적용되므로 실수로 누른 Esc는 남지 않습니다. 같은 키를 같은 쪽으로 두 번
 고치면 그때부터 기억하고, Seamtype이 처음 고른 쪽으로 되돌리면 잊습니다.
@@ -134,7 +136,8 @@ Space를 눌렀다가 Delete, ⇧Esc를 눌러도 단어가 바뀝니다. Return
 
 시스템 설정 → 키보드 → 텍스트 대치에 넣은 약어 중 한국어·일본어로 읽히는 것(`주소`, `ㅈㅅ`, `よろ`)은
 판단과 상관없이 그 언어로 보여서, Space를 치면 앱이 시스템 입력기에서처럼 바꿉니다. 영어 약어는 원래대로
-판단합니다. 일본어 약어는 Space를 누르면 대치할 문구가 첫 후보로 나옵니다. 바꾸는 건 앱이라, 텍스트 대치를
+판단합니다. 일본어 약어는 Space를 누르면 대치할 문구가 첫 후보로 나오고, 같은 약어를 여러 번 넣었다면 문구가 모두
+차례로 나옵니다. 바꾸는 건 앱이라, 텍스트 대치를
 지원하지 않는 앱(터미널, Chrome 등)에서는 일본어 후보 말고는 바뀌지 않습니다. 목록을 고치면 다음에 입력창을
 누를 때 반영됩니다. 일본어 약어는 히라가나 읽기로 넣으세요(`よろ`, `ぐー`).
 
@@ -180,7 +183,7 @@ Vim(8.2 이상, `+job`)은 [`scripts/vim/seamtype.vim`](scripts/vim/seamtype.vim
 입력 메뉴(Seamtype을 고른 상태의 메뉴 막대)에서 할 수 있는 것:
 - 이 입력창에서 일시정지(오른쪽 ⌘와 같음)
 - 지금 앞에 있는 앱의 단어 변환 켜고 끄기, 그 앱의 변환 기준(보통·엄격하게), Esc 키(앱으로), Space 뒤에도 단어 유지 정하기, 그
-  앱을 기본 설정으로 되돌리기. 단어 변환이 꺼져 있으면 변환 기준과 Esc 키는 흐리게 나옵니다
+  앱을 기본 설정으로 되돌리기. 단어 변환이 꺼져 있으면 이 항목들은 흐리게 나옵니다
 - 일본어 입력과 라이브 변환 켜고 끄기
 - 마지막으로 학습한 단어 되돌리기, 입력해 보기, 기억한 단어, 설정 창 열기
 
@@ -202,11 +205,15 @@ Vim(8.2 이상, `+job`)은 [`scripts/vim/seamtype.vim`](scripts/vim/seamtype.vim
 | `japanese` | **꺼짐** | 로마자 일본어를 알아보고 변환합니다. |
 | `liveConversion` | 꺼짐 | 일본어 구절을 치는 동안 가장 앞선 한자 후보를 보여 주고(`今日はいい天気でs`), Return을 누르면 보이는 대로 확정합니다. macOS의 실시간 변환과 같습니다. |
 | `returnConfirmsOnly` | 켜짐 | 밑줄 친 단어에서 누른 Return은 확정만 합니다. 끄면 앱도 그 Return을 받습니다(일본어 구절은 그대로 확정만). |
+| `switchKey` | `"rightOption"` | 치는 중이거나 방금 친 단어의 읽기를 ⇧Esc처럼 바꾸는 키. `"rightOption"`(오른쪽 ⌥ 단독), `"optionSpace"`(⌥Space), `"rightShift"`(오른쪽 ⇧ 단독), `"off"`(Esc·⇧Esc만). |
 | `rightCommandPause` | 켜짐 | 오른쪽 ⌘를 단독으로 눌러 일시정지합니다([일시정지](#일시정지) 참고). |
+| `fullWidthDigits` | 꺼짐 | 일본어 뒤의 숫자를 전각으로 씁니다(`１２３`, 주소·전화번호의 `０３－１２３４`). 밑줄 친 채 남고 Space로 `123`(반각)이나 `三月` 같은 변환을 고릅니다. |
+| `fullWidthSpace` | 꺼짐 | 일본어 뒤의 Space를 전각 공백(`　`)으로 씁니다. ⇧Space는 설정과 반대 폭의 공백을 넣습니다(꺼져 있으면 전각). |
+| `japaneseEngine` | `"apple"` | 한자 변환 엔진. `"apple"`은 macOS 일본어 입력기의 엔진을, `"azooKey"`는 앱에 든 AzooKey를 씁니다. |
 
 라이브 변환에서 Space는 다음 후보부터 후보 창을 열고, Esc는 가나를 보여 줍니다(한 번 더 누르면 언어를
 바꿉니다). 짧은 읽기는 한자로만 바뀝니다(`と`는 그대로, `私`는 변환). 맨 앞 후보는 짧은 구절 5개 중 4개,
-문장 전체 3개 중 2개꼴로 맞으니([평가 결과](#평가-결과-학습에-쓰지-않은-데이터)) Return 전에 한번
+문장 전체 4개 중 3개꼴로 맞으니([평가 결과](#평가-결과-학습에-쓰지-않은-데이터)) Return 전에 한번
 확인하세요. 변환은 키마다 8–21 ms 걸립니다.
 
 앱별 동작은 같은 폴더의 `apps.json`에 있습니다. `"*"`는 모든 앱의 기본값이고, 앱(번들 ID, `.`으로 끝나는
@@ -224,7 +231,8 @@ Vim(8.2 이상, `+job`)은 [`scripts/vim/seamtype.vim`](scripts/vim/seamtype.vim
 | `enabled` | `true` | `false`면 모든 키를 그대로 넘깁니다(영어만 입력). |
 | `conversionThreshold` | `0.5` | 이만큼 확신할 때만 친 영문을 다른 글자로 바꿉니다. `0.97`(엄격하게)은 터미널에서 짧은 셸 명령이 한글로 바뀌지 않게 하고, `0.5`는 글을 쓸 때 한국어를 더 많이 바꿉니다. |
 | `escapeToApp` | `false` | Esc는 앱으로 가고, ⇧Esc로 읽기를 바꿉니다(편집기용). |
-| `holdSpace` | `false` | Space를 눌러도 단어를 확정하지 않고 공백과 함께 밑줄 상태로 두었다가, 다음 단어의 첫 글자에서 들어갑니다. 그동안 Esc로 읽기를 바꿀 수 있고 Delete는 공백만 되돌립니다. 확정한 단어를 고칠 수 없는 터미널용이며, 앱이 Space 키를 받지 않아 텍스트 대치는 동작하지 않습니다. |
+| `holdSpace` | `false` | Space가 단어를 끝내지 않고 공백까지 밑줄 안에 넣습니다. 치는 중인 단어처럼 Esc로 바꾸고 Delete로 지울 수 있고, 다음 단어를 치면 공백과 함께 들어갑니다. 확정한 단어를 고칠 수 없는 터미널용이며, Return은 확정만 하고 텍스트 대치는 동작하지 않습니다. |
+| `fullWidth` | `true` | `false`면 이 앱에서는 전각 숫자·공백 설정을 따르지 않고 반각으로 씁니다(터미널, 코드 편집기용). |
 
 파일을 직접 고친 뒤에는 입력기를 다시 시작하세요: `pkill -x Seamtype`.
 
@@ -261,8 +269,12 @@ Vim(8.2 이상, `+job`)은 [`scripts/vim/seamtype.vim`](scripts/vim/seamtype.vim
      기울이는 정도를 줄입니다.
    - 아는 영어 단어는 일본어가 분명히 이길 때만 가나로 바뀝니다.
 
-한자는 [AzooKey](https://github.com/azooKey/AzooKeyKanaKanjiConverter)의 사전 변환기에서 나오고,
-일본어 문어 글자 3-그램 모델로 순서를 다시 매깁니다. AzooKey는 사용자가 고른 후보도 학습합니다.
+한자는 macOS 일본어 입력기가 쓰는 변환 엔진(libmecabra)에서 나오고, 일본어 문어 글자 3-그램 모델로
+맨 앞 후보를 다시 고릅니다. 그래서 `髙` 같은 이체자(`たか`, `たかはし` → `髙橋`), 고유명사의 영어
+표기(`とぅいっち` → `Twitch`), 읽기 앞부분으로 고르는 예측 후보(`ゆーちゅ` → `YouTube`, 맨 앞 후보
+다음)가 기본 입력기처럼 나옵니다. 고른 후보는 Seamtype이 읽기별로 기억해 다음에 맨 앞에 둡니다. 이
+엔진은 공개되지 않은 macOS 내부 기능이라, 불러오지 못하는 macOS에서는 앱에 든
+[AzooKey](https://github.com/azooKey/AzooKeyKanaKanjiConverter) 사전 변환기를 대신 씁니다.
 
 ### 평가 결과 (학습에 쓰지 않은 데이터)
 
@@ -289,10 +301,10 @@ SCOWL 목록, 한국어 단어 목록, 언어 전환을 고려한 기울기를 �
 
 한자 변환에서 맨 앞 후보가 원문과 정확히 같은 비율입니다(학습에 쓰지 않은 Tatoeba 문장).
 
-| | AzooKey만 | + 순서 재조정 | 후보 목록 안에 정답 |
-| --- | --- | --- | --- |
-| 2–3단어 구절 | 69.5% | **81.0%** | 96.2% |
-| 문장 전체 | 56.0% | **66.0%** | 82.2% |
+| | macOS 엔진 | + 순서 재조정 | 후보 목록 안에 정답 | AzooKey + 순서 재조정 |
+| --- | --- | --- | --- | --- |
+| 2–3단어 구절 | 74.5% | **81.0%** | 96.2% | 81.0% |
+| 문장 전체 | 71.2% | **74.0%** | 91.5% | 67.2% |
 
 정확히 같아야 맞은 것으로 세므로, 가나·한자 표기 차이(ひとまとめ와 一まとめ)도 틀린 것으로 칩니다.
 
@@ -310,8 +322,8 @@ SCOWL 목록, 한국어 단어 목록, 언어 전환을 고려한 기울기를 �
 
 ```sh
 swift test                     # 테스트: 조합기, 엔진, 세션, 설정, 처음부터 끝까지
-scripts/install.sh             # 빌드하고 자체 점검한 뒤 ~/Library/Input Methods에 설치
-scripts/typing-test/run.sh     # 설치된 Seamtype으로 TextEdit에 실제 키 입력
+scripts/install.sh             # 빌드하고 자체 점검한 뒤 ~/Library/Input Methods에 설치(개발용; pkg 사본이 있으면 멈춤)
+scripts/typing-test/run.sh     # 설치된 Seamtype으로 설정 창의 입력해 보기 칸에 실제 키 입력
 swift scripts/make-readme-logo.swift docs/media  # README 로고(애니메이션 SVG)
 scripts/release.sh             # 릴리스용 범용(arm64 + x86_64) zip과 pkg; Developer ID가 있으면 서명·공증(앱과 pkg 모두)
 tools/prepare.sh               # 정확도 (단어 목록, Tatoeba, SCOWL을 처음 한 번 내려받음)
@@ -334,7 +346,8 @@ printf 'きょうはいいてんきですね\n' | swift run seamtype-cli --conve
 Seamtype은 MIT 라이선스입니다([LICENSE](LICENSE)). 앱에 컴파일되거나 복사된 모든 것의 라이선스는
 `Contents/Resources/ThirdPartyNotices.txt`에 들어 있고, `scripts/build-app.sh`가 모읍니다.
 
-- AzooKey Kana-Kanji Converter: MIT, 사전: Apache-2.0.
+- 한자 변환: macOS에 들어 있는 일본어 변환 엔진을 실행할 때 불러 씁니다(앱에 포함하지 않음).
+- AzooKey Kana-Kanji Converter(대신 쓰는 변환기): MIT, 사전: Apache-2.0.
 - Tatoeba 문장(가나·일본어 문어 모델, 한국어 음절·단어 빈도, 평가): CC-BY 2.0 FR, https://tatoeba.org.
 - 영어 단어와 빈도: [SCOWL](http://wordlist.aspell.net) (자유 라이선스, 고지는 앱에 포함).
   macOS의 `/usr/share/dict/words`로 실행할 때 글자 3-그램을 학습합니다.

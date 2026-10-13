@@ -43,23 +43,29 @@ if [[ -n ${SEAMTYPE_NOTARY_PROFILE:-} ]]; then
   rm $out/notarize.zip
 fi
 
-# Not relocatable: the installer must not "upgrade" a copy it finds elsewhere (a development
-# install in ~/Library/Input Methods) instead of installing into /Library/Input Methods.
+# The payload goes to a staging folder and the postinstall syncs it into /Library/Input Methods:
+# PackageKit would swap the bundle for a new folder, which imklaunchagent can't launch from until
+# the user logs out. Not relocatable: the installer must not "upgrade" a copy it finds elsewhere
+# (the installed one, or a development install in ~/Library/Input Methods) in place.
 cp -R "$app" $out/root/
 pkgbuild --analyze --root $out/root $out/component.plist | grep -v '^pkgbuild: ' || true
 plutil -replace 0.BundleIsRelocatable -bool false $out/component.plist
-pkgbuild --root $out/root --component-plist $out/component.plist --install-location "/Library/Input Methods" \
+pkgbuild --root $out/root --component-plist $out/component.plist --install-location "/Library/Application Support/Seamtype/Install" \
   --scripts scripts/pkg --identifier com.aimdevlee.inputmethod.Seamtype.pkg --version "$version" \
   $out/Seamtype-component.pkg | grep -v '^pkgbuild: ' || true
 pkg=$out/Seamtype-$version.pkg
 # An array: zsh would pass ${…:+--sign "$name"} as one word, which productbuild rejects.
 pkgsign=()
 [[ -n ${SEAMTYPE_PKG_SIGN:-} ]] && pkgsign=(--sign "$SEAMTYPE_PKG_SIGN" --timestamp)
-productbuild --package $out/Seamtype-component.pkg $pkgsign $pkg | grep -v '^productbuild: ' || true
+# The optional clean reinstall (Customize → Reset settings and learned words): scripts only.
+pkgbuild --nopayload --scripts scripts/pkg-reset --identifier com.aimdevlee.inputmethod.Seamtype.reset \
+  --version "$version" $out/Seamtype-reset.pkg | grep -v '^pkgbuild: ' || true
+sed "s/@VERSION@/$version/g" scripts/Distribution.xml > $out/Distribution.xml
+productbuild --distribution $out/Distribution.xml --package-path $out $pkgsign $pkg | grep -v '^productbuild: ' || true
 # pkgbuild registered the staged copy with LaunchServices; like build-app.sh, unregister it so
 # macOS never picks it when it launches the input method.
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -u "$out/root/Seamtype.app" 2>/dev/null || true
-rm -rf $out/root $out/component.plist $out/Seamtype-component.pkg
+rm -rf $out/root $out/component.plist $out/Seamtype-component.pkg $out/Seamtype-reset.pkg $out/Distribution.xml
 
 # The zip keeps the signature and its sealed resources intact (ditto, not zip).
 ditto -c -k --keepParent "$app" $out/Seamtype-$version.zip
@@ -70,5 +76,7 @@ if [[ -n ${SEAMTYPE_NOTARY_PROFILE:-} ]]; then
   xcrun stapler staple $pkg
 fi
 cp $pkg $out/Seamtype.pkg
+[[ -z ${SEAMTYPE_APP_SIGN:-} ]] &&
+  echo "warning: ad-hoc app: Gatekeeper rejects it once installed from the pkg (it is selected but never starts); try installs with scripts/install.sh"
 echo "built $out/Seamtype-$version.zip, $out/Seamtype.zip, $pkg, $out/Seamtype.pkg"
 echo "  (${SEAMTYPE_APP_SIGN:-ad-hoc app}, ${SEAMTYPE_PKG_SIGN:-unsigned pkg}${SEAMTYPE_NOTARY_PROFILE:+, notarized})"

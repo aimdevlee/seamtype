@@ -13,16 +13,37 @@ public struct Settings: Codable, Equatable, Sendable {
     public var liveConversion: Bool = false
     /// A right ⌘ tap pauses Seamtype in the text field (keys go through as typed).
     public var rightCommandPause: Bool = true
+    /// The key that switches the word being typed, or the one just committed, to its next
+    /// reading, like ⇧Esc, but one no app acts on (Chromium apps also see an Esc the input
+    /// method took, and close their window).
+    public var switchKey: SwitchKey = .rightOption
     /// Return on an underlined word only confirms it, like a Japanese IME; off, the app gets the
     /// Return too (a Japanese phrase is still only confirmed).
     public var returnConfirmsOnly: Bool = true
+    /// Once a day, ask GitHub for the latest release's version (nothing else is sent), and offer
+    /// it in the input menu and About when it is newer.
+    public var checkForUpdates: Bool = true
+    /// Kanji conversion: "apple", macOS's own Japanese engine (AzooKey where it can't be loaded),
+    /// or "azooKey".
+    public var japaneseEngine: String = "apple"
+    /// With Japanese on: digits after Japanese text are part of it, full-width (１２３); Space offers 123.
+    public var fullWidthDigits: Bool = false
+    /// With Japanese on: a space after Japanese text is full-width (⇧Space types the other width).
+    public var fullWidthSpace: Bool = false
 
     public init(japanese: Bool = false, liveConversion: Bool = false, rightCommandPause: Bool = true,
-                returnConfirmsOnly: Bool = true) {
+                switchKey: SwitchKey = .rightOption,
+                returnConfirmsOnly: Bool = true, checkForUpdates: Bool = true, japaneseEngine: String = "apple",
+                fullWidthDigits: Bool = false, fullWidthSpace: Bool = false) {
+        self.fullWidthDigits = fullWidthDigits
+        self.fullWidthSpace = fullWidthSpace
         self.japanese = japanese
         self.liveConversion = liveConversion
         self.rightCommandPause = rightCommandPause
+        self.switchKey = switchKey
         self.returnConfirmsOnly = returnConfirmsOnly
+        self.checkForUpdates = checkForUpdates
+        self.japaneseEngine = japaneseEngine
     }
 
     public init(from decoder: Decoder) throws {
@@ -30,7 +51,14 @@ public struct Settings: Codable, Equatable, Sendable {
         japanese = try c.decodeIfPresent(Bool.self, forKey: .japanese) ?? false
         liveConversion = try c.decodeIfPresent(Bool.self, forKey: .liveConversion) ?? false
         rightCommandPause = try c.decodeIfPresent(Bool.self, forKey: .rightCommandPause) ?? true
+        // An unknown value (a later version's key) falls back to the default.
+        let switchName = try? c.decodeIfPresent(String.self, forKey: .switchKey)
+        switchKey = switchName.flatMap { $0 }.flatMap { SwitchKey(rawValue: $0) } ?? .rightOption
         returnConfirmsOnly = try c.decodeIfPresent(Bool.self, forKey: .returnConfirmsOnly) ?? true
+        checkForUpdates = try c.decodeIfPresent(Bool.self, forKey: .checkForUpdates) ?? true
+        japaneseEngine = try c.decodeIfPresent(String.self, forKey: .japaneseEngine) ?? "apple"
+        fullWidthDigits = try c.decodeIfPresent(Bool.self, forKey: .fullWidthDigits) ?? false
+        fullWidthSpace = try c.decodeIfPresent(Bool.self, forKey: .fullWidthSpace) ?? false
     }
 
     public static var storeURL: URL? {
@@ -54,4 +82,16 @@ public struct Settings: Codable, Equatable, Sendable {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: url, options: .atomic)
     }
+}
+
+/// What switches the word's language besides Esc and ⇧Esc (`Settings.switchKey`).
+public enum SwitchKey: String, Codable, CaseIterable, Sendable {
+    /// Right ⌥ pressed and released on its own.
+    case rightOption
+    /// ⌥Space (which otherwise types a no-break space).
+    case optionSpace
+    /// Right ⇧ pressed and released on its own.
+    case rightShift
+    /// Only Esc and ⇧Esc.
+    case off
 }

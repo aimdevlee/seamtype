@@ -3,7 +3,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 Seamtype is a macOS InputMethodKit input method: the user types on QWERTY and Seamtype decides per
-word whether it is English, Korean (2-set) or Japanese romaji (kanji through AzooKey). README.md
+word whether it is English, Korean (2-set) or Japanese romaji (kanji through macOS's own engine, AzooKey where it can't be loaded). README.md
 (Korean, the main one) and README.en.md (English) cover the keys, settings files, accuracy numbers
 and data licenses; read one before changing behavior users see, and keep both in step. The website,
 https://nyttastudio.com/seamtype/ (Korean only), lives in `seamtype/` of the nyttastudio/nyttastudio.com
@@ -16,13 +16,15 @@ swift build                                  # debug build of everything
 swift test                                   # all tests (Swift Testing, ~7 s)
 swift test --filter MixedWordTests           # one suite; --filter 'MixedWordTests/splitsEnglishPlusParticle' for one test
 scripts/install.sh                           # release build + --selftest, install to ~/Library/Input Methods, enable, restart menu agent
+                                             # (asks reinstall/clean/uninstall when already installed and a tty exists;
+                                             #  --reinstall | --clean | --uninstall [--delete-data] to choose)
 scripts/release.sh                           # universal build → build/release/Seamtype{,-<version>}.{zip,pkg}
                                              # (SEAMTYPE_APP_SIGN / SEAMTYPE_PKG_SIGN / SEAMTYPE_NOTARY_PROFILE: Developer ID, notarization)
 swift run seamtype-cli -v "dkssud hello"     # English/Korean decision with scores
 printf 'keys\tprevious\n' | swift run seamtype-cli --decide --japanese   # previous: english|korean|japanese|empty
-printf 'きょうは\n' | swift run seamtype-cli --convert                    # AzooKey candidates
+printf 'きょうは\n' | swift run seamtype-cli --convert                    # AzooKey candidates (SEAMTYPE_ENGINE=apple: macOS's)
 tools/prepare.sh [--models]                  # held-out accuracy (downloads into tools/data, gitignored)
-scripts/typing-test/run.sh                   # real key events into TextEdit through the installed app
+scripts/typing-test/run.sh                   # real key events into the settings window's typing pane through the installed app
 /usr/bin/log show --last 10m --predicate 'subsystem == "com.aimdevlee.inputmethod.Seamtype"' --info --debug
 ```
 
@@ -131,10 +133,42 @@ runtime.
   `SEAMTYPE_NOTARY_PROFILE=seamtype`, or the assets come out ad hoc and unsigned. Upload
   `Seamtype.pkg` (the website's download button) and `Seamtype.zip` (`scripts/get.sh`) under those
   names for `releases/latest/download/`, plus the versioned copies.
+  Pushing a `v<version>` tag that matches `Resources/Info.plist` runs `.github/workflows/release.yml`,
+  which does the same with the certificates and notary credentials from the repo secrets and leaves
+  a draft release with the four assets; write the notes and publish it by hand.
   `SEAMTYPE_ZIP=build/release/Seamtype.zip sh scripts/get.sh` tries the zip locally. The pkg installs
-  into `/Library/Input Methods` and is not relocatable; its postinstall runs `Seamtype --register` as
-  the logged-in user (users have no Swift toolchain, so registration can't use the scripts).
+  into `/Library/Input Methods` and is not relocatable. Its payload lands in
+  `/Library/Application Support/Seamtype/Install` and the postinstall rsyncs it into the existing
+  bundle: a bundle PackageKit swaps for a new folder leaves imklaunchagent failing to launch it
+  (`LaunchInputMethod() Error, status=-50`) until the user logs out. Then the postinstall runs
+  `lsregister -f` and `Seamtype --register` as the logged-in user, until `Seamtype --registered`
+  sees the source (users have no Swift toolchain, so registration can't use the scripts).
   `release.sh` signs the app with the hardened runtime even ad hoc, and `build-app.sh` runs the
   self-test under Rosetta too for a universal build.
+- **Reinstalling** (the pattern of vChewing's installer): put the new bundle in place first, then
+  stop Seamtype (SIGTERM, wait, SIGKILL, wait); stopping it earlier only lets macOS start the old
+  code again. Then the new copy's `--register` (`Registration.swift`) unregisters other copies from
+  LaunchServices and registers/enables the source only if macOS doesn't list/enable it yet.
+  Don't kill `imklaunchagent` (every app that was typing loses all input methods until it
+  restarts), and don't start Seamtype yourself (`open`): apps that held the old process report its
+  endpoint invalid and the new one's endpoint is dropped with it, so keys go nowhere.
+  `--uninstall [--delete-data]` runs `Uninstaller` for the scripts. The pkg's postinstall also
+  removes the console user's `~/Library/Input Methods` copy; its Customize pane offers a clean
+  reinstall (`scripts/Distribution.xml`, the payload-free `scripts/pkg-reset` package).
+- **Updates** (`Updater.swift`, `Release.swift`): the IME checks GitHub's latest release once a day
+  (and the settings window on open and on Check Now); the result is shared through the bundle's
+  user defaults. Install downloads `Seamtype.pkg`, requires `pkgutil --check-signature` to show
+  the Developer ID Installer of team 2UZ65T3U82 and notarization, then opens it in Installer. So
+  a release must keep the `Seamtype.pkg` asset name and a `v<version>` tag.
+  To try an update before publishing (drafts aren't visible to it), point the check at a file in
+  GitHub's format: `defaults write com.aimdevlee.inputmethod.Seamtype updateFeed file:///…/latest.json`
+  (its `browser_download_url` may be a file URL to a signed pkg); `defaults delete … updateFeed` after.
+- **One install method while developing:** `scripts/install.sh` (ad hoc, `~/Library`) or a signed
+  pkg (`/Library`), not both. After trying a pkg, run its copy's `--uninstall` before going back to
+  `install.sh`; without a terminal `install.sh` refuses to install while the pkg's copy is there
+  (two copies are one input method twice). Never install an ad-hoc pkg (`release.sh` without
+  `SEAMTYPE_APP_SIGN`): Gatekeeper rejects a copy the installer put down, so it is selectable but
+  never starts. A move between the two folders, or an uninstall, drops the input source; re-add it
+  in System Settings (− then +) or log out.
 - **Stale registrations:** extra copies of the app registered with LaunchServices (`build/`,
   the old `AutoIME.app`) can make macOS launch the wrong one. `build-app.sh` unregisters its copy.

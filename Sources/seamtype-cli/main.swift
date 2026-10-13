@@ -17,9 +17,12 @@ case "--compose":
     }
     exit(0)
 case "--convert":
-    // kana per line → top candidates (smoke test for the AzooKey dictionary)
+    // kana per line → top candidates (SEAMTYPE_ENGINE=apple for macOS's engine, else AzooKey)
     MainActor.assumeIsolated {
-        guard let converter = AzooKeyConverter() else { print("no Japanese dictionary found"); exit(1) }
+        let apple = ProcessInfo.processInfo.environment["SEAMTYPE_ENGINE"] == "apple"
+        guard let converter: JapaneseConverter = apple ? AppleJapaneseConverter(learning: nil) : AzooKeyConverter() else {
+            print("no Japanese converter"); exit(1)
+        }
         while let kana = readLine() {
             let start = Date()
             let candidates = converter.candidates(for: kana)
@@ -34,11 +37,19 @@ case "--convert-all":
         // Fresh, learning-free memory so evaluation isn't affected by earlier runs.
         let memory = FileManager.default.temporaryDirectory.appendingPathComponent("seamtype-eval-\(UUID().uuidString)")
         let nBest = ProcessInfo.processInfo.environment["SEAMTYPE_NBEST"].flatMap(Int.init) ?? 20
-        guard let converter = AzooKeyConverter(memory: memory, nBest: nBest) else { print("no Japanese dictionary found"); exit(1) }
-        // Optional: --convert-all <rerank weight | none>
-        if args.count > 1 { converter.rerankWeight = Double(args[1]) }
+        let weight = args.count > 1 ? Double(args[1]) : 1.0 // optional: --convert-all <rerank weight | none>
+        let converter: JapaneseConverter
+        if ProcessInfo.processInfo.environment["SEAMTYPE_ENGINE"] == "apple" {
+            guard let apple = AppleJapaneseConverter(learning: nil) else { print("macOS's engine not available"); exit(1) }
+            apple.rerankWeight = weight
+            converter = apple
+        } else {
+            guard let azooKey = AzooKeyConverter(memory: memory, nBest: nBest) else { print("no Japanese dictionary found"); exit(1) }
+            azooKey.rerankWeight = weight
+            converter = azooKey
+        }
         while let kana = readLine() {
-            let full = converter.candidates(for: kana).filter { $0.kanaCount == kana.count }
+            let full = converter.candidates(for: kana).filter { $0.kanaCount == kana.count && !$0.isPrediction }
             print(full.map(\.text).joined(separator: "\t"))
         }
     }

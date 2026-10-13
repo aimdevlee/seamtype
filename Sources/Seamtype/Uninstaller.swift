@@ -111,7 +111,7 @@ enum Uninstaller {
     }
 
     /// What to type with once Seamtype is gone: ABC or U.S. if enabled, else any other.
-    private static func fallbackSource() -> TISInputSource? {
+    static func fallbackSource() -> TISInputSource? {
         let others = sources(installedToo: false).filter {
             property($0, kTISPropertyBundleID) != SeamtypeSource.id
                 && property($0, kTISPropertyInputSourceCategory) == kTISCategoryKeyboardInputSource as String
@@ -130,7 +130,7 @@ enum Uninstaller {
         TISGetInputSourceProperty(source, key).map { Unmanaged<CFString>.fromOpaque($0).takeUnretainedValue() as String }
     }
 
-    private static func launch(_ path: String, _ arguments: [String]) {
+    static func launch(_ path: String, _ arguments: [String]) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: path)
         process.arguments = arguments

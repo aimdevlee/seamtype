@@ -1,14 +1,59 @@
 #!/bin/sh
-# Register the input method for the logged-in user (the installer runs this as root) and
-# refresh the input menu. Adding it in System Settings → Keyboard → Input Sources may still
-# be needed; never fail the install over it.
+# The payload lands in a staging folder, not in /Library/Input Methods: PackageKit swaps a bundle
+# it upgrades for a new folder, and imklaunchagent, which had seen the old one, then fails to
+# launch Seamtype (LaunchInputMethod -50) until the user logs out. So the files are synced into
+# the existing Seamtype.app here, each written aside and renamed over the old one (the folder
+# stays, and a running Seamtype keeps its old files). A first install just moves it into place.
+#
+# The old Seamtype keeps running while that happens (no preinstall stops it: macOS would only
+# start the old code again). Stop it after, then register the new copy for the logged-in user (the
+# installer runs this as root) and refresh the input menu. Adding it in System Settings →
+# Keyboard → Input Sources may still be needed; never fail the install.
+staged="/Library/Application Support/Seamtype/Install/Seamtype.app"
 app="/Library/Input Methods/Seamtype.app"
+if [ -d "$staged" ]; then
+  if [ -d "$app" ]; then
+    # --checksum: a file of the same size and time must still be compared.
+    rsync -a --delete --checksum "$staged/" "$app/"
+  else
+    mkdir -p "/Library/Input Methods"
+    mv "$staged" "$app"
+  fi
+  rm -rf "/Library/Application Support/Seamtype/Install"
+  rmdir "/Library/Application Support/Seamtype" 2>/dev/null || true
+fi
+# SIGTERM, then SIGKILL whatever is left, and wait until it is gone (as vChewing's installer does):
+# a Seamtype still running would keep the old code, and registering may start one.
+pkill -x Seamtype 2>/dev/null || true
+i=0; while pgrep -x Seamtype >/dev/null && [ $i -lt 30 ]; do sleep 0.1; i=$((i+1)); done
+pkill -9 -x Seamtype 2>/dev/null || true
+i=0; while pgrep -x Seamtype >/dev/null && [ $i -lt 30 ]; do sleep 0.1; i=$((i+1)); done
 user=$(stat -f %Su /dev/console)
 if [ -n "$user" ] && [ "$user" != root ]; then
   uid=$(id -u "$user")
-  launchctl asuser "$uid" sudo -u "$user" "$app/Contents/MacOS/Seamtype" --register || true
-  launchctl asuser "$uid" sudo -u "$user" killall TextInputMenuAgent 2>/dev/null || true
+  as_user() { launchctl asuser "$uid" sudo -u "$user" "$@"; }
+  lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+  # Let LaunchServices take in the changed bundle first: left to --register, the update ran
+  # asynchronously beside its TISRegisterInputSource, failed, and the source was gone after.
+  as_user "$lsregister" -f "$app" 2>/dev/null || true
+  # Then register until a fresh process sees the source (its list is cached per process).
+  i=0
+  while [ $i -lt 10 ]; do
+    as_user "$app/Contents/MacOS/Seamtype" --register || true
+    as_user "$app/Contents/MacOS/Seamtype" --registered && break
+    sleep 1; i=$((i+1))
+  done
+  # A copy get.sh or install.sh put in ~/Library/Input Methods is the same input method twice, and
+  # macOS may launch that one: the package's copy replaces it (settings live elsewhere and stay).
+  # Only after registering this copy: removed first, it takes the input source (and the user's
+  # choice to use it) with it, and Seamtype is gone from the input menu until it is added again.
+  home=$(dscl . -read "/Users/$user" NFSHomeDirectory 2>/dev/null | awk '{print $2}')
+  if [ -n "$home" ] && [ -d "$home/Library/Input Methods/Seamtype.app" ]; then
+    as_user "$lsregister" -u "$home/Library/Input Methods/Seamtype.app" 2>/dev/null || true
+    rm -rf "$home/Library/Input Methods/Seamtype.app"
+  fi
+  as_user killall TextInputMenuAgent 2>/dev/null || true
   # The switch indicator by the caret keeps the icon it read first (they ignore SIGTERM).
-  launchctl asuser "$uid" sudo -u "$user" killall -KILL CursorUIViewService TextInputSwitcher 2>/dev/null || true
+  as_user killall -KILL CursorUIViewService TextInputSwitcher 2>/dev/null || true
 fi
 exit 0

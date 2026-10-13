@@ -1,0 +1,83 @@
+# On a v<version> tag: scripts/release.sh with the Developer ID (signed, notarized, stapled), then
+# a draft release with Seamtype{,-<version>}.{zip,pkg}. Write the notes and publish it by hand;
+# the updater only sees published releases.
+#
+# Secrets:
+#   DEVELOPER_ID_APP_P12, DEVELOPER_ID_INSTALLER_P12   base64 of each exported .p12
+#   P12_PASSWORD                                       the password the .p12 files were exported with
+#   NOTARY_APPLE_ID, NOTARY_PASSWORD                   Apple ID and an app-specific password
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+    env:
+      SEAMTYPE_APP_SIGN: "Developer ID Application: Dongbin Lee (2UZ65T3U82)"
+      SEAMTYPE_PKG_SIGN: "Developer ID Installer: Dongbin Lee (2UZ65T3U82)"
+      SEAMTYPE_NOTARY_PROFILE: seamtype
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag against Info.plist
+        run: |
+          version=$(plutil -extract CFBundleShortVersionString raw Resources/Info.plist)
+          [[ "$GITHUB_REF_NAME" == "v$version" ]] || { echo "tag $GITHUB_REF_NAME, Info.plist $version"; exit 1; }
+
+      - name: Keychain with the Developer ID certificates and notary credentials
+        env:
+          APP_P12: ${{ secrets.DEVELOPER_ID_APP_P12 }}
+          PKG_P12: ${{ secrets.DEVELOPER_ID_INSTALLER_P12 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
+          NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
+        run: |
+          keychain=$RUNNER_TEMP/release.keychain-db
+          password=$(uuidgen)
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          for p12 in APP_P12 PKG_P12; do
+            echo "${!p12}" | base64 --decode > "$RUNNER_TEMP/$p12.p12"
+            security import "$RUNNER_TEMP/$p12.p12" -k "$keychain" -P "$P12_PASSWORD" \
+              -T /usr/bin/codesign -T /usr/bin/productbuild -T /usr/bin/pkgbuild
+            rm "$RUNNER_TEMP/$p12.p12"
+          done
+          security set-key-partition-list -S apple-tool:,apple: -k "$password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          # release.sh calls notarytool --keychain-profile without --keychain: it reads the default one.
+          security default-keychain -d user -s "$keychain"
+          xcrun notarytool store-credentials "$SEAMTYPE_NOTARY_PROFILE" \
+            --apple-id "$NOTARY_APPLE_ID" --team-id 2UZ65T3U82 --password "$NOTARY_PASSWORD"
+          security find-identity -v -p codesigning "$keychain"
+
+      # build-app.sh runs the self-test of the Intel half under Rosetta.
+      - run: /usr/bin/pgrep -q oahd || softwareupdate --install-rosetta --agree-to-license
+
+      - run: scripts/release.sh
+
+      - name: Verify the signatures
+        run: |
+          codesign --verify --strict --deep build/Seamtype.app
+          spctl --assess --type execute build/Seamtype.app
+          pkgutil --check-signature build/release/Seamtype.pkg
+          spctl --assess --type install build/release/Seamtype.pkg
+
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          gh release create "$GITHUB_REF_NAME" --draft --title "Seamtype $version" --notes "" \
+            build/release/Seamtype.pkg build/release/Seamtype.zip \
+            build/release/Seamtype-$version.pkg build/release/Seamtype-$version.zip
+
+      - name: Remove the keychain
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/release.keychain-db" || true

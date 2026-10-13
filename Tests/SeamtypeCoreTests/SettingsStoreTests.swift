@@ -26,6 +26,17 @@ import Testing
         #expect(!Settings.load(from: url).returnConfirmsOnly)
     }
 
+    @Test func switchKeyIsRightOptionUnlessChosen() throws {
+        let url = dir.appendingPathComponent("settings.json")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try Data(#"{ "japanese": true }"#.utf8).write(to: url)
+        #expect(Settings.load(from: url).switchKey == .rightOption)
+        try Settings(switchKey: .optionSpace).save(to: url)
+        #expect(Settings.load(from: url).switchKey == .optionSpace)
+        try Data(#"{ "switchKey": "capsLock" }"#.utf8).write(to: url) // unknown: the default
+        #expect(Settings.load(from: url).switchKey == .rightOption)
+    }
+
     @Test func settingsSaveKeepsUnknownKeys() throws {
         let url = dir.appendingPathComponent("settings.json")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

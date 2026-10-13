@@ -32,6 +32,11 @@ public enum RomajiComposer {
             let c = chars[i]
             let next: Character? = i + 1 < chars.count ? chars[i + 1] : nil
 
+            // Digits are full-width, and so is the punctuation inside a number (０３－１２３４, ３．５).
+            if let full = fullWidthDigits[c] { emit(full); i += 1; continue }
+            if i > 0, chars[i - 1].isASCII, chars[i - 1].isNumber, let full = numberPunctuation[c] {
+                emit(full); i += 1; continue
+            }
             if c == "n" {
                 if let next {
                     if next == "'" { emit("ん"); i += 2; continue }
@@ -118,6 +123,13 @@ public enum RomajiComposer {
 
     /// What the symbols become, except ー, which is part of a word (らーめん) rather than punctuation.
     public static let punctuation: Set<Character> = Set(symbols.values.compactMap(\.first)).subtracting(["ー"])
+
+    /// 0–9 as ０–９, for a Japanese phrase with a number in it.
+    static let fullWidthDigits: [Character: String] = Dictionary(uniqueKeysWithValues: (0...9).map {
+        (Character(String($0)), String(UnicodeScalar(0xFF10 + UInt32($0))!))
+    })
+    /// After a digit, - . , / belong to the number (addresses, phone numbers, dates), not ー。、・.
+    static let numberPunctuation: [Character: String] = ["-": "－", ".": "．", ",": "，", "/": "／"]
 
     static let vowels: Set<Character> = ["a", "i", "u", "e", "o"]
     static let consonants: Set<Character> = Set("bcdfghjklmpqrstvwxyz")
