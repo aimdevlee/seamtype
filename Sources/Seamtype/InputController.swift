@@ -160,8 +160,9 @@ final class InputController: IMKInputController {
             return
         }
         if event.modifierFlags.contains(.option) {
-            let others = event.modifierFlags.intersection([.command, .control, .shift])
-            rightOptionDown = others.isEmpty ? Date() : nil
+            // Other modifiers may come with it: a right ⌥ remapped as a Hyper key (Karabiner)
+            // reports ⌃⌥⇧⌘ at once. A key pressed with it still makes it a shortcut (keyDown).
+            rightOptionDown = Date()
             return
         }
         guard let down = rightOptionDown, Date().timeIntervalSince(down) < 0.5 else { return }
