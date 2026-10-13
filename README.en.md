@@ -88,7 +88,7 @@ While a word is being typed it is underlined and shows the language Seamtype exp
 | letters | extend the word | extend the phrase (kana preview) |
 | **Esc** | switch reading: English → English+particle → Korean → Japanese | same |
 | **⇧Esc** | switch reading, in every app (where Esc is set to go to the app) | same |
-| **Right ⌥** (tapped on its own) | same as ⇧Esc; apps ignore it, so it never closes a window or clears input the way an Esc can | same |
+| **Right ⌥** (tapped on its own) | same as ⇧Esc; apps ignore it, so it never closes a window or clears input the way an Esc can (a setting can make it ⌥Space or right ⇧) | same |
 | Delete | English: the last letter. Korean: the syllable being typed jamo by jamo, earlier ones whole (한국 → 한구 → 한ㄱ → 한 → gone, as the system's 2-set does) | one kana at a time (かんこく → かんこ) |
 | **Space** | commit, then a space | **convert to kanji** (candidate window) |
 | `, . ? !` and other symbols | commit, then the key | join the phrase, full-width: 、。？！ （）＿ 「」(`[ ]`) ・(`/`) 〜(`~`) |
@@ -124,7 +124,7 @@ nothing to change does nothing and never reaches the app.
 
 Chromium-based apps such as Claude's desktop app or Slack also see an Esc the input method took, so
 they may close their window or cancel the input while the word changes. There, tap **right ⌥** on its
-own instead: it changes the word exactly as Esc does, and apps don't react to it.
+own instead (or ⌥Space or right ⇧, chosen as the language switch key in settings): it changes the word exactly as Esc does, and apps don't react to it.
 
 A correction changes only that word, so a stray Esc doesn't stick. Correct the same keys the same
 way a second time and Seamtype remembers it; switching a word back to Seamtype's own guess forgets
@@ -207,7 +207,7 @@ You can edit it by hand; missing keys keep the default.
 | `japanese` | **off** | Detect romaji Japanese and convert it. |
 | `liveConversion` | off | While you type a Japanese phrase, show its top kanji candidate (`今日はいい天気でs`); Return commits it as shown. Like macOS Live Conversion. |
 | `returnConfirmsOnly` | on | Return on an underlined word only confirms it. Off, the app gets that Return too (a Japanese phrase is still only confirmed). |
-| `rightOptionSwitches` | on | A right ⌥ tap switches the reading of the word being typed or just typed, like ⇧Esc. |
+| `switchKey` | `"rightOption"` | The key that switches the reading of the word being typed or just typed, like ⇧Esc: `"rightOption"` (right ⌥ tapped alone), `"optionSpace"` (⌥Space), `"rightShift"` (right ⇧ tapped alone) or `"off"` (Esc and ⇧Esc only). |
 | `rightCommandPause` | on | A right ⌘ tap pauses Seamtype in the text field (see [Pause](#pause)). |
 | `fullWidthDigits` | off | Numbers after Japanese come out full-width (`１２３`, `０３－１２３４` in addresses and phone numbers), underlined, with Space offering `123` (half-width) or conversions like `三月`. |
 | `fullWidthSpace` | off | Space after Japanese types a full-width space (`　`). ⇧Space types the other width (full-width while this is off). |

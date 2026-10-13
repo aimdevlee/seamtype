@@ -109,8 +109,12 @@
 "Keys" = "키";
 "Return only confirms" = "Return은 확정만";
 "Return on an underlined English or Korean word confirms it; press it again for a new line or to send. Off, the app gets that Return too. Japanese is always only confirmed." = "밑줄 친 영어·한국어 단어에서 누른 Return은 확정만 합니다. 줄바꿈이나 전송은 한 번 더 누르세요. 끄면 그 Return도 앱에 갑니다. 일본어는 항상 확정만 합니다.";
-"Right ⌥ changes the language" = "오른쪽 ⌥로 언어 바꾸기";
-"Tap right ⌥ on its own to switch the word you're typing, or the one just typed, like ⇧Esc. Apps ignore it, so it never closes a window or clears what you wrote." = "오른쪽 ⌥만 눌렀다 떼면 치는 중이거나 방금 친 단어를 ⇧Esc처럼 다른 언어로 바꿉니다. 앱은 이 키를 무시하므로 창이 닫히거나 쓰던 글이 지워지지 않습니다.";
+"Language switch key" = "언어 바꾸기 키";
+"Switches the word you're typing, or the one just typed, like ⇧Esc. Apps ignore it, so unlike Esc it never closes a window or clears what you wrote." = "치는 중이거나 방금 친 단어를 ⇧Esc처럼 다른 언어로 바꿉니다. 앱은 이 키를 무시하므로 Esc와 달리 창이 닫히거나 쓰던 글이 지워지지 않습니다.";
+"Right ⌥ tap" = "오른쪽 ⌥ 단독";
+"⌥Space" = "⌥Space";
+"Right ⇧ tap" = "오른쪽 ⇧ 단독";
+"None (Esc only)" = "없음 (Esc만)";
 "Right ⌘ pauses" = "오른쪽 ⌘로 일시정지";
 "Tap right ⌘ on its own and keys go through as typed in that text field, for hjkl in terminal programs. Tap again, or move to another field, to resume." = "오른쪽 ⌘만 눌렀다 떼면 그 입력창에서는 키가 친 그대로 갑니다. 터미널 프로그램의 hjkl 같은 곳에 씁니다. 한 번 더 누르거나 다른 입력창으로 가면 다시 켜집니다.";
 "Undo Last Learned (%@)" = "마지막 학습 취소 (%@)";
