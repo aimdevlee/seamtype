@@ -81,7 +81,7 @@ func runSettingsApp(tab: SettingsTab) -> Never {
     let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(model: model)))
     window.title = L("Seamtype Settings")
     window.styleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
-    window.setContentSize(NSSize(width: 860, height: 640))
+    window.setContentSize(NSSize(width: 960, height: 640))
     window.center()
     let delegate = SettingsAppDelegate()
     app.delegate = delegate
@@ -432,7 +432,7 @@ struct SettingsView: View {
             }
             .navigationTitle(model.tab.title)
         }
-        .frame(width: 860, height: 640)
+        .frame(width: 960, height: 640) // wide enough for the Apps pane's four columns
     }
 }
 
@@ -454,7 +454,7 @@ private struct GeneralPane: View {
                 }
                 Toggle(isOn: binding(\.japanese)) {
                     Text(L("Japanese"))
-                    Text(L("Romaji becomes kana; Space converts to kanji."))
+                    Text(L("Off by default. Turn on to type Japanese with romaji; Space converts to kanji."))
                 }
             }
             if model.settings.japanese {
@@ -725,6 +725,14 @@ private struct AppRowView: View {
                     model.setEntry(for: row.id) { $0.switchKeys = value }
                 }
                 .frame(width: AppColumns.switchKeys, alignment: .leading)
+                // Per app only, for terminals: in "*" it would turn off text replacements everywhere.
+                FieldMenu(own: row.entry.holdSpace.map(holdSpaceName),
+                          inherited: holdSpaceName(defaultPolicy.holdSpace),
+                          choices: [(holdSpaceName(false), false), (holdSpaceName(true), true)]) { value in
+                    model.setEntry(for: row.id) { $0.holdSpace = value }
+                }
+                .help(L("Hold: Space puts the space inside the underline, so the word can still be changed until the next word starts. For terminals."))
+                .frame(width: AppColumns.space, alignment: .leading)
             }
             .disabled(!(row.entry.enabled ?? defaultPolicy.enabled))
         }
@@ -759,9 +767,13 @@ private struct ChoiceRow<Choice: View>: View {
 /// Column widths shared by the exceptions' header and rows.
 private enum AppColumns {
     static let conversion: CGFloat = 130
-    static let switchKeys: CGFloat = 230
+    static let switchKeys: CGFloat = 190
+    static let space: CGFloat = 112
     static let enabled: CGFloat = 100
 }
+
+/// What Space does to the word in an app (`AppPolicy.holdSpace`), as the Apps column shows it.
+private func holdSpaceName(_ holds: Bool) -> String { holds ? L("Hold") : L("Finish") }
 
 /// Names the exceptions' columns after the default settings above them.
 private struct AppColumnsHeader: View {
@@ -771,6 +783,7 @@ private struct AppColumnsHeader: View {
             Text(L("Convert words")).frame(width: AppColumns.enabled, alignment: .leading)
             Text(L("Conversion")).frame(width: AppColumns.conversion, alignment: .leading)
             Text(L("Switch keys")).frame(width: AppColumns.switchKeys, alignment: .leading)
+            Text(L("After Space")).frame(width: AppColumns.space, alignment: .leading)
         }
         .font(.caption).foregroundStyle(.secondary).lineLimit(1)
         .accessibilityHidden(true)

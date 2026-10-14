@@ -4,37 +4,39 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>Seamtype</string>
+	<key>CFBundleExecutable</key>
+	<string>Seamtype</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.aimdevlee.inputmethod.Seamtype</string>
 	<key>CFBundleLocalizations</key>
 	<array>
 		<string>en</string>
 		<string>ko</string>
 	</array>
-	<key>CFBundleExecutable</key>
-	<string>Seamtype</string>
-	<key>CFBundleIdentifier</key>
-	<string>com.aimdevlee.inputmethod.Seamtype</string>
 	<key>CFBundleName</key>
-	<string>Seamtype</string>
-	<key>CFBundleDisplayName</key>
 	<string>Seamtype</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.9</string>
+	<string>0.1.10</string>
 	<key>CFBundleVersion</key>
-	<string>10</string>
-	<key>LSMinimumSystemVersion</key>
-	<string>13.0</string>
-	<key>LSBackgroundOnly</key>
-	<true/>
-	<key>LSUIElement</key>
-	<true/>
-	<key>NSPrincipalClass</key>
-	<string>NSApplication</string>
+	<string>11</string>
 	<key>InputMethodConnectionName</key>
 	<string>com.aimdevlee.inputmethod.Seamtype_Connection</string>
 	<key>InputMethodServerControllerClass</key>
 	<string>SeamtypeInputController</string>
+	<key>LSBackgroundOnly</key>
+	<true/>
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+	<key>TISIconIsTemplate</key>
+	<true/>
 	<key>TISInputSourceID</key>
 	<string>com.aimdevlee.inputmethod.Seamtype</string>
 	<key>TISIntendedLanguage</key>
@@ -46,7 +48,5 @@
 	</array>
 	<key>tsInputMethodIconFileKey</key>
 	<string>Seamtype.tiff</string>
-	<key>TISIconIsTemplate</key>
-	<true/>
 </dict>
 </plist>

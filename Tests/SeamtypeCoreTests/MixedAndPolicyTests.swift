@@ -85,6 +85,21 @@ let splitting = SplittingEngine(base: sharedEngine, english: sharedEngine.englis
         #expect(policies.policy(for: "com.apple.Terminal") == AppPolicy(switchKeys: [.escape]))
         #expect(policies.apps == ["com.example.Game", "com.mitchellh.ghostty"])
     }
+
+    /// Holding the word after Space is an app's own choice, and only that key is written for it.
+    @Test func holdSpaceIsPerApp() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("seamtype-apps-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try Data(#"{"com.mitchellh.ghostty": {"holdSpace": true}}"#.utf8).write(to: url)
+        var policies = AppPolicies.load(from: url)
+        #expect(policies.policy(for: "com.mitchellh.ghostty") == AppPolicy(holdSpace: true))
+        #expect(policies.policy(for: "com.apple.TextEdit") == .standard)
+        policies.set(AppPolicy(holdSpace: true), for: "com.apple.Terminal")
+        #expect(policies.overrides["com.apple.Terminal"] == AppPolicy.Override(holdSpace: true))
+        // Written and read back (Override's Codable names each key).
+        try policies.save(to: url)
+        #expect(AppPolicies.load(from: url).policy(for: "com.apple.Terminal") == AppPolicy(holdSpace: true))
+    }
 }
 
 @MainActor @Suite struct SessionPolicyTests {

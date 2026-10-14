@@ -20,7 +20,7 @@
 "Korean · English" = "한국어 · 영어";
 "Always on" = "항상 켜짐";
 "Japanese" = "일본어";
-"Romaji becomes kana; Space converts to kanji." = "로마자로 치면 가나로, Space로 한자 변환.";
+"Off by default. Turn on to type Japanese with romaji; Space converts to kanji." = "기본값은 꺼짐입니다. 켜면 로마자로 일본어를 입력하고 Space로 한자를 변환합니다.";
 "Live conversion" = "라이브 변환";
 "Shows the top kanji candidate as you type." = "입력하면서 가장 앞선 한자 후보를 바로 보여 줍니다.";
 "Full-width numbers" = "전각 숫자";
@@ -39,6 +39,10 @@
 "Normal" = "보통";
 "Strict" = "엄격하게";
 "Switch keys" = "언어 바꾸기 키";
+"After Space" = "Space 뒤";
+"Hold" = "유지";
+"Finish" = "확정";
+"Hold: Space puts the space inside the underline, so the word can still be changed until the next word starts. For terminals." = "유지: Space가 공백까지 밑줄 안에 넣어, 다음 단어를 칠 때까지 단어를 바꿀 수 있습니다. 터미널용입니다.";
 "None" = "없음";
 "None — can't switch" = "없음 — 바꿀 수 없음";
 "Convert words" = "단어 변환";
@@ -89,6 +93,7 @@
 "Convert Words" = "단어 변환";
 "Conversion: Normal" = "변환 기준: 보통";
 "Conversion: Strict" = "변환 기준: 엄격하게";
+"Hold the Word After Space" = "Space 뒤에도 단어 유지";
 "Esc Switches Language" = "Esc로 언어 바꾸기";
 "Use Default Settings in This App" = "이 앱에서 기본 설정 따르기";
 "Pause in This Text Field (right ⌘)" = "이 입력창에서 일시정지 (오른쪽 ⌘)";

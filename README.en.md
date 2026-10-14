@@ -142,6 +142,13 @@ next reading, and pressing it again keeps cycling. Deleting the space or punctua
 that chance; any other key ends it. This needs the caret still right after the word and an app that
 lets Seamtype read the text there.
 
+In an app that doesn't, such as a terminal, turn on **Hold the word after Space** for that app (the
+input menu, or Apps in the settings window; `holdSpace` in `apps.json`). Space then doesn't end the
+word but puts the space inside the underline too. While underlined it is the word being typed: a
+language switch key changes it, Delete deletes (the space first), and starting the next word puts it
+in with its space. Return only confirms it, as on any underlined word, so press it again to run a
+command; the app never gets the Space key, so its text replacements don't fire.
+
 A correction changes only that word, so a stray switch doesn't stick. Correct the same keys the same
 way a second time and Seamtype remembers it; switching a word back to Seamtype's own guess forgets
 it.
@@ -194,8 +201,8 @@ quits, words are decided again at the shell.
 From the input menu (the menu bar, while Seamtype is selected) you can:
 - pause Seamtype in this text field (like right ⌘)
 - turn word conversion on or off for the app in front, set its conversion threshold
-  (Normal/Strict) and whether Esc switches languages, or drop its settings. The threshold and Esc
-  are greyed while conversion is off
+  (Normal/Strict), whether Esc switches languages and whether the word is held after Space, or drop
+  its settings. Those are greyed while conversion is off
 - turn Japanese Input and Live Conversion on or off
 - undo the last learned word, and open Try Typing, the remembered words or the settings window
 
@@ -246,6 +253,7 @@ from it. No app is listed unless you list it.
 | `enabled` | `true` | `false` passes every key through (plain English). |
 | `conversionThreshold` | `0.5` | Convert away from the typed letters only when at least this sure. `0.97` (Strict) keeps short shell commands from turning into Hangul in a terminal; `0.5` converts more Korean when you write prose. |
 | `switchKeys` | `["rightOption", "shiftEscape"]` | The keys that switch readings ([language switch keys](#language-switch-keys)): `"rightOption"` (right ⌥ tapped alone), `"optionSpace"` (⌥Space), `"rightShift"` (right ⇧ tapped alone), `"escape"` (Esc), `"shiftEscape"` (⇧Esc). A key not chosen goes to the app. 0.1.9's `escapeToApp`, and `switchKey` in settings.json, are read and carried over. |
+| `holdSpace` | `false` | Space puts the space inside the underline instead of ending the word. Like a word being typed, a switch key changes it and Delete deletes; the next word puts it in with its space. For terminals, which can't change a committed word, so set per app only (not in `"*"`); Return only confirms it, and text replacements don't fire. |
 | `fullWidth` | `true` | `false` keeps numbers and spaces half-width in this app whatever the full-width settings say (terminals, code editors). |
 
 After editing these files by hand, restart the input method: `pkill -x Seamtype`.
@@ -328,9 +336,11 @@ Exact match counts kana/kanji style differences (ひとまとめ vs 一まとめ
 ## Known limits
 
 - Never tested end to end in every app. Secure fields (passwords) bypass input methods, and undo
-  after commit needs apps that report their caret and text. A field that reaches the input method
-  but won't hold an underlined word (KakaoTalk's login password field asks for a commit on every
-  key) gets the keys as typed, with no word decided.
+  after commit needs apps that report their caret and text; in a terminal, set `"holdSpace": true`
+  to keep the word underlined after Space instead. A field that reaches the input method but won't
+  hold an underlined word (KakaoTalk's login password field asks for a commit on every key) gets
+  the keys as typed: until another field is active, no word is decided there, and Japanese
+  conversion, the switch keys, text replacement and changing a word after commit are all off.
 - Where Esc is a switch key, Esc right after a word (e.g. to close a popup) changes that word first.
   It isn't learned unless repeated; leave Esc out for such apps in the per-app settings.
 - Japanese: only the first clause is resized with ←/→ (Return commits it and moves on to the

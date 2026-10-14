@@ -31,6 +31,11 @@ public struct AppPolicy: Codable, Equatable, Sendable {
     /// The keys that switch the word's language here; the others go to the app. (Inside a vim
     /// that reports its modes, Esc is vim's whatever this says.)
     public var switchKeys: Set<SwitchKey>
+    /// Space doesn't end the word but puts the space inside the underline too. Held there, it is
+    /// still the word being typed: a switch key changes it, Delete deletes (the space first), and
+    /// the next word puts it in with its space. For terminals, which can't hand a committed word
+    /// back for a change. The app then never sees the Space key, so its text replacements don't fire.
+    public var holdSpace: Bool
     /// Full-width digits and spaces after Japanese (when turned on in the settings) apply here;
     /// false keeps them half-width in this app (a terminal, a code editor).
     public var fullWidth: Bool
@@ -38,10 +43,12 @@ public struct AppPolicy: Codable, Equatable, Sendable {
     public static let standardSwitchKeys: Set<SwitchKey> = [.rightOption, .shiftEscape]
 
     public init(enabled: Bool = true, conversionThreshold: Double = 0.5,
-                switchKeys: Set<SwitchKey> = AppPolicy.standardSwitchKeys, fullWidth: Bool = true) {
+                switchKeys: Set<SwitchKey> = AppPolicy.standardSwitchKeys, holdSpace: Bool = false,
+                fullWidth: Bool = true) {
         self.enabled = enabled
         self.conversionThreshold = conversionThreshold
         self.switchKeys = switchKeys
+        self.holdSpace = holdSpace
         self.fullWidth = fullWidth
     }
 
@@ -56,16 +63,18 @@ public struct AppPolicy: Codable, Equatable, Sendable {
         public var enabled: Bool?
         public var conversionThreshold: Double?
         public var switchKeys: Set<SwitchKey>?
+        public var holdSpace: Bool?
         public var fullWidth: Bool?
         /// 0.1.9 and earlier: true sent Esc to the app, false made it switch. Read for an entry
         /// that doesn't name `switchKeys`, as a change to the default's Esc, and kept until it does.
         var escapeToApp: Bool?
 
         public init(enabled: Bool? = nil, conversionThreshold: Double? = nil, switchKeys: Set<SwitchKey>? = nil,
-                    fullWidth: Bool? = nil) {
+                    holdSpace: Bool? = nil, fullWidth: Bool? = nil) {
             self.enabled = enabled
             self.conversionThreshold = conversionThreshold
             self.switchKeys = switchKeys
+            self.holdSpace = holdSpace
             self.fullWidth = fullWidth
         }
 
@@ -74,6 +83,7 @@ public struct AppPolicy: Codable, Equatable, Sendable {
             self.init(enabled: policy.enabled == base.enabled ? nil : policy.enabled,
                       conversionThreshold: policy.conversionThreshold == base.conversionThreshold ? nil : policy.conversionThreshold,
                       switchKeys: policy.switchKeys == base.switchKeys ? nil : policy.switchKeys,
+                      holdSpace: policy.holdSpace == base.holdSpace ? nil : policy.holdSpace,
                       fullWidth: policy.fullWidth == base.fullWidth ? nil : policy.fullWidth)
         }
 
@@ -85,11 +95,12 @@ public struct AppPolicy: Codable, Equatable, Sendable {
             return AppPolicy(enabled: enabled ?? base.enabled,
                              conversionThreshold: conversionThreshold ?? base.conversionThreshold,
                              switchKeys: keys,
+                             holdSpace: holdSpace ?? base.holdSpace,
                              fullWidth: fullWidth ?? base.fullWidth)
         }
 
         private enum CodingKeys: String, CodingKey {
-            case enabled, conversionThreshold, switchKeys, fullWidth, escapeToApp
+            case enabled, conversionThreshold, switchKeys, holdSpace, fullWidth, escapeToApp
         }
 
         public init(from decoder: Decoder) throws {
@@ -99,6 +110,7 @@ public struct AppPolicy: Codable, Equatable, Sendable {
             // A later version's key is skipped rather than failing the whole file.
             switchKeys = (try? c.decodeIfPresent([String].self, forKey: .switchKeys))
                 .flatMap { $0 }.map { Set($0.compactMap(SwitchKey.init(rawValue:))) }
+            holdSpace = try c.decodeIfPresent(Bool.self, forKey: .holdSpace)
             fullWidth = try c.decodeIfPresent(Bool.self, forKey: .fullWidth)
             escapeToApp = try? c.decodeIfPresent(Bool.self, forKey: .escapeToApp)
         }
@@ -108,6 +120,7 @@ public struct AppPolicy: Codable, Equatable, Sendable {
             try c.encodeIfPresent(enabled, forKey: .enabled)
             try c.encodeIfPresent(conversionThreshold, forKey: .conversionThreshold)
             try c.encodeIfPresent(switchKeys.map(SwitchKey.list), forKey: .switchKeys)
+            try c.encodeIfPresent(holdSpace, forKey: .holdSpace)
             try c.encodeIfPresent(fullWidth, forKey: .fullWidth)
             // The 0.1.9 key stays until the entry names its own switch keys.
             if switchKeys == nil { try c.encodeIfPresent(escapeToApp, forKey: .escapeToApp) }

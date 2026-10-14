@@ -61,7 +61,7 @@ final class InputController: IMKInputController {
             session.replacements = Runtime.shared.textReplacements
             if let last = Runtime.shared.lastVim { vimChanged(to: last.signal, from: last.app) }
             let policy = session.policy
-            log.info("activate \(app ?? "?", privacy: .public) enabled=\(policy.enabled) threshold=\(policy.conversionThreshold) switchKeys=\(SwitchKey.allCases.filter(policy.switchKeys.contains).map(\.rawValue).joined(separator: ","), privacy: .public) replacements=\(self.session.replacements.count)")
+            log.info("activate \(app ?? "?", privacy: .public) enabled=\(policy.enabled) threshold=\(policy.conversionThreshold) switchKeys=\(SwitchKey.allCases.filter(policy.switchKeys.contains).map(\.rawValue).joined(separator: ","), privacy: .public) holdSpace=\(policy.holdSpace) replacements=\(self.session.replacements.count)")
         }
     }
 
@@ -325,6 +325,8 @@ final class InputController: IMKInputController {
                     on: policy.conversionThreshold >= AppPolicy.strictThreshold, enabled: policy.enabled, indent: 2, value: app)
                 add(L("Esc Switches Language"), #selector(toggleEscapeSwitches(_:)), on: policy.switchKeys.contains(.escape),
                     enabled: policy.enabled, indent: 2, value: app)
+                add(L("Hold the Word After Space"), #selector(toggleHoldSpace(_:)), on: policy.holdSpace,
+                    enabled: policy.enabled, indent: 2, value: app)
                 if listed {
                     add(L("Use Default Settings in This App"), #selector(removeAppEntry(_:)), indent: 1, value: app)
                 }
@@ -384,6 +386,13 @@ final class InputController: IMKInputController {
             Runtime.shared.updatePolicy(for: app) {
                 if $0.switchKeys.remove(.escape) == nil { $0.switchKeys.insert(.escape) }
             }
+        }
+    }
+
+    @objc func toggleHoldSpace(_ sender: Any?) {
+        guard let app = appOf(sender) else { return }
+        MainActor.assumeIsolated {
+            Runtime.shared.updatePolicy(for: app) { $0.holdSpace.toggle() }
         }
     }
 

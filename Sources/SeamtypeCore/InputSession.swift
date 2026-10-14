@@ -26,6 +26,8 @@ public protocol TextClient: AnyObject {
 ///                  syllable being typed, then whole syllables (as the system's 2-set does);
 ///                  else the last keystroke. The word keeps its language until the next letter.
 ///   Space          English/Korean: commit, then a space. Japanese: convert to kanji
+///                  (`AppPolicy.holdSpace`: the space goes inside the underline instead, and the
+///                  word stays the word being typed until the next one starts)
 ///                  (with `fullWidthSpace`, a space after Japanese text is full-width; ⇧Space
 ///                  types the other width)
 ///   0–9            with `fullWidthDigits`, after Japanese text or inside a phrase they are part
@@ -141,6 +143,11 @@ public final class InputSession {
         didSet { if previousLanguage == nil { openBrackets.removeAll() } } // a new context
     }
     private var lastCommit: Committed?
+    /// The word was ended with Space in an app set to hold it (`AppPolicy.holdSpace`): it stays
+    /// composed, shown with its space, until the next word starts or another key finishes it. A
+    /// switch key still cycles it and Delete takes back only the space. Terminals can't give a finished word
+    /// back (Ghostty reports its mouse selection as the caret), so this keeps the word on hand.
+    private var heldSpace = false
     /// The mode vim last reported (`vimChanged`), nil when no vim is reporting. In normal mode
     /// every key goes straight through; while vim reports at all, Esc is vim's.
     private var vimMode: VimSignal?
@@ -320,6 +327,7 @@ public final class InputSession {
 
         switch key {
         case .letter(let ch):
+            if heldSpace { commit(client: client) } // the held word goes in with its space; a new word starts
             // A symbol on its own is confirmed by the next word, which is judged by itself.
             if !keys.isEmpty, keys.allSatisfy({ RomajiComposer.symbols[$0] != nil }) { commit(client: client) }
             if keys.isEmpty { // a new word
@@ -337,6 +345,12 @@ public final class InputSession {
             return true
 
         case .delete:
+            if heldSpace {
+                // Only the space comes back; the word is still there to be changed.
+                heldSpace = false
+                updatePreview(client)
+                return true
+            }
             guard !keys.isEmpty else { return false }
             let shown = forced ?? pinned ?? previewLanguage
             if forced == nil { pinned = shown }
@@ -376,6 +390,16 @@ public final class InputSession {
             return true
 
         case .printable(let ch):
+            if heldSpace {
+                // A held word is still the word being typed: Space on it in Japanese (after a switch)
+                // converts, as it would have before; the held space was never a Japanese one.
+                if ch == " ", currentLanguage() == .japanese, converter != nil {
+                    heldSpace = false
+                    startConversion(client)
+                    return true
+                }
+                commit(client: client) // the held word goes in with its space; the key follows as after any commit
+            }
             if keys.isEmpty {
                 defer { afterDigit = ch.isNumber }
                 if previousLanguage == .japanese {
@@ -415,6 +439,18 @@ public final class InputSession {
                 startSymbol(String(ch), client)
                 return true
             }
+            if ch == " ", policy.holdSpace {
+                // The word stays underlined with its space, shown as it would be committed (the
+                // whole word's decision, not the last keystroke's preview), so a switch key still
+                // changes it and Delete takes back the space. The next word commits both (see `heldSpace`).
+                let language = currentLanguage()
+                if language != .japanese {
+                    if forced == nil { pinned = language }
+                    heldSpace = true
+                    updatePreview(client)
+                    return true
+                }
+            }
             let marked = client.markedRange()
             let location = marked.location != NSNotFound ? marked.location : client.selectedRange().location
             let previous = previousLanguage
@@ -440,6 +476,7 @@ public final class InputSession {
 
         case .katakana, .hiragana:
             // Only for a Japanese phrase; otherwise ⌃K/⌃J stay the app's shortcuts.
+            if heldSpace { commit(client: client); return false } // a held word is done: the shortcut is the app's
             guard !keys.isEmpty, japaneseEnabled, forced == .japanese || previewLanguage == .japanese else {
                 commit(client: client)
                 return false
@@ -469,9 +506,11 @@ public final class InputSession {
             previousLanguage = .japanese
             return
         }
-        guard !keys.isEmpty else { return }
+        guard !keys.isEmpty else { heldSpace = false; return }
+        let space = heldSpace ? " " : "" // a word held after Space goes in with it
+        heldSpace = false
         let word = finishWord()
-        client?.insertText(word.text, replacing: nil)
+        client?.insertText(word.text + space, replacing: nil)
     }
 
     /// Commits what's in progress after the caret was moved elsewhere (a click; the app asks):
@@ -975,13 +1014,14 @@ public final class InputSession {
 
     private func updatePreview(_ client: TextClient) {
         if keys.isEmpty {
+            heldSpace = false
             previewLanguage = nil
             enginePreview = nil
             client.setMarkedText("")
         } else if let forced = forced ?? pinned {
             previewLanguage = forced
-            client.setMarkedText(forced == .japanese ? japaneseDisplay()
-                                 : forced == .korean ? hangul() ?? keys : engine.render(keys, as: forced))
+            show(forced == .japanese ? japaneseDisplay()
+                 : forced == .korean ? hangul() ?? keys : engine.render(keys, as: forced), client)
         } else {
             splitOffKoreanBeforeOther(client)
             splitOffJapaneseBeforeKorean(client)
@@ -994,8 +1034,13 @@ public final class InputSession {
             }
             previewLanguage = language
             enginePreview = language
-            client.setMarkedText(language == .japanese ? japaneseDisplay() : preview(as: language) ?? keys)
+            show(language == .japanese ? japaneseDisplay() : preview(as: language) ?? keys, client)
         }
+    }
+
+    /// The word being composed as the marked text, with its space while it is held after Space.
+    private func show(_ text: String, _ client: TextClient) {
+        client.setMarkedText(heldSpace ? text + " " : text)
     }
 
     private static let koreanModel = KoreanModel()
