@@ -81,7 +81,7 @@ func runSettingsApp(tab: SettingsTab) -> Never {
     let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(model: model)))
     window.title = L("Seamtype Settings")
     window.styleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
-    window.setContentSize(NSSize(width: 860, height: 640))
+    window.setContentSize(NSSize(width: 960, height: 640))
     window.center()
     let delegate = SettingsAppDelegate()
     app.delegate = delegate
@@ -432,7 +432,7 @@ struct SettingsView: View {
             }
             .navigationTitle(model.tab.title)
         }
-        .frame(width: 860, height: 640)
+        .frame(width: 960, height: 640) // wide enough for the Apps pane's four columns
     }
 }
 
@@ -767,9 +767,9 @@ private struct ChoiceRow<Choice: View>: View {
 /// Column widths shared by the exceptions' header and rows.
 private enum AppColumns {
     static let conversion: CGFloat = 130
-    static let switchKeys: CGFloat = 200
-    static let space: CGFloat = 100
-    static let enabled: CGFloat = 90
+    static let switchKeys: CGFloat = 190
+    static let space: CGFloat = 112
+    static let enabled: CGFloat = 100
 }
 
 /// What Space does to the word in an app (`AppPolicy.holdSpace`), as the Apps column shows it.
