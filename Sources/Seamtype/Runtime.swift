@@ -20,6 +20,7 @@ final class Runtime {
     private(set) var lastVim: (signal: VimSignal, app: String?)?
 
     private init() {
+        AppPolicies.migrateSwitchKey()
         settings = Settings.load()
         engine = Self.makeEngine(japanese: settings.japanese)
         converter = settings.japanese ? Self.makeConverter(settings) : nil

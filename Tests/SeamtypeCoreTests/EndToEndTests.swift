@@ -13,8 +13,10 @@ import Testing
         let engine = LearningEngine(base: SplittingEngine(base: trilingual, english: trilingual.english, japanese: trilingual.segmenter),
                                     storeURL: dir.appendingPathComponent("seamtype-e2e-\(UUID().uuidString).json"))
         let converter = try #require(AzooKeyConverter(memory: dir.appendingPathComponent("seamtype-e2e-\(UUID().uuidString)")))
-        // A terminal the user set to strict, with Esc going to the app.
-        let terminal = AppPolicies(overrides: ["test.terminal": .init(conversionThreshold: AppPolicy.strictThreshold, escapeToApp: true)])
+        // A terminal the user set to strict, where Esc goes to the app; Esc switches elsewhere.
+        let terminal = AppPolicies(overrides: ["*": .init(switchKeys: [.escape, .shiftEscape]),
+                                               "test.terminal": .init(conversionThreshold: AppPolicy.strictThreshold,
+                                                                      switchKeys: [.shiftEscape])])
         session = InputSession(engine: engine, policies: terminal, converter: converter, japaneseEnabled: true)
     }
 

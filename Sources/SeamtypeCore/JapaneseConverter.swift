@@ -59,8 +59,7 @@ public final class AzooKeyConverter: JapaneseConverter {
     }
 
     nonisolated public static var memoryURL: URL? {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
-            .appendingPathComponent("Seamtype/azooKey", isDirectory: true)
+        SupportDirectory.url?.appendingPathComponent("azooKey", isDirectory: true)
     }
 
     public func candidates(for kana: String) -> [ConversionCandidate] {

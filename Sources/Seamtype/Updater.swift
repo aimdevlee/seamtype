@@ -3,7 +3,7 @@ import SeamtypeCore
 
 /// Updates: asks GitHub for the latest release's version (nothing else is sent) once a day from
 /// the input method, each time the settings window opens, and on Check Now. A newer one shows in
-/// the input menu and in About, whose Install button downloads `Seamtype.pkg`, checks that it is
+/// the input menu and in About, with what changed in it (the release notes' first section), whose Install button downloads `Seamtype.pkg`, checks that it is
 /// signed with Seamtype's Developer ID and notarized, and opens it in Installer (macOS asks for
 /// the password there). Nothing installs on its own: the user picks the moment.
 ///
@@ -32,7 +32,7 @@ final class Updater: ObservableObject {
     private static let teamID = "2UZ65T3U82"
     private static let interval: TimeInterval = 24 * 60 * 60
     private enum Key {
-        static let checked = "updateLastCheck", version = "updateVersion", package = "updatePackage", page = "updatePage"
+        static let checked = "updateLastCheck", version = "updateVersion", package = "updatePackage", page = "updatePage", notes = "updateNotes"
     }
 
     static var currentVersion: String {
@@ -49,7 +49,9 @@ final class Updater: ObservableObject {
         guard let version = defaults.string(forKey: Key.version),
               let package = defaults.string(forKey: Key.package).flatMap(URL.init(string:)),
               Release.isNewer(version, than: currentVersion) else { return nil }
-        return Release(version: version, package: package, page: defaults.string(forKey: Key.page).flatMap(URL.init(string:)))
+        return Release(version: version, package: package,
+                       page: defaults.string(forKey: Key.page).flatMap(URL.init(string:)),
+                       notes: defaults.stringArray(forKey: Key.notes) ?? [])
     }
 
     /// Reads again what the last check found, which the other process may have written.
@@ -99,6 +101,7 @@ final class Updater: ObservableObject {
         defaults.set(release.version, forKey: Key.version)
         defaults.set(release.package.absoluteString, forKey: Key.package)
         defaults.set(release.page?.absoluteString, forKey: Key.page)
+        defaults.set(release.notes, forKey: Key.notes)
         available = Release.isNewer(release.version, than: Self.currentVersion) ? release : nil
         state = available == nil ? .upToDate : .idle
     }

@@ -13,7 +13,7 @@ import Testing
         learning = LearningEngine(base: SplittingEngine(base: trilingual, english: trilingual.english, japanese: trilingual.segmenter),
                                   storeURL: dir.appendingPathComponent("seamtype-corr-\(UUID().uuidString).json"))
         let converter = try #require(AzooKeyConverter(memory: dir.appendingPathComponent("seamtype-corr-\(UUID().uuidString)")))
-        session = InputSession(engine: learning, converter: converter, japaneseEnabled: true)
+        session = InputSession(engine: learning, policies: .escSwitches, converter: converter, japaneseEnabled: true)
         session.activate(app: "com.apple.TextEdit")
     }
 

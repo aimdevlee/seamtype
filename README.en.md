@@ -46,7 +46,7 @@ If Seamtype isn't in the input menu, add it in **System Settings → Keyboard �
 Edit… → + → Korean → Seamtype**. If it isn't listed there either, log out and back in once.
 
 When a new version is out, the input menu shows **Update to Seamtype …** and **About** in the
-settings window installs it (**Check Now** checks by hand). It downloads the installer, checks its
+settings window lists what changed and installs it (**Check Now** checks by hand). It downloads the installer, checks its
 signature and opens it, so you only enter your password. Checks happen once a day and when the
 settings window opens; they ask GitHub only for the latest version number, and nothing you type
 is sent. Turn them off with **Check for updates automatically** in About.
@@ -86,9 +86,8 @@ While a word is being typed it is underlined and shows the language Seamtype exp
 | Key | English / Korean word | Japanese phrase |
 | --- | --- | --- |
 | letters | extend the word | extend the phrase (kana preview) |
-| **Esc** | switch reading: English → English+particle → Korean → Japanese | same |
-| **⇧Esc** | switch reading, in every app (where Esc is set to go to the app) | same |
-| **Right ⌥** (tapped on its own) | same as ⇧Esc; apps ignore it, so it never closes a window or clears input the way an Esc can (a setting can make it ⌥Space or right ⇧) | same |
+| **[Language switch keys](#language-switch-keys)** (by default right ⌥ tapped on its own, and ⇧Esc) | switch reading: English → English+particle → Korean → Japanese | same (with live conversion, the kana first) |
+| Esc | commit; the app gets the Esc (when chosen as a switch key, as above) | with live conversion, the kana first |
 | Delete | English: the last letter. Korean: the syllable being typed jamo by jamo, earlier ones whole (한국 → 한구 → 한ㄱ → 한 → gone, as the system's 2-set does) | one kana at a time (かんこく → かんこ) |
 | **Space** | commit, then a space | **convert to kanji** (candidate window) |
 | `, . ? !` and other symbols | commit, then the key | join the phrase, full-width: 、。？！ （）＿ 「」(`[ ]`) ・(`/`) 〜(`~`) |
@@ -99,6 +98,8 @@ While a word is being typed it is underlined and shows the language Seamtype exp
 | **Right ⌘** (tapped on its own) | pause / resume Seamtype in this text field | same |
 
 A symbol typed on its own after Japanese is full-width and stays underlined, as in a Japanese IME (`！`, `＿`, `「`): Return confirms it (no newline), Space offers its other forms (`!`, `‼︎`, `『`…), and a letter confirms it and starts a new word. Inside numbers (`3.5`, `10:30`) it stays half-width, and a bracket opened full-width closes full-width even after an English word (`日本語（English）`).
+
+With Japanese on, numbers and symbols can be Japanese too. Typed on their own at the start of a sentence or after Korean or English they go in half-width, but a language switch key right after them turns them into their Japanese form, underlined (`123` → `１２３`, `[` → `「`, `?` → `？`). In Japanese text, a word typed straight after a number reads as a counter, and Space converts it together with the number (`3ji` → `3時`, `5fun` → `5分`). Units that aren't romaji, like `5km` or `3pm`, stay English.
 
 While converting (candidate window open):
 
@@ -114,26 +115,41 @@ While converting (candidate window open):
 Conversion goes clause by clause: a candidate that covers only the start of the reading (`今日は`
 for きょうはいいてんきですね) commits that part and keeps converting the rest.
 
+### Language switch keys
+
+Choose the keys that switch readings in the settings window's Keys pane, keycaps you click: right ⌥
+tapped alone, ⌥Space, right ⇧ tapped alone, Esc and ⇧Esc, as many as you like. By default they are
+**right ⌥ tapped alone** and **⇧Esc**. A key not chosen goes to the app.
+
+- **Right ⌥ or right ⇧ tapped alone**: apps don't react to a lone modifier, so it never closes a
+  window or clears input. A tap with other modifiers isn't taken, so a key remapped as a Hyper key
+  (⌃⌥⇧⌘ at once, by Raycast or Karabiner) keeps doing what it's bound to; choose another key then.
+- **⌥Space**: it otherwise types a no-break space, which it no longer does once chosen.
+- **Esc**: quick if you're used to it, but Chromium-based apps such as Claude's desktop app or Slack
+  also see an Esc the input method took, so they may close their window or cancel the input while
+  the word changes. With nothing to change, Esc goes to the app.
+- **⇧Esc**: with nothing to change it does nothing and never reaches the app.
+
+The per-app settings can choose other keys for one app: switch with Esc by default, say, and leave
+Esc out where it has to reach the app, as in an editor. The input menu's "Esc Switches Language"
+adds or removes only Esc for the app in front. In the Japanese candidate window and with live
+conversion, Esc goes back to the kana first whatever keys are chosen.
+
 ### Undo after commit, and learning
 
-Right after a word is committed with Space or punctuation, **Esc** switches it to its next reading,
-and pressing it again keeps cycling (⇧Esc where Esc goes to the app). Deleting the space or
-punctuation first keeps that chance; any other key ends it. This needs the caret still right after
-the word and an app that lets Seamtype read the text there; otherwise Esc goes to the app. ⇧Esc with
-nothing to change does nothing and never reaches the app.
+Right after a word is committed with Space or punctuation, a language switch key switches it to its
+next reading, and pressing it again keeps cycling. Deleting the space or punctuation first keeps
+that chance; any other key ends it. This needs the caret still right after the word and an app that
+lets Seamtype read the text there.
 
-Chromium-based apps such as Claude's desktop app or Slack also see an Esc the input method took, so
-they may close their window or cancel the input while the word changes. There, tap **right ⌥** on its
-own instead (or ⌥Space or right ⇧, chosen as the language switch key in settings): it changes the word exactly as Esc does, and apps don't react to it.
+In an app that doesn't, such as a terminal, turn on **Hold the word after Space** for that app (the
+input menu, or Apps in the settings window; `holdSpace` in `apps.json`). Space then doesn't end the
+word but puts the space inside the underline too. While underlined it is the word being typed: a
+language switch key changes it, Delete deletes (the space first), and starting the next word puts it
+in with its space. Return only confirms it, as on any underlined word, so press it again to run a
+command; the app never gets the Space key, so its text replacements don't fire.
 
-In an app that doesn't report the text at the caret, so a committed word can't be changed (a
-terminal), turn on **Hold the word after Space** for that app (`holdSpace` in `apps.json`). Space
-then doesn't end the word but puts the space inside the underline too. While underlined it is the
-word being typed: Esc (⇧Esc) changes it, Delete deletes (the space first), and starting the next
-word puts it in with its space. Return only confirms it, as on any underlined word, so press it
-again to run a command; the app never gets the Space key, so its text replacements don't fire.
-
-A correction changes only that word, so a stray Esc doesn't stick. Correct the same keys the same
+A correction changes only that word, so a stray switch doesn't stick. Correct the same keys the same
 way a second time and Seamtype remembers it; switching a word back to Seamtype's own guess forgets
 it.
 
@@ -146,12 +162,6 @@ phrase is the first candidate on Space, and a shortcut entered more than once of
 replacement (terminals, Chrome…) only get the Japanese candidate. Edits to the list apply the next
 time a text field becomes active. Enter a Japanese shortcut as its hiragana reading (`よろ`, `ぐー`).
 
-### Esc that belongs to the app
-
-If Esc has to reach the app, as when closing a popup in an editor, set that app's Esc key (or the
-default's) to "Send to app" in the per-app settings. The word goes in as shown and the app gets
-Esc. Use ⇧Esc to switch readings there.
-
 ### Pause
 
 Where every key is a command, like lazygit or htop in a terminal, tap **right ⌘** on its own. The
@@ -160,7 +170,7 @@ another app or text field, or change a setting, to resume.
 
 Each tap shows Seamtype's icon under the caret for a moment, like the input source indicator,
 struck through when paused. The menu bar icon doesn't change, so to check later, look for the tick
-in the input menu. Turn the key off under General in the settings window.
+in the input menu. Turn the key off under Keys in the settings window.
 
 ### vim
 
@@ -178,11 +188,11 @@ quits, words are decided again at the shell.
   (entering and leaving insert mode, start, quit, focus), not on keys.
 - The bundle identifier is `$__CFBundleIdentifier`, which macOS sets for every app, so nothing
   needs setting up per terminal (Ghostty, Terminal, iTerm2, VS Code…), and the signal reaches only
-  that app's text field. A signal without `--app` is taken only where Esc goes to the app.
+  that app's text field. A signal without `--app` is taken only where Esc isn't a switch key.
 - Attached to tmux from a different terminal than the one that started its server, the bundle
   identifiers differ and the signal is ignored.
 - If Vim doesn't see the terminal's focus changes, Seamtype can't tell when you move from its pane
-  to a shell pane; press ⇧Esc there to start deciding words again.
+  to a shell pane; press ⇧Esc there (when it's a switch key) to start deciding words again.
 
 </details>
 
@@ -191,14 +201,15 @@ quits, words are decided again at the shell.
 From the input menu (the menu bar, while Seamtype is selected) you can:
 - pause Seamtype in this text field (like right ⌘)
 - turn word conversion on or off for the app in front, set its conversion threshold
-  (Normal/Strict), whether Esc goes to the app and whether the word is held after Space, or drop
+  (Normal/Strict), whether Esc switches languages and whether the word is held after Space, or drop
   its settings. Those are greyed while conversion is off
 - turn Japanese Input and Live Conversion on or off
 - undo the last learned word, and open Try Typing, the remembered words or the settings window
 
-The settings window has General, Try Typing (how each word was decided, with scores), per-app
-behavior, the learned words (forget one or all) and About. The kanji candidate order resets under
-Japanese. Changes apply at once.
+The settings window has Languages (Japanese and its options), Keys (the language switch keys,
+Return, right ⌘), per-app behavior, Try Typing (how each word was decided, with scores), the learned
+words (forget one or all) and About. The kanji candidate order resets under Japanese input in
+Languages. Changes apply at once.
 
 ### Settings files
 
@@ -214,14 +225,14 @@ You can edit it by hand; missing keys keep the default.
 | `japanese` | **off** | Detect romaji Japanese and convert it. |
 | `liveConversion` | off | While you type a Japanese phrase, show its top kanji candidate (`今日はいい天気でs`); Return commits it as shown. Like macOS Live Conversion. |
 | `returnConfirmsOnly` | on | Return on an underlined word only confirms it. Off, the app gets that Return too (a Japanese phrase is still only confirmed). |
-| `switchKey` | `"rightOption"` | The key that switches the reading of the word being typed or just typed, like ⇧Esc: `"rightOption"` (right ⌥ tapped alone), `"optionSpace"` (⌥Space), `"rightShift"` (right ⇧ tapped alone) or `"off"` (Esc and ⇧Esc only). |
 | `rightCommandPause` | on | A right ⌘ tap pauses Seamtype in the text field (see [Pause](#pause)). |
 | `fullWidthDigits` | off | Numbers after Japanese come out full-width (`１２３`, `０３－１２３４` in addresses and phone numbers), underlined, with Space offering `123` (half-width) or conversions like `三月`. |
 | `fullWidthSpace` | off | Space after Japanese types a full-width space (`　`). ⇧Space types the other width (full-width while this is off). |
 | `japaneseEngine` | `"apple"` | Kanji conversion: `"apple"` uses the engine of macOS's Japanese input, `"azooKey"` the AzooKey converter in the app. |
 
 With live conversion, Space opens the candidate window at the next candidate, and Esc shows the
-kana (Esc again switches language). Short readings only change into kanji (`と` stays `と`, `私`
+kana (Esc again switches language where Esc is a switch key, else commits the kana and goes to the
+app). Short readings only change into kanji (`と` stays `と`, `私`
 converts). The top candidate is right for about 4 in 5 short phrases and 3 in 4 whole sentences
 ([held-out results](#held-out-results)), so glance before Return. Conversion takes 8–21 ms a
 keystroke.
@@ -231,7 +242,8 @@ app (by bundle identifier, a key ending in `.` matches as a prefix) names only t
 from it. No app is listed unless you list it.
 
 ```json
-{ "*":                     { "escapeToApp": true },
+{ "*":                     { "switchKeys": ["escape", "shiftEscape"] },
+  "com.microsoft.VSCode":  { "switchKeys": ["rightOption", "shiftEscape"] },
   "com.apple.Terminal":    { "conversionThreshold": 0.97 },
   "com.example.Game":      { "enabled": false } }
 ```
@@ -240,8 +252,8 @@ from it. No app is listed unless you list it.
 | --- | --- | --- |
 | `enabled` | `true` | `false` passes every key through (plain English). |
 | `conversionThreshold` | `0.5` | Convert away from the typed letters only when at least this sure. `0.97` (Strict) keeps short shell commands from turning into Hangul in a terminal; `0.5` converts more Korean when you write prose. |
-| `escapeToApp` | `false` | Esc goes to the app, and ⇧Esc switches readings (for editors). |
-| `holdSpace` | `false` | Space puts the space inside the underline instead of ending the word. Like a word being typed, Esc changes it and Delete deletes; the next word puts it in with its space. For terminals, which can't change a committed word; Return only confirms it, and text replacements don't fire. |
+| `switchKeys` | `["rightOption", "shiftEscape"]` | The keys that switch readings ([language switch keys](#language-switch-keys)): `"rightOption"` (right ⌥ tapped alone), `"optionSpace"` (⌥Space), `"rightShift"` (right ⇧ tapped alone), `"escape"` (Esc), `"shiftEscape"` (⇧Esc). A key not chosen goes to the app. 0.1.9's `escapeToApp`, and `switchKey` in settings.json, are read and carried over. |
+| `holdSpace` | `false` | Space puts the space inside the underline instead of ending the word. Like a word being typed, a switch key changes it and Delete deletes; the next word puts it in with its space. For terminals, which can't change a committed word, so set per app only (not in `"*"`); Return only confirms it, and text replacements don't fire. |
 | `fullWidth` | `true` | `false` keeps numbers and spaces half-width in this app whatever the full-width settings say (terminals, code editors). |
 
 After editing these files by hand, restart the input method: `pkill -x Seamtype`.
@@ -326,8 +338,8 @@ Exact match counts kana/kanji style differences (ひとまとめ vs 一まとめ
 - Never tested end to end in every app. Secure fields (passwords) bypass input methods, and undo
   after commit needs apps that report their caret and text; in a terminal, set `"holdSpace": true`
   to keep the word underlined after Space instead.
-- Where Esc doesn't go to the app, Esc right after a word (e.g. to close a popup) changes that word
-  first. It isn't learned unless repeated; list such apps with `"escapeToApp": true`.
+- Where Esc is a switch key, Esc right after a word (e.g. to close a popup) changes that word first.
+  It isn't learned unless repeated; leave Esc out for such apps in the per-app settings.
 - Japanese: only the first clause is resized with ←/→ (Return commits it and moves on to the
   rest). Rare words still need the candidate list.
 

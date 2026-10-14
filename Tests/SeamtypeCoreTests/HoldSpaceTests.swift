@@ -3,7 +3,7 @@ import Testing
 @testable import SeamtypeCore
 
 /// An app set to hold Space (`AppPolicy.holdSpace`, for terminals): the word stays underlined with
-/// its space until the next word starts, so Esc still changes it and Delete takes back only the space.
+/// its space until the next word starts, so a switch key still changes it and Delete takes back only the space.
 @MainActor @Suite struct HoldSpaceTests {
     let field = FakeTextField()
     let learning: LearningEngine
@@ -69,12 +69,19 @@ import Testing
         #expect(field.marked.location == ("dkssud " as NSString).length)
     }
 
-    @Test func escRightAfterSpaceChangesTheWordAndKeepsTheSpace() {
+    @Test func aSwitchRightAfterSpaceChangesTheWordAndKeepsTheSpace() {
         type("dkssud ")
         #expect(session.handle(.cycle, client: field))
         #expect(field.text == "dkssud " && marked == "dkssud ")
-        #expect(session.handle(.escape, client: field))
+        #expect(session.handle(.cycle, client: field))
         #expect(field.text == "안녕 " && marked == "안녕 ")
+    }
+
+    /// Esc that isn't one of the app's switch keys finishes the word with its space and goes to the app.
+    @Test func escNotASwitchKeyCommitsTheHeldWordWithItsSpace() {
+        type("dkssud ")
+        #expect(!session.handle(.escape, client: field))
+        #expect(field.text == "안녕 " && marked == nil)
     }
 
     /// What is shown after Space is what would have been committed: the whole word's decision,

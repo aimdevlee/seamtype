@@ -10,7 +10,7 @@ import Testing
 
     init() {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("seamtype-vim-\(UUID().uuidString).json")
-        session = InputSession(engine: LearningEngine(base: sharedEngine, storeURL: url))
+        session = InputSession(engine: LearningEngine(base: sharedEngine, storeURL: url), policies: .escSwitches)
         session.activate(app: "test.terminal")
     }
 

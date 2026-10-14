@@ -17,6 +17,9 @@ import Testing
             return [.init(text: "変換", kanaCount: 4), .init(text: "返還", kanaCount: 4), .init(text: "編纂", kanaCount: 4)]
         case "３がつ":
             return [.init(text: "三月", kanaCount: 3), .init(text: "３月", kanaCount: 3), .init(text: "3月", kanaCount: 3)]
+        case "3じ":
+            return [.init(text: "三時", kanaCount: 2), .init(text: "３時", kanaCount: 2), .init(text: "3時", kanaCount: 2),
+                    .init(text: "3", kanaCount: 1)]
         case "１２３":
             return [.init(text: "一二三", kanaCount: 3), .init(text: "123", kanaCount: 3), .init(text: kana, kanaCount: 3)]
         default:
@@ -252,6 +255,99 @@ import Testing
         session.fullWidthDigits = true
         type("hello 123 ")
         #expect(field.text == "hello 123 ")
+    }
+
+    /// A switch key right after digits the app typed makes them a Japanese number, as if typed
+    /// after Japanese with full-width digits on.
+    @Test func switchKeyAfterDigitsMakesThemFullWidth() {
+        type("hello 123")
+        #expect(session.handle(.cycle, client: field))
+        #expect(field.text == "hello １２３")
+        #expect(field.marked.location != NSNotFound)
+        type(" ")
+        #expect(session.conversion?.candidates.prefix(2).map(\.text) == ["１２３", "123"])
+        session.handle(.enter, client: field)
+        #expect(field.text == "hello １２３")
+    }
+
+    /// The same for symbols: [ at the start of a line opens a Japanese quote, and ] closes it.
+    @Test func switchKeyAfterSymbolMakesItJapanese() {
+        type("[")
+        #expect(session.handle(.cycle, client: field))
+        #expect(field.text == "「")
+        type("henkan]")
+        #expect(field.text == "「へんかん」")
+    }
+
+    /// One digit: it becomes １, neither doubled (1１) nor lost.
+    @Test func switchKeyAfterOneDigit() {
+        type("hello 1")
+        #expect(session.handle(.cycle, client: field))
+        #expect(field.text == "hello １")
+        session.handle(.enter, client: field)
+        #expect(field.text == "hello １")
+    }
+
+    /// An app that can't read back its text (most terminals): the digits stay as typed.
+    @Test func switchKeyAfterDigitsWhereTheAppCantBeRead() {
+        field.readable = false
+        type("hello 1")
+        #expect(session.handle(.cycle, client: field))
+        #expect(field.text == "hello 1")
+        #expect(session.keys.isEmpty)
+    }
+
+    /// The same app with a counter: the phrase converts on its own (no 33時).
+    @Test func counterWhereTheAppCantBeRead() {
+        field.readable = false
+        type("henkan ")
+        session.handle(.enter, client: field)
+        type("3ji ")
+        #expect(field.text == "変換3じ")
+        session.handle(.enter, client: field)
+        #expect(field.text == "変換3じ")
+    }
+
+    /// Nothing typed by the app just before: the switch key stays a no-op (and after a space too).
+    @Test func switchKeyAfterSpaceDoesNothing() {
+        type("123 ")
+        #expect(session.handle(.cycle, client: field))
+        #expect(field.text == "123 ")
+    }
+
+    /// In Japanese text, a counter typed right after a number converts with it: 3ji is 3時, as
+    /// typed, first (ji alone reads as English).
+    @Test func numberBeforePhraseJoinsConversion() {
+        type("henkan ")
+        session.handle(.enter, client: field)
+        type("3ji ")
+        #expect(session.conversion?.candidates.first?.text == "3時")
+        #expect(field.text == "変換3時")
+        session.handle(.enter, client: field)
+        #expect(field.text == "変換3時")
+    }
+
+    /// Back to kana from such a conversion puts the number back as typed.
+    @Test func numberBeforePhraseBackToKana() {
+        type("henkan ")
+        session.handle(.enter, client: field)
+        type("3ji ")
+        session.handle(.cycle, client: field)
+        #expect(field.text == "変換3じ")
+        #expect(session.keys == "ji")
+    }
+
+    /// Units after a number stay English in Japanese text, and nothing changes elsewhere.
+    @Test func numberBeforeOtherWordsUnchanged() {
+        type("henkan ")
+        session.handle(.enter, client: field)
+        type("5km ")
+        #expect(field.text == "変換5km ")
+        let other = FakeTextField()
+        for ch in "3pm 3dlf 1on1 " where !(ch.isLetter ? session.handle(.letter(ch), client: other) : session.handle(.printable(ch), client: other)) {
+            other.insertText(String(ch), replacing: nil)
+        }
+        #expect(other.text == "3pm 3일 1on1 ")
     }
 
     @Test func fullWidthSpaceAfterJapanese() {

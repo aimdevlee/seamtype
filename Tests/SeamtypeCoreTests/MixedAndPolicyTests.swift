@@ -77,12 +77,12 @@ let splitting = SplittingEngine(base: sharedEngine, english: sharedEngine.englis
     @Test func appEntriesSitOnTheDefault() throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("seamtype-apps-\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: url) }
-        try Data(#"{"*": {"escapeToApp": true}, "com.mitchellh.ghostty": {"conversionThreshold": 0.97}, "com.example.Game": {"enabled": false}}"#.utf8).write(to: url)
+        try Data(#"{"*": {"switchKeys": ["escape"]}, "com.mitchellh.ghostty": {"conversionThreshold": 0.97}, "com.example.Game": {"enabled": false}}"#.utf8).write(to: url)
         let policies = AppPolicies.load(from: url)
-        #expect(policies.defaultPolicy == AppPolicy(escapeToApp: true))
-        #expect(policies.policy(for: "com.mitchellh.ghostty") == AppPolicy(conversionThreshold: 0.97, escapeToApp: true))
-        #expect(policies.policy(for: "com.example.Game") == AppPolicy(enabled: false, escapeToApp: true))
-        #expect(policies.policy(for: "com.apple.Terminal") == AppPolicy(escapeToApp: true))
+        #expect(policies.defaultPolicy == AppPolicy(switchKeys: [.escape]))
+        #expect(policies.policy(for: "com.mitchellh.ghostty") == AppPolicy(conversionThreshold: 0.97, switchKeys: [.escape]))
+        #expect(policies.policy(for: "com.example.Game") == AppPolicy(enabled: false, switchKeys: [.escape]))
+        #expect(policies.policy(for: "com.apple.Terminal") == AppPolicy(switchKeys: [.escape]))
         #expect(policies.apps == ["com.example.Game", "com.mitchellh.ghostty"])
     }
 
@@ -96,6 +96,9 @@ let splitting = SplittingEngine(base: sharedEngine, english: sharedEngine.englis
         #expect(policies.policy(for: "com.apple.TextEdit") == .standard)
         policies.set(AppPolicy(holdSpace: true), for: "com.apple.Terminal")
         #expect(policies.overrides["com.apple.Terminal"] == AppPolicy.Override(holdSpace: true))
+        // Written and read back (Override's Codable names each key).
+        try policies.save(to: url)
+        #expect(AppPolicies.load(from: url).policy(for: "com.apple.Terminal") == AppPolicy(holdSpace: true))
     }
 }
 
@@ -107,7 +110,8 @@ let splitting = SplittingEngine(base: sharedEngine, english: sharedEngine.englis
     init() {
         let dir = FileManager.default.temporaryDirectory
         learning = LearningEngine(base: splitting, storeURL: dir.appendingPathComponent("seamtype-lex-\(UUID().uuidString).json"))
-        let policies = AppPolicies(overrides: ["test.strict": .init(conversionThreshold: 0.9999),
+        let policies = AppPolicies(overrides: ["*": .init(switchKeys: [.escape, .shiftEscape]),
+                                               "test.strict": .init(conversionThreshold: 0.9999),
                                                "test.off": .init(enabled: false)])
         session = InputSession(engine: learning, policies: policies)
     }

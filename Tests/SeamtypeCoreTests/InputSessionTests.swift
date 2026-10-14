@@ -2,6 +2,11 @@ import Foundation
 import Testing
 @testable import SeamtypeCore
 
+extension AppPolicies {
+    /// Esc switches languages, as the tests of Esc cycling need (the default leaves Esc to the app).
+    static let escSwitches = AppPolicies(overrides: [defaultKey: .init(switchKeys: [.escape, .shiftEscape])])
+}
+
 /// A text field: committed text, an optional marked (underlined) span, and a caret.
 final class FakeTextField: TextClient {
     var text = ""
@@ -13,6 +18,15 @@ final class FakeTextField: TextClient {
     func setMarkedText(_ s: String) {
         let ns = text as NSString
         let target = marked.location != NSNotFound ? marked : NSRange(location: cursor, length: 0)
+        text = ns.replacingCharacters(in: target, with: s)
+        let length = (s as NSString).length
+        marked = length > 0 ? NSRange(location: target.location, length: length) : NSRange(location: NSNotFound, length: 0)
+        cursor = target.location + length
+    }
+
+    func setMarkedText(_ s: String, replacing range: NSRange) {
+        let ns = text as NSString
+        let target = marked.location != NSNotFound ? NSUnionRange(range, marked) : range
         text = ns.replacingCharacters(in: target, with: s)
         let length = (s as NSString).length
         marked = length > 0 ? NSRange(location: target.location, length: length) : NSRange(location: NSNotFound, length: 0)
@@ -40,7 +54,7 @@ final class FakeTextField: TextClient {
 
     init() {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("seamtype-session-\(UUID().uuidString).json")
-        session = InputSession(engine: LearningEngine(base: sharedEngine, storeURL: url))
+        session = InputSession(engine: LearningEngine(base: sharedEngine, storeURL: url), policies: .escSwitches)
     }
 
     @discardableResult
@@ -229,7 +243,7 @@ final class FakeTextField: TextClient {
     func session(japanese: Bool = false) -> InputSession {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("seamtype-mixed-\(UUID().uuidString).json")
         let base = japanese ? SplittingEngine(base: trilingual, english: trilingual.english, japanese: trilingual.segmenter) : splitting
-        return InputSession(engine: LearningEngine(base: base, storeURL: url), japaneseEnabled: japanese)
+        return InputSession(engine: LearningEngine(base: base, storeURL: url), policies: .escSwitches, japaneseEnabled: japanese)
     }
 
     /// The English + Korean word split is what gets typed, not only what the engine decides.
@@ -245,6 +259,24 @@ final class FakeTextField: TextClient {
         #expect(session.handle(.enter, client: field))
         #expect(field.text == "안녕" && field.marked.location == NSNotFound)
         #expect(!session.handle(.enter, client: field))
+    }
+
+    /// By default Esc isn't a switch key: the word goes in as shown and the app gets the Esc,
+    /// also right after a commit. The chosen keys (`.cycle`) still switch.
+    @Test func escGoesToTheAppUnlessChosen() {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("seamtype-esc-\(UUID().uuidString).json")
+        let session = InputSession(engine: LearningEngine(base: sharedEngine, storeURL: url))
+        #expect(session.policy.switchKeys == [.rightOption, .shiftEscape])
+        type(session, "dkssud")
+        #expect(!session.handle(.escape, client: field))
+        #expect(field.text == "안녕" && field.marked.location == NSNotFound)
+        type(session, " ")
+        #expect(!session.handle(.escape, client: field))
+        #expect(field.text == "안녕 ")
+        #expect(session.handle(.cycle, client: field)) // nothing to change: dropped
+        type(session, "dkssud ")
+        #expect(session.handle(.cycle, client: field))
+        #expect(field.text == "안녕 dkssud ")
     }
 
     /// With the setting off, Return confirms the word and the app gets it too.

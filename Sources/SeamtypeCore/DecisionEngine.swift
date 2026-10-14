@@ -293,8 +293,7 @@ public final class LearningEngine: DecisionEngine, @unchecked Sendable {
     }
 
     public static var defaultStoreURL: URL? {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
-            .appendingPathComponent("Seamtype/lexicon.json")
+        SupportDirectory.url?.appendingPathComponent("lexicon.json")
     }
 
     public func decide(_ keys: String, context: DecisionContext) -> Decision {

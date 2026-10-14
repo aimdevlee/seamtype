@@ -12,7 +12,7 @@ import Testing
         let engine = LearningEngine(base: SplittingEngine(base: trilingual, english: trilingual.english, japanese: trilingual.segmenter),
                                     storeURL: dir.appendingPathComponent("seamtype-live-\(UUID().uuidString).json"))
         let converter = try #require(AzooKeyConverter(memory: dir.appendingPathComponent("seamtype-live-\(UUID().uuidString)")))
-        session = InputSession(engine: engine, converter: converter, japaneseEnabled: true, liveConversion: true)
+        session = InputSession(engine: engine, policies: .escSwitches, converter: converter, japaneseEnabled: true, liveConversion: true)
     }
 
     /// Letters and printable keys as themselves, "⏎" Return, "⎋" Esc.
@@ -44,6 +44,19 @@ import Testing
         #expect(field.text.hasSuffix("s"), "\(field.text)")
     }
 
+    /// A short word shown as kanji converts on Space, though once it ends it reads as English
+    /// (zi went in as "zi " after 地 was on screen); an English word still goes in as typed.
+    @Test func spaceConvertsAShortWordShownAsKanji() {
+        type("zi")
+        let live = field.text
+        #expect(live != "zi")
+        type(" ")
+        #expect(session.conversion != nil)
+        #expect(field.text != live)
+        type("⏎hi ")
+        #expect(field.text.hasSuffix("hi "))
+    }
+
     @Test func spaceShowsTheNextCandidate() {
         type("kyouhaiitenkidesune")
         let live = field.text
@@ -61,6 +74,18 @@ import Testing
         type("⎋")
         #expect(!field.text.contains("きょう"))
         type("⎋⎋⎋")
+    }
+
+    /// Where Esc isn't a switch key, it still shows the kana first; the next one goes to the app.
+    @Test func escapeShowsKanaEvenWhereItGoesToTheApp() throws {
+        let dir = FileManager.default.temporaryDirectory
+        let converter = try #require(AzooKeyConverter(memory: dir.appendingPathComponent("seamtype-live-\(UUID().uuidString)")))
+        let session = InputSession(engine: session.engine, converter: converter, japaneseEnabled: true, liveConversion: true)
+        for ch in "kyouhaiitenkidesune" { _ = session.handle(.letter(ch), client: field) }
+        #expect(session.handle(.escape, client: field))
+        #expect(field.text == "きょうはいいてんきですね")
+        #expect(!session.handle(.escape, client: field))
+        #expect(field.text == "きょうはいいてんきですね" && field.marked.location == NSNotFound)
     }
 
     @Test func kanaCommitAfterEscape() {

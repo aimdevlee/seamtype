@@ -5,7 +5,8 @@
 # window takes the focus for about a minute.
 #
 # Each suite runs with its own settings.json: cases.tsv with Japanese on, live.tsv with live
-# conversion too, fullwidth.tsv with full-width numbers and spaces. The user's settings and
+# conversion too, fullwidth.tsv with full-width numbers and spaces. Esc and ⇧Esc are the switch
+# keys throughout (apps.json), as the cases switch with Esc. The user's settings, apps and
 # learning files (the cases' Esc corrections would be learned like any other; so would its kanji
 # choices) are backed up first and restored afterwards. Seamtype keeps running: it reads changed
 # files when told, as from the settings window.
@@ -14,7 +15,7 @@
 set -euo pipefail
 here="${0:A:h}"
 support="$HOME/Library/Application Support/Seamtype"
-files=(settings.json lexicon.json apple-learning.json)
+files=(settings.json apps.json lexicon.json apple-learning.json)
 app=""
 for candidate in "$HOME/Library/Input Methods/Seamtype.app" "/Library/Input Methods/Seamtype.app"; do
   [[ -d "$candidate" ]] && { app=$candidate; break; }
@@ -59,6 +60,7 @@ suite() {
   "$work/typer" "$here/$1" "$app" || failed=1
 }
 failed=0
+print -r -- '{ "*": { "switchKeys": ["escape", "shiftEscape"] } }' > "$support/apps.json"
 suite cases.tsv '{ "japanese": true }'
 suite live.tsv '{ "japanese": true, "liveConversion": true }'
 suite fullwidth.tsv '{ "japanese": true, "fullWidthDigits": true, "fullWidthSpace": true }'

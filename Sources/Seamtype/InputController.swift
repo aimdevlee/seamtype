@@ -16,9 +16,9 @@ final class InputController: IMKInputController {
     private var current: (session: InputSession, generation: Int)?
     /// When right ⌘ went down, while no other key has been pressed with it: a tap pauses.
     private var rightCommandDown: Date?
-    /// When the switch key (right ⌥ or right ⇧, `Settings.switchKey`) went down, while no other
-    /// key has been pressed with it: a tap switches the word's language, like ⇧Esc.
-    private var switchTapDown: Date?
+    /// Which switch key (right ⌥ or right ⇧, in `AppPolicy.switchKeys`) went down and when,
+    /// while no other key has been pressed with it: a tap switches the word's language.
+    private var switchTapDown: (key: UInt16, at: Date)?
 
     /// This client's session, rebuilt (after committing what was being typed) when a setting changed.
     @MainActor private var session: InputSession {
@@ -61,16 +61,16 @@ final class InputController: IMKInputController {
             session.replacements = Runtime.shared.textReplacements
             if let last = Runtime.shared.lastVim { vimChanged(to: last.signal, from: last.app) }
             let policy = session.policy
-            log.info("activate \(app ?? "?", privacy: .public) enabled=\(policy.enabled) threshold=\(policy.conversionThreshold) escapeToApp=\(policy.escapeToApp) holdSpace=\(policy.holdSpace) replacements=\(self.session.replacements.count)")
+            log.info("activate \(app ?? "?", privacy: .public) enabled=\(policy.enabled) threshold=\(policy.conversionThreshold) switchKeys=\(SwitchKey.allCases.filter(policy.switchKeys.contains).map(\.rawValue).joined(separator: ","), privacy: .public) holdSpace=\(policy.holdSpace) replacements=\(self.session.replacements.count)")
         }
     }
 
     /// Vim changed mode (`Seamtype --vim`). Taken only when vim runs in this controller's app,
     /// so a signal that arrives while focus moves between apps changes nothing elsewhere; a
-    /// signal without its app is taken where Esc goes to the app.
+    /// signal without its app is taken where Esc goes to the app (isn't a switch key).
     @MainActor func vimChanged(to signal: VimSignal, from app: String?) {
         let session = session
-        guard app.map({ $0 == session.app }) ?? session.policy.escapeToApp else { return }
+        guard app.map({ $0 == session.app }) ?? !session.policy.switchKeys.contains(.escape) else { return }
         session.vimChanged(to: signal, client: client().map { IMKClient($0 as IMKTextInput) })
         log.debug("vim \(signal.rawValue, privacy: .public)")
     }
@@ -151,33 +151,31 @@ final class InputController: IMKInputController {
         togglePause(client: client)
     }
 
-    /// The switch key (right ⌥ or right ⇧) pressed and released on its own, within a moment:
-    /// switch the word being typed, or the one just committed, to its next reading (as ⇧Esc
+    /// A switch key (right ⌥ or right ⇧) pressed and released on its own, within a moment:
+    /// switch the word being typed, or the one just committed, to its next reading (as Esc
     /// does). The app still gets the modifier's events, and a lone modifier does nothing there,
     /// so nothing leaks the way an Esc can (Chromium apps see an Esc the input method took and
     /// close their window).
     @MainActor private func switchTapChanged(_ event: NSEvent, client: IMKTextInput) {
-        let keyCode: UInt16
         let flag: NSEvent.ModifierFlags
-        switch Runtime.shared.settings.switchKey {
-        case .rightOption: keyCode = KeyCode.rightOption; flag = .option
-        case .rightShift: keyCode = KeyCode.rightShift; flag = .shift
-        case .optionSpace, .off: return
-        }
-        guard event.keyCode == keyCode else {
-            switchTapDown = nil // another modifier joined in
+        switch event.keyCode {
+        case KeyCode.rightOption where session.policy.switchKeys.contains(.rightOption): flag = .option
+        case KeyCode.rightShift where session.policy.switchKeys.contains(.rightShift): flag = .shift
+        default:
+            switchTapDown = nil // another modifier joined in, or one that isn't a switch key here
             return
         }
         if event.modifierFlags.contains(flag) {
             // Only on its own: a key remapped as a Hyper key (Karabiner) reports ⌃⌥⇧⌘ at once,
             // and its tap belongs to whatever the user bound it to.
             let others = event.modifierFlags.intersection([.command, .control, .option, .shift]).subtracting(flag)
-            switchTapDown = others.isEmpty ? Date() : nil
+            switchTapDown = others.isEmpty ? (event.keyCode, Date()) : nil
             return
         }
-        guard let down = switchTapDown, Date().timeIntervalSince(down) < 0.5 else { return }
+        guard let down = switchTapDown, down.key == event.keyCode,
+              Date().timeIntervalSince(down.at) < 0.5 else { return }
         switchTapDown = nil
-        guard !session.inVimNormalMode else { return } // vim's own keys; ⇧Esc is the way out there
+        guard !session.inVimNormalMode else { return } // vim's own keys
         let handled = session.handle(.cycle, client: IMKClient(client))
         syncCandidates()
         log.debug("handle switchTap handled=\(handled) app=\(self.session.app ?? "?", privacy: .public)")
@@ -200,8 +198,8 @@ final class InputController: IMKInputController {
     @MainActor private func key(for event: NSEvent) -> InputSession.Key {
         let modifiers = event.modifierFlags.intersection([.command, .control, .option])
         if modifiers == .option, !event.modifierFlags.contains(.shift), event.keyCode == KeyCode.space,
-           Runtime.shared.settings.switchKey == .optionSpace {
-            return .cycle // ⌥Space chosen as the switch key, like ⇧Esc
+           session.policy.switchKeys.contains(.optionSpace) {
+            return .cycle // ⌥Space chosen as a switch key
         }
         if modifiers == .control {
             switch event.charactersIgnoringModifiers?.lowercased() {
@@ -211,7 +209,10 @@ final class InputController: IMKInputController {
             }
         }
         if !modifiers.isEmpty { return .other }
-        if event.keyCode == KeyCode.escape, event.modifierFlags.contains(.shift) { return .cycle }
+        if event.keyCode == KeyCode.escape, event.modifierFlags.contains(.shift) {
+            // Not chosen: the app's ⇧Esc, after the word goes in as shown.
+            return session.policy.switchKeys.contains(.shiftEscape) ? .cycle : .other
+        }
         switch event.keyCode {
         case KeyCode.f7: return .katakana
         case KeyCode.f6: return .hiragana
@@ -315,9 +316,9 @@ final class InputController: IMKInputController {
                     on: policy.conversionThreshold < AppPolicy.strictThreshold, enabled: policy.enabled, indent: 2, value: app)
                 add(L("Conversion: Strict"), #selector(setStrict(_:)),
                     on: policy.conversionThreshold >= AppPolicy.strictThreshold, enabled: policy.enabled, indent: 2, value: app)
-                add(L("Esc Key: Send to App (⇧Esc switches)"), #selector(toggleEscapeToApp(_:)), on: policy.escapeToApp,
+                add(L("Esc Switches Language"), #selector(toggleEscapeSwitches(_:)), on: policy.switchKeys.contains(.escape),
                     enabled: policy.enabled, indent: 2, value: app)
-                add(L("Hold the Word After Space (Esc still changes it)"), #selector(toggleHoldSpace(_:)), on: policy.holdSpace,
+                add(L("Hold the Word After Space"), #selector(toggleHoldSpace(_:)), on: policy.holdSpace,
                     enabled: policy.enabled, indent: 2, value: app)
                 if listed {
                     add(L("Use Default Settings in This App"), #selector(removeAppEntry(_:)), indent: 1, value: app)
@@ -372,10 +373,12 @@ final class InputController: IMKInputController {
         MainActor.assumeIsolated { Runtime.shared.updatePolicy(for: app) { $0.conversionThreshold = AppPolicy.standard.conversionThreshold } }
     }
 
-    @objc func toggleEscapeToApp(_ sender: Any?) {
+    @objc func toggleEscapeSwitches(_ sender: Any?) {
         guard let app = appOf(sender) else { return }
         MainActor.assumeIsolated {
-            Runtime.shared.updatePolicy(for: app) { $0.escapeToApp.toggle() }
+            Runtime.shared.updatePolicy(for: app) {
+                if $0.switchKeys.remove(.escape) == nil { $0.switchKeys.insert(.escape) }
+            }
         }
     }
 
@@ -420,6 +423,11 @@ private final class IMKClient: TextClient {
     func setMarkedText(_ text: String) {
         let length = (text as NSString).length
         input.setMarkedText(text, selectionRange: NSRange(location: length, length: 0), replacementRange: Self.noRange)
+    }
+
+    func setMarkedText(_ text: String, replacing range: NSRange) {
+        let length = (text as NSString).length
+        input.setMarkedText(text, selectionRange: NSRange(location: length, length: 0), replacementRange: range)
     }
 
     func insertText(_ text: String, replacing range: NSRange?) {

@@ -26,15 +26,60 @@ import Testing
         #expect(!Settings.load(from: url).returnConfirmsOnly)
     }
 
-    @Test func switchKeyIsRightOptionUnlessChosen() throws {
-        let url = dir.appendingPathComponent("settings.json")
+    /// 0.1.9's one extra switch key in settings.json moves into the default's switch keys.
+    @Test(arguments: [
+        (#"{ "japanese": true }"#, nil as [SwitchKey]?),
+        (#"{ "switchKey": "rightOption", "japanese": true }"#, nil), // the new default already
+        (#"{ "switchKey": "optionSpace" }"#, [.optionSpace, .shiftEscape]),
+        (#"{ "switchKey": "rightShift" }"#, [.rightShift, .shiftEscape]),
+        (#"{ "switchKey": "off" }"#, [.escape, .shiftEscape]), // "Esc only"
+    ])
+    func oldSwitchKeyMovesToTheDefault(settings json: String, expected: [SwitchKey]?) throws {
+        let settings = dir.appendingPathComponent("settings.json"), apps = dir.appendingPathComponent("apps.json")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        try Data(#"{ "japanese": true }"#.utf8).write(to: url)
-        #expect(Settings.load(from: url).switchKey == .rightOption)
-        try Settings(switchKey: .optionSpace).save(to: url)
-        #expect(Settings.load(from: url).switchKey == .optionSpace)
-        try Data(#"{ "switchKey": "capsLock" }"#.utf8).write(to: url) // unknown: the default
-        #expect(Settings.load(from: url).switchKey == .rightOption)
+        try Data(json.utf8).write(to: settings)
+        AppPolicies.migrateSwitchKey(settings: settings, apps: apps)
+        AppPolicies.migrateSwitchKey(settings: settings, apps: apps) // again: nothing more
+        #expect(AppPolicies.load(from: apps).overrides["*"]?.switchKeys == expected.map(Set.init))
+        let object = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: settings)) as? [String: Any])
+        #expect(object["switchKey"] == nil)
+    }
+
+    /// A default that names its own switch keys keeps them; "off" with Esc sent to the app leaves out Esc.
+    @Test func oldSwitchKeyKeepsWhatAppsJsonSays() throws {
+        let settings = dir.appendingPathComponent("settings.json"), apps = dir.appendingPathComponent("apps.json")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try Data(#"{ "switchKey": "off" }"#.utf8).write(to: settings)
+        try Data(#"{ "*": { "switchKeys": ["rightShift"] } }"#.utf8).write(to: apps)
+        AppPolicies.migrateSwitchKey(settings: settings, apps: apps)
+        #expect(AppPolicies.load(from: apps).defaultPolicy.switchKeys == [.rightShift])
+
+        try Data(#"{ "switchKey": "off" }"#.utf8).write(to: settings)
+        try Data(#"{ "*": { "escapeToApp": true } }"#.utf8).write(to: apps)
+        AppPolicies.migrateSwitchKey(settings: settings, apps: apps)
+        #expect(AppPolicies.load(from: apps).defaultPolicy.switchKeys == [.shiftEscape])
+    }
+
+    /// apps.json from 0.1.9: `escapeToApp` changes the default's Esc for an entry that doesn't
+    /// name its switch keys; a later version's key name is skipped.
+    @Test func oldEscapeToAppAndUnknownKeys() throws {
+        let url = dir.appendingPathComponent("apps.json")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try Data(#"""
+            { "*": { "switchKeys": ["escape", "rightOption", "capsLock"] },
+              "com.microsoft.VSCode": { "escapeToApp": true },
+              "com.example.Notes": { "escapeToApp": false, "switchKeys": ["shiftEscape"] },
+              "com.apple.Terminal": { "escapeToApp": true, "conversionThreshold": 0.97 } }
+            """#.utf8).write(to: url)
+        var policies = AppPolicies.load(from: url)
+        #expect(policies.defaultPolicy.switchKeys == [.escape, .rightOption])
+        #expect(policies.policy(for: "com.microsoft.VSCode").switchKeys == [.rightOption])
+        #expect(policies.policy(for: "com.example.Notes").switchKeys == [.shiftEscape])
+        // Saved again untouched, the old key keeps meaning what it meant.
+        try policies.save(to: url)
+        policies = AppPolicies.load(from: url)
+        #expect(policies.policy(for: "com.apple.Terminal").switchKeys == [.rightOption])
+        #expect(policies.policy(for: "com.apple.Terminal").conversionThreshold == 0.97)
     }
 
     @Test func settingsSaveKeepsUnknownKeys() throws {
@@ -49,8 +94,8 @@ import Testing
 
     @Test func appEntryNamesOnlyWhatDiffersFromTheDefault() throws {
         var policies = AppPolicies()
-        policies.setDefault(AppPolicy(escapeToApp: true))
-        #expect(policies.overrides["*"] == AppPolicy.Override(escapeToApp: true))
+        policies.setDefault(AppPolicy(switchKeys: [.escape]))
+        #expect(policies.overrides["*"] == AppPolicy.Override(switchKeys: [.escape]))
 
         var ghostty = policies.policy(for: "com.mitchellh.ghostty")
         ghostty.conversionThreshold = AppPolicy.strictThreshold

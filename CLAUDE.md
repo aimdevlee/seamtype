@@ -63,12 +63,18 @@ tests use `FakeTextField`). It owns the preview and hysteresis, commits, Esc rea
   those guards, ordinary Japanese phrases split (`chanwokoroshita` → `초무をころした`).
 - In a Strict app, a token of 3 keys or fewer kept English by the threshold wins over a Korean
   preview shown along the way (`gst` stays `gst`); longer words keep the preview's hysteresis.
+- The keys that switch a word's reading are per app (`AppPolicy.switchKeys`; default right ⌥ tap
+  and ⇧Esc). `InputController` turns a chosen tap, ⌥Space or ⇧Esc into `.cycle`, and only a chosen
+  one; an unchosen Esc or ⇧Esc commits and goes to the app. Esc still goes back to the kana in the
+  candidate window and with live conversion. `AppPolicies.migrateSwitchKey` moves 0.1.9's
+  `switchKey` (settings.json) into `"*"`; an entry's old `escapeToApp` still applies until
+  the entry names its own `switchKeys`.
 - Return on an underlined word only confirms it (`returnConfirmsOnly`, on by default); off, the
   app gets the Return too, except after Japanese.
 - Vim reports its modes through `scripts/vim/seamtype.{lua,vim}` (`Seamtype --vim <mode> --app
   $__CFBundleIdentifier`, a distributed notification). `Runtime` hands it to the active controller,
-  which takes it only if vim runs in its app (a signal without `--app`, only where Esc goes to the
-  app). Outside insert mode every key passes straight through, and while
+  which takes it only if vim runs in its app (a signal without `--app`, only where Esc isn't a
+  switch key). Outside insert mode every key passes straight through, and while
   vim reports, Esc is vim's whatever the app's policy says; nothing guesses the mode from keys.
 - A right ⌘ tap (flagsChanged, in `InputController`) pauses the session until the next tap,
   `activate`, or a settings change (a fresh session). The menu icon can't change, so `PauseHUD`
@@ -78,11 +84,13 @@ tests use `FakeTextField`). It owns the preview and hysteresis, commits, Esc rea
 - After a word ends with Space or punctuation, only the word is inserted and `handle` returns
   false, so the app types the key itself, as the system Korean IME does. Inserting "word + space"
   left a stray character in Ghostty. Test harnesses must insert the passed-on key themselves.
-- In an app set to `holdSpace`, Space doesn't commit: the word stays composed with `heldSpace` set
-  and is shown with its space (`show`), rendered as the whole word's decision (`pinned`) so what's
-  underlined is what will go in. Esc cycles it and Delete only clears `heldSpace`; the next letter,
-  Return, Tab, punctuation, a shortcut or a focus change commits the word and its space in one
-  `insertText`. Ghostty sends text committed on a letter key as text and encodes nothing for a key
+- In an app set to `holdSpace` (per app only: the Apps pane offers no default for it, since in `"*"`
+  it would turn off text replacements everywhere), Space doesn't commit: the word stays composed
+  with `heldSpace` set and is shown with its space (`show`), rendered as the whole word's decision
+  (`pinned`) so what's underlined is what will go in. It is still the word being typed: a switch
+  key cycles it, Delete only clears `heldSpace`, and Space on it once switched to Japanese converts.
+  The next letter, Return, Tab, punctuation, a shortcut or a focus change commits the word and its
+  space in one `insertText`. Ghostty sends text committed on a letter key as text and encodes nothing for a key
   the IME consumed while composing, which is what makes this work there; it reports its mouse
   selection as the caret, so the post-commit flip window can't.
 
@@ -135,7 +143,16 @@ runtime.
   names for `releases/latest/download/`, plus the versioned copies.
   Pushing a `v<version>` tag that matches `Resources/Info.plist` runs `.github/workflows/release.yml`,
   which does the same with the certificates and notary credentials from the repo secrets and leaves
-  a draft release with the four assets; write the notes and publish it by hand.
+  a draft release with the four assets and `.github/release-notes.md` as its notes; fill them in
+  and publish it by hand.
+- **Release notes** are in Korean, and About shows their first section in the app
+  (`Release.changes`, `Release.headline`), so write them to these rules:
+  - `## 바뀐 것` first, as a list of `- **제목**: 설명`, then the fixed `## 설치·업데이트` text
+    from the template. About shows each bold lead as a title and the rest under it.
+  - 제목: a short noun phrase, about 10 characters, no period (`입력 중 지우기`, `텍스트 대치`).
+  - 설명: About cuts it at two lines (about 70–80 Korean characters), so the first sentence says
+    what changed; examples, exceptions and setting keys come after it.
+  - What a user notices, not how it was built; a fix says what works now. 3–5 items, biggest first.
   `SEAMTYPE_ZIP=build/release/Seamtype.zip sh scripts/get.sh` tries the zip locally. The pkg installs
   into `/Library/Input Methods` and is not relocatable. Its payload lands in
   `/Library/Application Support/Seamtype/Install` and the postinstall rsyncs it into the existing
@@ -159,7 +176,8 @@ runtime.
   (and the settings window on open and on Check Now); the result is shared through the bundle's
   user defaults. Install downloads `Seamtype.pkg`, requires `pkgutil --check-signature` to show
   the Developer ID Installer of team 2UZ65T3U82 and notarization, then opens it in Installer. So
-  a release must keep the `Seamtype.pkg` asset name and a `v<version>` tag.
+  a release must keep the `Seamtype.pkg` asset name and a `v<version>` tag. About lists the items of
+  the notes' first `## ` section as what changed (see Release notes).
   To try an update before publishing (drafts aren't visible to it), point the check at a file in
   GitHub's format: `defaults write com.aimdevlee.inputmethod.Seamtype updateFeed file:///…/latest.json`
   (its `browser_download_url` may be a file URL to a signed pkg); `defaults delete … updateFeed` after.

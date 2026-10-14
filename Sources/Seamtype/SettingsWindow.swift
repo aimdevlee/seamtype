@@ -6,13 +6,14 @@ import SwiftUI
 /// itself is a background-only app that can't take keyboard focus for a window. It edits the
 /// files in the support folder and tells the input method to read them again.
 enum SettingsTab: String, CaseIterable, Identifiable {
-    case general, typing, apps, learning, about
+    case general, keys, apps, typing, learning, about
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .general: return L("General")
+        case .general: return L("Languages")
+        case .keys: return L("Keys")
         case .typing: return L("Try Typing")
         case .apps: return L("Apps")
         case .learning: return L("Learning")
@@ -22,8 +23,9 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
-        case .general: return "gearshape"
-        case .typing: return "keyboard"
+        case .general: return "globe"
+        case .keys: return "command"
+        case .typing: return "character.cursor.ibeam"
         case .apps: return "macwindow"
         case .learning: return "book.closed"
         case .about: return "info.circle"
@@ -159,6 +161,7 @@ final class SettingsModel: ObservableObject {
 
     init(tab: SettingsTab) {
         self.tab = tab
+        AppPolicies.migrateSwitchKey() // before the window shows (or saves) anything
         reload()
     }
 
@@ -275,22 +278,6 @@ private enum Strictness {
         default: return String(format: "%.2f", threshold)
         }
     }
-}
-
-private func escapeName(_ toApp: Bool) -> String { toApp ? L("Send to app") : L("Switch language") }
-
-/// What the Esc choice does, shown under the picker.
-private func escapeExplanation(_ toApp: Bool) -> String {
-    toApp ? L("Esc finishes the word and goes to the app. ⇧Esc changes the language.")
-          : L("Esc changes the word you're typing, or the one just typed, to another language. The app doesn't get that Esc.")
-}
-
-private func holdSpaceName(_ holds: Bool) -> String { holds ? L("Keep it underlined") : L("Finish the word") }
-
-/// What the Space choice does, shown under the picker.
-private func holdSpaceExplanation(_ holds: Bool) -> String {
-    holds ? L("The word and its space stay underlined until the next word, so Esc can still change it and Delete takes back just the space. For terminals, where a finished word can't be changed.")
-          : L("Space finishes the word, and the app types the space, so its text replacements work.")
 }
 
 private func strictnessExplanation(_ threshold: Double) -> String {
@@ -436,6 +423,7 @@ struct SettingsView: View {
             Group {
                 switch model.tab {
                 case .general: GeneralPane(model: model)
+                case .keys: KeysPane(model: model)
                 case .typing: TypingPane(model: model)
                 case .apps: AppsPane(model: model)
                 case .learning: LearningPane(model: model)
@@ -460,80 +448,36 @@ private struct GeneralPane: View {
 
     var body: some View {
         Form {
-            Section {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(L("Type on the English layout; each word comes out in the language you meant."))
-                        .font(.callout).foregroundStyle(.secondary)
-                    HStack(spacing: 8) {
-                        Example(keys: "dkssud githubdp", output: "안녕 github에")
-                        Example(keys: "hello TextEditdptj", output: "hello TextEdit에서")
-                        Example(keys: "kyouha ␣", output: "今日は")
-                    }
-                }
-                .padding(.vertical, 4)
-            }
             Section(L("Languages")) {
-                LabeledContent(L("Korean · English")) { Text(L("Always on")).foregroundStyle(.secondary) }
+                LabeledContent(L("Korean · English")) {
+                    Text(L("Always on")).foregroundStyle(.secondary)
+                }
                 Toggle(isOn: binding(\.japanese)) {
                     Text(L("Japanese"))
                     Text(L("Romaji becomes kana; Space converts to kanji."))
                 }
-                Group {
-                    Toggle(isOn: binding(\.liveConversion)) {
-                        Text(L("Live conversion"))
-                        Text(L("Shows the top kanji candidate as you type."))
-                    }
-                    Toggle(isOn: binding(\.fullWidthDigits)) {
-                        Text(L("Full-width numbers"))
-                        Text(L("After Japanese, numbers come out full-width (１２３); Space offers 123."))
-                    }
-                    Toggle(isOn: binding(\.fullWidthSpace)) {
-                        Text(L("Full-width space"))
-                        Text(L("After Japanese, Space types a full-width space. ⇧Space types the other width."))
-                    }
-                    LabeledContent {
-                        Button(L("Reset…")) { confirmKanji = true }
-                    } label: {
-                        Text(L("Kanji candidate order"))
-                        Text(L("Kanji you pick in the candidate window come first next time."))
-                    }
-                }
-                .padding(.leading, 18)
-                .disabled(!model.settings.japanese)
             }
-            Section(L("When a word comes out wrong")) {
-                LabeledContent {
-                    Text(verbatim: "Esc").foregroundStyle(.secondary)
-                } label: {
-                    Text(L("Switch its language"))
-                    Text(L("While typing, or right after the word. ⇧Esc in apps where Esc goes to the app."))
+            if model.settings.japanese {
+            Section(L("Japanese input")) {
+                Toggle(isOn: binding(\.liveConversion)) {
+                    Text(L("Live conversion"))
+                    Text(L("Shows the top kanji candidate as you type."))
+                }
+                Toggle(isOn: binding(\.fullWidthDigits)) {
+                    Text(L("Full-width numbers"))
+                    Text(L("１２３ after Japanese; Space offers 123."))
+                }
+                Toggle(isOn: binding(\.fullWidthSpace)) {
+                    Text(L("Full-width space"))
+                    Text(L("A full-width space after Japanese; ⇧Space types the other width."))
                 }
                 LabeledContent {
-                    Button(L("Show Remembered Words")) { model.tab = .learning }
+                    Button(L("Reset…")) { confirmKanji = true }
                 } label: {
-                    Text(L("Remembering"))
-                    Text(L("Correct the same word the same way twice and Seamtype keeps it."))
+                    Text(L("Kanji candidate order"))
+                    Text(L("Kanji you pick come first next time."))
                 }
             }
-            Section(L("Keys")) {
-                Toggle(isOn: binding(\.returnConfirmsOnly)) {
-                    Text(L("Return only confirms"))
-                    Text(L("Return on an underlined English or Korean word confirms it; press it again for a new line or to send. Off, the app gets that Return too. Japanese is always only confirmed."))
-                }
-                Picker(selection: Binding(get: { model.settings.switchKey },
-                                          set: { model.set(\.switchKey, $0) })) {
-                    Text(L("Right ⌥ tap")).tag(SwitchKey.rightOption)
-                    Text(L("⌥Space")).tag(SwitchKey.optionSpace)
-                    Text(L("Right ⇧ tap")).tag(SwitchKey.rightShift)
-                    Text(L("None (Esc only)")).tag(SwitchKey.off)
-                } label: {
-                    Text(L("Language switch key"))
-                    Text(L("Switches the word you're typing, or the one just typed, like ⇧Esc. Apps ignore it, so unlike Esc it never closes a window or clears what you wrote."))
-                }
-                Toggle(isOn: binding(\.rightCommandPause)) {
-                    Text(L("Right ⌘ pauses"))
-                    Text(L("Tap right ⌘ on its own and keys go through as typed in that text field, for hjkl in terminal programs. Tap again, or move to another field, to resume."))
-                }
             }
         }
         .formStyle(.grouped)
@@ -545,7 +489,112 @@ private struct GeneralPane: View {
     }
 }
 
-private struct Example: View {
+// MARK: - Keys
+
+private struct KeysPane: View {
+    @ObservedObject var model: SettingsModel
+    @State private var showInfo = false
+
+    private func binding(_ key: WritableKeyPath<SeamtypeCore.Settings, Bool>) -> Binding<Bool> {
+        Binding(get: { model.settings[keyPath: key] }, set: { model.set(key, $0) })
+    }
+
+    /// Apps whose switch keys differ from the default.
+    private var appsWithOwnKeys: Int {
+        model.apps.filter { $0.entry.applied(to: model.defaultPolicy).switchKeys != model.defaultPolicy.switchKeys }.count
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                LabeledContent {
+                    HStack(spacing: 4) {
+                        KeycapToggles(selection: model.defaultPolicy.switchKeys) { key, on in
+                            model.setDefault { if on { $0.switchKeys.insert(key) } else { $0.switchKeys.remove(key) } }
+                        }
+                        Button { showInfo.toggle() } label: { Image(systemName: "info.circle") }
+                            .buttonStyle(.borderless)
+                            .padding(.leading, 4)
+                            .help(L("Which key to choose"))
+                            .accessibilityLabel(L("Which key to choose"))
+                            .popover(isPresented: $showInfo, arrowEdge: .trailing) { SwitchKeysInfo() }
+                    }
+                } label: {
+                    Text(L("Switch a word's language"))
+                    SwitchKeysStatus(keys: model.defaultPolicy.switchKeys)
+                }
+                LabeledContent {
+                    Button(L("Apps…")) { model.tab = .apps }
+                } label: {
+                    Text(L("In some apps only"))
+                    Text(appsWithOwnKeys == 0 ? L("Every app uses these keys.")
+                         : appsWithOwnKeys == 1 ? L("One app uses its own keys.")
+                         : L("%ld apps use their own keys.", appsWithOwnKeys))
+                }
+            } header: {
+                Text(L("Language switch keys"))
+            }
+            Section(L("Other keys")) {
+                Toggle(isOn: binding(\.returnConfirmsOnly)) {
+                    Text(L("Return only confirms"))
+                    Text(L("Return on an underlined word confirms it; press it again for a new line. Japanese is always only confirmed."))
+                }
+                Toggle(isOn: binding(\.rightCommandPause)) {
+                    Text(L("Right ⌘ tap pauses"))
+                    Text(L("Keys go through as typed in that text field, for hjkl in terminal programs. Tap again to resume."))
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+/// Under the keycaps: what happens to the keys not chosen, or that none is.
+private struct SwitchKeysStatus: View {
+    let keys: Set<SwitchKey>
+
+    var body: some View {
+        let others = SwitchKey.allCases.filter { !keys.contains($0) }
+        Group {
+            if keys.isEmpty {
+                Label(L("Nothing switches a word's language."), systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+            } else if others.isEmpty {
+                Text(L("All of these switch languages."))
+                    .foregroundStyle(.secondary)
+            } else {
+                Text(L("Go to the app as usual: %@", others.map(\.displayName).joined(separator: ", ")))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .font(.subheadline)
+    }
+}
+
+/// What each key is good for, behind the info button.
+private struct SwitchKeysInfo: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(L("Which key to choose")).font(.headline)
+            ForEach(SwitchKey.allCases, id: \.self) { key in
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(key.displayName).font(.callout.weight(.medium))
+                    Text(key.help).font(.callout).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Divider()
+            Text(L("A right ⌥ or ⇧ tap with other modifiers (a Hyper key) is left to what it's bound to."))
+                .font(.callout).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16)
+        .frame(width: 320)
+    }
+}
+
+/// Keys and what they come out as, for trying.
+struct Example: View {
     let keys: String
     let output: String
 
@@ -576,6 +625,14 @@ private struct AppsPane: View {
                     Text(L("Off: keys go to the app as typed, as with the ABC layout."))
                 }
                 Group {
+                    LabeledContent {
+                        HStack(spacing: 10) {
+                            MiniKeycaps(keys: model.defaultPolicy.switchKeys)
+                            Button(L("Change…")) { model.tab = .keys }
+                        }
+                    } label: {
+                        Text(L("Language switch keys"))
+                    }
                     ChoiceRow(title: L("Conversion"),
                               explanation: strictnessExplanation(model.defaultPolicy.conversionThreshold)) {
                         Picker(L("Conversion"), selection: Binding(
@@ -583,22 +640,6 @@ private struct AppsPane: View {
                             set: { value in model.setDefault { $0.conversionThreshold = value } })) {
                             Text(L("Normal")).tag(AppPolicy.standard.conversionThreshold)
                             Text(L("Strict")).tag(AppPolicy.strictThreshold)
-                        }
-                    }
-                    ChoiceRow(title: L("Esc key"), explanation: escapeExplanation(model.defaultPolicy.escapeToApp)) {
-                        Picker(L("Esc key"), selection: Binding(
-                            get: { model.defaultPolicy.escapeToApp },
-                            set: { value in model.setDefault { $0.escapeToApp = value } })) {
-                            Text(L("Switch language")).tag(false)
-                            Text(L("Send to app")).tag(true)
-                        }
-                    }
-                    ChoiceRow(title: L("After Space"), explanation: holdSpaceExplanation(model.defaultPolicy.holdSpace)) {
-                        Picker(L("After Space"), selection: Binding(
-                            get: { model.defaultPolicy.holdSpace },
-                            set: { value in model.setDefault { $0.holdSpace = value } })) {
-                            Text(L("Finish the word")).tag(false)
-                            Text(L("Keep it underlined")).tag(true)
                         }
                     }
                 }
@@ -678,17 +719,19 @@ private struct AppRowView: View {
                     model.setEntry(for: row.id) { $0.conversionThreshold = value }
                 }
                 .frame(width: AppColumns.conversion, alignment: .leading)
-                FieldMenu(own: row.entry.escapeToApp.map(escapeName),
-                          inherited: escapeName(defaultPolicy.escapeToApp),
-                          choices: [(L("Switch language"), false), (L("Send to app"), true)]) { value in
-                    model.setEntry(for: row.id) { $0.escapeToApp = value }
+                SwitchKeysMenu(own: row.entry.switchKeys,
+                               effective: row.entry.applied(to: defaultPolicy).switchKeys,
+                               inherited: defaultPolicy.switchKeys) { value in
+                    model.setEntry(for: row.id) { $0.switchKeys = value }
                 }
-                .frame(width: AppColumns.escape, alignment: .leading)
+                .frame(width: AppColumns.switchKeys, alignment: .leading)
+                // Per app only, for terminals: in "*" it would turn off text replacements everywhere.
                 FieldMenu(own: row.entry.holdSpace.map(holdSpaceName),
                           inherited: holdSpaceName(defaultPolicy.holdSpace),
-                          choices: [(L("Finish the word"), false), (L("Keep it underlined"), true)]) { value in
+                          choices: [(holdSpaceName(false), false), (holdSpaceName(true), true)]) { value in
                     model.setEntry(for: row.id) { $0.holdSpace = value }
                 }
+                .help(L("Hold: Space puts the space inside the underline, so the word can still be changed until the next word starts. For terminals."))
                 .frame(width: AppColumns.space, alignment: .leading)
             }
             .disabled(!(row.entry.enabled ?? defaultPolicy.enabled))
@@ -723,11 +766,14 @@ private struct ChoiceRow<Choice: View>: View {
 
 /// Column widths shared by the exceptions' header and rows.
 private enum AppColumns {
-    static let conversion: CGFloat = 120
-    static let escape: CGFloat = 170
-    static let space: CGFloat = 160
+    static let conversion: CGFloat = 130
+    static let switchKeys: CGFloat = 200
+    static let space: CGFloat = 100
     static let enabled: CGFloat = 90
 }
+
+/// What Space does to the word in an app (`AppPolicy.holdSpace`), as the Apps column shows it.
+private func holdSpaceName(_ holds: Bool) -> String { holds ? L("Hold") : L("Finish") }
 
 /// Names the exceptions' columns after the default settings above them.
 private struct AppColumnsHeader: View {
@@ -736,7 +782,7 @@ private struct AppColumnsHeader: View {
             Text(L("App")).frame(maxWidth: .infinity, alignment: .leading)
             Text(L("Convert words")).frame(width: AppColumns.enabled, alignment: .leading)
             Text(L("Conversion")).frame(width: AppColumns.conversion, alignment: .leading)
-            Text(L("Esc key")).frame(width: AppColumns.escape, alignment: .leading)
+            Text(L("Switch keys")).frame(width: AppColumns.switchKeys, alignment: .leading)
             Text(L("After Space")).frame(width: AppColumns.space, alignment: .leading)
         }
         .font(.caption).foregroundStyle(.secondary).lineLimit(1)
@@ -761,6 +807,39 @@ private struct FieldMenu<Value>: View {
             }
         } label: {
             Text(own ?? L("Default · %@", inherited))
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+    }
+}
+
+/// An app's switch keys: "Default · <keys>" while it follows the default, else its own set,
+/// changed one key at a time (the first change starts from what the app has now).
+private struct SwitchKeysMenu: View {
+    let own: Set<SwitchKey>?
+    let effective: Set<SwitchKey>
+    let inherited: Set<SwitchKey>
+    let set: (Set<SwitchKey>?) -> Void
+
+    var body: some View {
+        Menu {
+            // Checked while the app follows the default; choosing it drops the app's own keys.
+            Toggle(L("Default (%@)", SwitchKey.shortNames(inherited)),
+                   isOn: Binding(get: { own == nil }, set: { if $0 { set(nil) } }))
+            Divider()
+            ForEach(SwitchKey.allCases, id: \.self) { key in
+                Toggle(key.displayName, isOn: Binding(
+                    get: { (own ?? effective).contains(key) },
+                    set: { on in
+                        var keys = own ?? effective
+                        if on { keys.insert(key) } else { keys.remove(key) }
+                        set(keys)
+                    }))
+            }
+        } label: {
+            // A menu's label shows only text.
+            Text(own.map { $0.isEmpty ? L("None — can't switch") : SwitchKey.shortNames($0) }
+                 ?? L("Default · %@", SwitchKey.shortNames(effective)))
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
@@ -800,7 +879,7 @@ private struct LearningPane: View {
                 EmptyList(symbol: search.isEmpty ? "text.book.closed" : "magnifyingglass",
                           title: search.isEmpty ? (showPending ? L("No words corrected once") : L("No remembered words yet"))
                                                 : L("No matches"),
-                          detail: search.isEmpty ? L("Press Esc on a word that came out wrong; correct it the same way twice and it's remembered here.") : nil)
+                          detail: search.isEmpty ? L("Switch a word that came out wrong with the language switch key; correct it the same way twice and it's remembered here.") : nil)
             } else {
                 List {
                     ForEach(words) { WordRow(word: $0, model: model) }
@@ -914,6 +993,32 @@ private struct AboutPane: View {
                     Text(updateTitle)
                     if let detail = updateDetail { Text(detail) }
                 }
+                if let release = updater.available, !release.notes.isEmpty || release.page != nil {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if !release.notes.isEmpty {
+                            Text(L("What's changed")).font(.caption).foregroundStyle(.secondary)
+                        }
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(Array(release.notes.enumerated()), id: \.offset) { _, note in
+                                let line = Release.headline(of: note)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(Self.markdown(line.title))
+                                    if let detail = line.detail {
+                                        Text(Self.markdown(detail))
+                                            .font(.callout).foregroundStyle(.secondary)
+                                            .lineLimit(2).truncationMode(.tail)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                }
+                            }
+                            if let page = release.page {
+                                Link(L("Full Release Notes"), destination: page)
+                            }
+                        }
+                        .padding(.leading, 16)
+                    }
+                    .textSelection(.enabled)
+                }
                 Toggle(isOn: Binding(get: { model.settings.checkForUpdates }, set: { model.set(\.checkForUpdates, $0) })) {
                     Text(L("Check for updates automatically"))
                     Text(L("Once a day, and each time this window opens. Only the latest version number is asked of GitHub; nothing you type is sent."))
@@ -932,6 +1037,10 @@ private struct AboutPane: View {
         }
         .formStyle(.grouped)
     }
+    private static func markdown(_ text: String) -> AttributedString {
+        (try? AttributedString(markdown: text)) ?? AttributedString(text)
+    }
+
     private var updateTitle: String {
         if let release = updater.available { return L("Seamtype %@ is available", release.version) }
         switch updater.state {
