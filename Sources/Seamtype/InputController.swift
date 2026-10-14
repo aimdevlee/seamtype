@@ -426,7 +426,10 @@ private final class IMKClient: TextClient {
     private static let noRange = NSRange(location: NSNotFound, length: 0)
 
     /// A `setMarkedText` is under way: a `commitComposition` arriving now comes from a field
-    /// that won't hold marked text, not from a caret moved elsewhere.
+    /// that won't hold marked text, not from a caret moved elsewhere. Not actor-isolated because
+    /// `IMKClient` isn't; it is only ever touched on the main thread, where IMK delivers both
+    /// `handle` (which sets the marked text) and the client's `commitComposition` callback that
+    /// comes back inside that call.
     nonisolated(unsafe) static var settingMarkedText = false
 
     init(_ input: IMKTextInput) { self.input = input }

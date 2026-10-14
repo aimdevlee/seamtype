@@ -80,7 +80,8 @@ tests use `FakeTextField`). It owns the preview and hysteresis, commits, Esc rea
   text (KakaoTalk's masked password field; it reports no caret or length either). `IMKClient`
   flags the call in progress, `InputController.commitComposition` turns that into
   `clientRefusedComposition`, and the session inserts the keys typed so far as typed and keeps
-  typing letters itself (`compositionRefused`, until the next `activate`). Left to the app, the
+  typing letters itself (`compositionRefused`, until the next `activate`); a commit while the
+  marked text is being cleared (nothing typed) stays an ordinary commit. Left to the app, the
   letters were composed as Hangul by the system there; decided one by one, the Korean ones were
   dropped by the ASCII-only field (`Password` came out `Pao`).
 - A right ⌘ tap (flagsChanged, in `InputController`) pauses the session until the next tap,

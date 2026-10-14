@@ -223,6 +223,9 @@ public final class InputSession {
     /// set: it won't hold one. What was typed so far goes in as typed, and so does the rest of
     /// this field's input (`compositionRefused`). Called from inside the client's `setMarkedText`.
     public func clientRefusedComposition(client: TextClient) {
+        // Nothing being typed: the marked text was being cleared, and a commit asked then is an
+        // ordinary one (a field that commits as it clears is not refusing anything).
+        guard !keys.isEmpty else { commitForNewContext(client: client); return }
         let typed = keys
         resetWord()
         compositionRefused = true

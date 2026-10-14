@@ -23,6 +23,24 @@ final class UncomposingTextField: TextClient {
     func text(in range: NSRange) -> String? { nil }
 }
 
+/// A composing field (a `FakeTextField` underneath) that also asks for a commit whenever its
+/// marked text is cleared.
+final class CommittingWhenClearedTextField: TextClient {
+    let inner = FakeTextField()
+    var onClear: () -> Void = {}
+    var text: String { inner.text }
+
+    func setMarkedText(_ s: String) {
+        inner.setMarkedText(s)
+        if s.isEmpty { onClear() }
+    }
+    func setMarkedText(_ s: String, replacing range: NSRange) { inner.setMarkedText(s, replacing: range) }
+    func insertText(_ s: String, replacing range: NSRange?) { inner.insertText(s, replacing: range) }
+    func selectedRange() -> NSRange { inner.selectedRange() }
+    func markedRange() -> NSRange { inner.markedRange() }
+    func text(in range: NSRange) -> String? { inner.text(in: range) }
+}
+
 /// A field that commits the composition as soon as it is set gets its keys as typed.
 @MainActor @Suite struct RefusedCompositionTests {
     let field = UncomposingTextField()
@@ -59,6 +77,19 @@ final class UncomposingTextField: TextClient {
         field.refusesFrom = 3 // Pa shown, then the field gives up on Pas
         type("Password", into: field) { field.text += $0 }
         #expect(field.text == "Password")
+    }
+
+    /// A field that asks for a commit while the marked text is cleared (nothing typed) isn't
+    /// refusing composition: the next word is still decided.
+    @Test func aCommitWhileClearingIsNotARefusal() {
+        let composing = CommittingWhenClearedTextField()
+        composing.onClear = { [session] in session.clientRefusedComposition(client: composing) }
+        type("hello", into: composing) { composing.insertText($0, replacing: nil) }
+        for _ in 0..<5 { _ = session.handle(.delete, client: composing) }
+        #expect(composing.text == "")
+        #expect(!session.compositionRefused)
+        type("dkssud ", into: composing) { composing.insertText($0, replacing: nil) }
+        #expect(composing.text == "안녕 ")
     }
 
     @Test func theNextFieldComposesAgain() {
