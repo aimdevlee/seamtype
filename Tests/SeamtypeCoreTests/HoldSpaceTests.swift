@@ -150,6 +150,72 @@ import Testing
         #expect(field.text == "へっぉ")
     }
 
+    /// Holding changes when a word goes in, never what goes in: in a Strict app (as terminals are
+    /// usually set) a line comes out the same with or without it.
+    @Test(arguments: ["gst ls", "cd src", "git status", "rm -rf", "ls -al", "gs ", "vi ", "tmux a",
+                      "brew install", "npm run dev", "dkssud gktpdy", "rkskek "])
+    func strictAppTypesTheSameLine(keys: String) {
+        func run(hold: Bool) -> String {
+            let field = FakeTextField()
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("seamtype-hold-strict-\(UUID().uuidString).json")
+            let session = InputSession(engine: LearningEngine(base: splitting, storeURL: url),
+                                       policies: AppPolicies(overrides: ["test.strict": .init(conversionThreshold: AppPolicy.strictThreshold, holdSpace: hold)]))
+            session.activate(app: "test.strict")
+            for ch in keys {
+                let handled = ch.isASCII && ch.isLetter ? session.handle(.letter(ch), client: field)
+                                                        : session.handle(.printable(ch), client: field)
+                if !handled { field.insertText(String(ch), replacing: nil) }
+            }
+            session.commit(client: field)
+            return field.text
+        }
+        #expect(run(hold: true) == run(hold: false))
+    }
+
+    @Test func pausingCommitsTheHeldWordWithItsSpace() {
+        type("dkssud ")
+        session.togglePause(client: field)
+        #expect(field.text == "안녕 " && marked == nil)
+        // Paused, keys go to the app as typed.
+        #expect(type("gk") == [false, false])
+        #expect(field.text == "안녕 gk")
+    }
+
+    @Test func vimLeavingInsertModeCommitsTheHeldWordWithItsSpace() {
+        type("dkssud ")
+        session.vimChanged(to: .normal, client: field)
+        #expect(field.text == "안녕 " && marked == nil)
+    }
+
+    /// ⇧Space on a held word is a second Space: the word goes in with its space, the app types another.
+    @Test func shiftSpaceOnAHeldWordIsASecondSpace() {
+        type("dkssud ")
+        if !session.handle(.shiftSpace, client: field) { field.insertText(" ", replacing: nil) }
+        #expect(field.text == "안녕  " && marked == nil)
+    }
+
+    @Test func aDigitCommitsTheHeldWordAndGoesToTheApp() {
+        type("dkssud 3")
+        #expect(field.text == "안녕 3" && marked == nil)
+    }
+
+    /// With live conversion on too, Space on a held word switched to Japanese converts, without the held space.
+    @Test func spaceOnAHeldWordSwitchedToJapaneseConvertsWithLiveConversion() {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("seamtype-hold-live-\(UUID().uuidString).json")
+        let engine = LearningEngine(base: SplittingEngine(base: trilingual, english: trilingual.english, japanese: trilingual.segmenter), storeURL: url)
+        let live = InputSession(engine: engine, policies: AppPolicies(overrides: ["test.hold": .init(holdSpace: true)]),
+                                converter: FakeConverter(), japaneseEnabled: true, liveConversion: true)
+        live.activate(app: "test.hold")
+        let field = FakeTextField()
+        for ch in "hello" { live.handle(.letter(ch), client: field) }
+        live.handle(.printable(" "), client: field)
+        live.handle(.cycle, client: field)
+        #expect(field.text.hasSuffix(" "))
+        #expect(live.handle(.printable(" "), client: field))
+        #expect(live.conversion != nil)
+        #expect(!field.text.hasSuffix(" "))
+    }
+
     @Test func otherAppsFinishTheWordOnSpace() {
         session.activate(app: "com.example.editor")
         #expect(type("dkssud ").last == false)
