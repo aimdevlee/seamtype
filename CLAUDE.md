@@ -76,6 +76,13 @@ tests use `FakeTextField`). It owns the preview and hysteresis, commits, Esc rea
   which takes it only if vim runs in its app (a signal without `--app`, only where Esc isn't a
   switch key). Outside insert mode every key passes straight through, and while
   vim reports, Esc is vim's whatever the app's policy says; nothing guesses the mode from keys.
+- A field that answers `setMarkedText` by calling `commitComposition` at once won't hold marked
+  text (KakaoTalk's masked password field; it reports no caret or length either). `IMKClient`
+  flags the call in progress, `InputController.commitComposition` turns that into
+  `clientRefusedComposition`, and the session inserts the keys typed so far as typed and keeps
+  typing letters itself (`compositionRefused`, until the next `activate`). Left to the app, the
+  letters were composed as Hangul by the system there; decided one by one, the Korean ones were
+  dropped by the ASCII-only field (`Password` came out `Pao`).
 - A right ⌘ tap (flagsChanged, in `InputController`) pauses the session until the next tap,
   `activate`, or a settings change (a fresh session). The menu icon can't change, so `PauseHUD`
   shows the icon under the caret for a moment, struck through when paused (drawn by

@@ -86,7 +86,14 @@ final class InputController: IMKInputController {
 
     override func commitComposition(_ sender: Any!) {
         MainActor.assumeIsolated {
-            session.commitForNewContext(client: textInput(sender).map(IMKClient.init))
+            if IMKClient.settingMarkedText {
+                // Asked while the marked text was being set: this field won't hold one
+                // (KakaoTalk's masked password field). The keys go in as typed from here on.
+                if let input = textInput(sender) { session.clientRefusedComposition(client: IMKClient(input)) }
+                log.info("composition refused app=\(self.session.app ?? "?", privacy: .public)")
+            } else {
+                session.commitForNewContext(client: textInput(sender).map(IMKClient.init))
+            }
             candidatesWindow?.hide()
         }
     }
@@ -409,15 +416,23 @@ private final class IMKClient: TextClient {
     private let input: IMKTextInput
     private static let noRange = NSRange(location: NSNotFound, length: 0)
 
+    /// A `setMarkedText` is under way: a `commitComposition` arriving now comes from a field
+    /// that won't hold marked text, not from a caret moved elsewhere.
+    nonisolated(unsafe) static var settingMarkedText = false
+
     init(_ input: IMKTextInput) { self.input = input }
 
     func setMarkedText(_ text: String) {
         let length = (text as NSString).length
+        Self.settingMarkedText = true
+        defer { Self.settingMarkedText = false }
         input.setMarkedText(text, selectionRange: NSRange(location: length, length: 0), replacementRange: Self.noRange)
     }
 
     func setMarkedText(_ text: String, replacing range: NSRange) {
         let length = (text as NSString).length
+        Self.settingMarkedText = true
+        defer { Self.settingMarkedText = false }
         input.setMarkedText(text, selectionRange: NSRange(location: length, length: 0), replacementRange: range)
     }
 

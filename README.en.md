@@ -328,7 +328,9 @@ Exact match counts kana/kanji style differences (ひとまとめ vs 一まとめ
 ## Known limits
 
 - Never tested end to end in every app. Secure fields (passwords) bypass input methods, and undo
-  after commit needs apps that report their caret and text.
+  after commit needs apps that report their caret and text. A field that reaches the input method
+  but won't hold an underlined word (KakaoTalk's login password field asks for a commit on every
+  key) gets the keys as typed, with no word decided.
 - Where Esc is a switch key, Esc right after a word (e.g. to close a popup) changes that word first.
   It isn't learned unless repeated; leave Esc out for such apps in the per-app settings.
 - Japanese: only the first clause is resized with ←/→ (Return commits it and moves on to the

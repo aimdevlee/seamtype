@@ -147,6 +147,11 @@ public final class InputSession {
     /// The user paused Seamtype in this text field (a right ⌘ tap): keys go through as typed
     /// until the next tap or another text field.
     public private(set) var paused = false
+    /// The text field answered `setMarkedText` by asking for the composition to be committed:
+    /// it can't hold marked text (KakaoTalk's masked password field does this on every key).
+    /// Nothing can be shown and then replaced there, so keys go in as typed, as a secure field
+    /// takes them, until another text field becomes active.
+    public private(set) var compositionRefused = false
     /// Language of the current preview, so in-phrase symbols know where they belong.
     private var previewLanguage: Language?
     /// The last key passed to the app was a digit (so "." there is a decimal point).
@@ -204,6 +209,33 @@ public final class InputSession {
         previousLanguage = nil
         passedRun = nil
         paused = false
+        compositionRefused = false
+    }
+
+    /// The text field asked for the composition to be committed while its marked text was being
+    /// set: it won't hold one. What was typed so far goes in as typed, and so does the rest of
+    /// this field's input (`compositionRefused`). Called from inside the client's `setMarkedText`.
+    public func clientRefusedComposition(client: TextClient) {
+        let typed = keys
+        resetWord()
+        compositionRefused = true
+        previousLanguage = nil
+        if !typed.isEmpty { client.insertText(typed, replacing: nil) }
+    }
+
+    /// Forgets the word being typed without committing it.
+    private func resetWord() {
+        closeFlipWindow()
+        conversion = nil
+        keys = ""
+        forced = nil
+        forcedByUser = false
+        pinned = nil
+        syllableStart = nil
+        addedNMarker = false
+        previewLanguage = nil
+        enginePreview = nil
+        liveSuppressed = false
     }
 
     /// Pauses or resumes Seamtype in this text field; what was being typed goes in first.
@@ -228,6 +260,16 @@ public final class InputSession {
     /// Returns true when the key was consumed.
     public func handle(_ key: Key, client: TextClient) -> Bool {
         guard policy.enabled, !paused else { return false }
+        if compositionRefused {
+            // Typed by Seamtype, not left to the app: a letter the app gets back from a Korean
+            // input source is composed as Hangul by the system, not typed as pressed.
+            resetWord()
+            if case .letter(let ch) = key {
+                client.insertText(String(ch), replacing: nil)
+                return true
+            }
+            return false
+        }
         if vimMode == .normal {
             // Vim's normal mode: every key is a command. ⇧Esc is the way out if vim's last word
             // was lost (Vim not seeing the terminal's focus change): it only says "decide words".

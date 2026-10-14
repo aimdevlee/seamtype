@@ -9,6 +9,8 @@ first section (## 바뀐 것) in the app, so follow the rules in CLAUDE.md (Rele
 -->
 ## 바뀐 것
 
+- **비밀번호 칸**: 밑줄 친 단어를 두지 못하는 칸에서 글자가 빠지던 것을 고쳤습니다. 카카오톡 로그인의 비밀번호 칸처럼 글자마다 바로 확정을 요구하는 칸에서는 친 그대로 들어갑니다(`Password` → 전에는 `Pao`).
+
 ## 설치·업데이트
 
 설치 파일 [`Seamtype.pkg`](https://github.com/aimdevlee/seamtype/releases/latest/download/Seamtype.pkg)를 받아 열고 안내대로 설치하세요. 0.1.6 이상이라면 입력 메뉴나 설정 창의 **정보**에서 바로 업데이트할 수 있습니다.
