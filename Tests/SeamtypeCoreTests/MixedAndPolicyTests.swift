@@ -11,6 +11,8 @@ let splitting = SplittingEngine(base: sharedEngine, english: sharedEngine.englis
         // Names typed with their capitals, in the word list or not.
         ("TextEditdptj", "TextEdit에서"), ("Slackdptj", "Slack에서"), ("VSCodedptj", "VSCode에서"),
         ("GitHubdp", "GitHub에"), ("iPhonedptj", "iPhone에서"),
+        // Acronyms starting on a Korean shift key, typed in capitals throughout.
+        ("TVdp", "TV에"), ("QAfmf", "QA를"), ("RNdms", "RN은"),
     ])
     func splitsEnglishPlusParticle(keys: String, expected: String) {
         let d = splitting.decide(keys, context: DecisionContext())
@@ -19,7 +21,7 @@ let splitting = SplittingEngine(base: sharedEngine, english: sharedEngine.englis
     }
 
     // A lingering Shift (ㄲ then ㅜ as N) doesn't make the front a name: no split.
-    @Test(arguments: [("RNfdmf", "꿀을"), ("qkRNleh", "바뀌도"), ("djEJsrj", "어떤거")])
+    @Test(arguments: [("RNfdmf", "꿀을"), ("qkRNleh", "바뀌도"), ("djEJsrj", "어떤거"), ("TMfkrh", "쓰라고")])
     func lingeringShiftIsNotAName(keys: String, expected: String) {
         let d = splitting.decide(keys, context: DecisionContext())
         #expect(d.language == .korean, "\(keys) → \(d.output) \(d.explanation)")

@@ -35,6 +35,9 @@ let sharedEngine = HeuristicEngine()
     @Test(arguments: [
         ("djEJs", "어떤"), ("qkRNl", "바뀌"), ("qkRNleh", "바뀌도"), ("RNfdmf", "꿀을"),
         ("EKfktj", "따라서"), ("TkdRjvnf", "쌍꺼풀"), ("TKdRJvnf", "쌍꺼풀"),
+        // Reported on the PR (HyeonWooLee).
+        ("djEJfRkdy", "어떨까요"), ("gkfRK", "할까"), ("wlsWK", "진짜"), ("TMfkrh", "쓰라고"),
+        ("qkRNjTdj", "바꿨어"), ("ahtjflWHrdl", "모서리쪽이"), ("RKwl", "까지"),
     ])
     func lingeringShiftAfterDoubleConsonantStaysKorean(keys: String, expected: String) {
         let d = sharedEngine.decide(keys, context: DecisionContext())
@@ -42,12 +45,17 @@ let sharedEngine = HeuristicEngine()
         #expect(d.output == expected)
     }
 
-    // A capital that no lingering Shift explains is still only ever English.
-    @Test(arguments: ["Hello", "API", "TV", "OK", "QA", "WE", "QUICK", "TEst", "iPhone", "GitHub", "dHello"])
+    // A capital that no lingering Shift explains is still only ever English, after a Korean
+    // word too. A Shift lingers between lowercase keys, so an acronym typed in capitals
+    // throughout (TM, RN, TL) keeps the rule even when it starts on a Korean shift key.
+    @Test(arguments: ["Hello", "API", "TV", "OK", "QA", "WE", "QUICK", "TEst", "iPhone", "GitHub", "dHello",
+                      "TM", "EU", "RN", "TL", "THe", "WHat", "THis", "QUery"])
     func capitalsOutsideKoreanShiftKeysStayEnglish(word: String) {
-        let d = sharedEngine.decide(word, context: DecisionContext())
-        #expect(d.language == .english, "\(word) → \(d.output) \(d.explanation)")
-        #expect(d.output == word)
+        for previous in [nil, Language.english, .korean] {
+            let d = sharedEngine.decide(word, context: DecisionContext(previousLanguage: previous))
+            #expect(d.language == .english, "\(word) after \(String(describing: previous)) → \(d.output) \(d.explanation)")
+            #expect(d.output == word)
+        }
     }
 
     @Test func mixedSentence() {

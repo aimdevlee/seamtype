@@ -154,8 +154,10 @@ public final class SplittingEngine: DecisionEngine, @unchecked Sendable {
         guard spelling < mixedWordSpellingCeiling, !RomajiComposer.compose(keys).isClean else { return nil }
         for start in stride(from: chars.count - 2, through: 2, by: -1) {
             let front = String(chars[..<start]), back = String(chars[start...])
-            // Capitals count only when one has no Korean meaning (ThkT is 쐈, not a name).
-            guard (Self.hasEnglishOnlyCapital(front) && (Self.isAcronym(front) || Self.isCapitalizedName(front)))
+            // Capitals count only when one has no Korean meaning (ThkT is 쐈, not a name). Judged
+            // on the whole token: the front alone has no lowercase to show a lingering Shift
+            // (TMfkrh is 쓰라고, not TM라고).
+            guard (Self.hasEnglishOnlyCapital(keys) && (Self.isAcronym(front) || Self.isCapitalizedName(front)))
                     || (front.count >= 3 && english.isKnownWord(front)),
                   back.first.map(DubeolsikLayout.startsSyllable) == true,
                   let composed = HangulComposer.compose(keys: back), composed.strayJamo.isEmpty,
@@ -164,7 +166,7 @@ public final class SplittingEngine: DecisionEngine, @unchecked Sendable {
                     || (spelling < unknownWordSpellingCeiling
                         && composed.syllables.allSatisfy { korean.syllableLogProbability($0) > KoreanModel.unknownSyllableLogP })
             else { continue }
-            guard Self.hasEnglishOnlyCapital(front) || !readsAsKorean(keys) else { return nil }
+            guard Self.hasEnglishOnlyCapital(keys) || !readsAsKorean(keys) else { return nil }
             return MixedWord(english: front, koreanKeys: back, korean: composed.text)
         }
         return nil

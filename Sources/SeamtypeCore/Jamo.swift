@@ -66,11 +66,14 @@ public enum DubeolsikLayout {
     /// capitals that starts on a Korean shift key (어떤 typed fast is djEJs, 바뀌 is qkRNl:
     /// Shift was still down for the vowel after ㄸ or ㄲ). Such keys read as Korean or
     /// English by their scores; any other capital (Hello, API, dHello) is only ever English.
+    /// A Shift lingers between lowercase keys, so a word typed in capitals throughout (TM,
+    /// RN, TL: acronyms) gets no such allowance.
     public static func hasEnglishOnlyCapital(_ keys: String) -> Bool {
+        let hasLowercase = keys.contains(where: \.isLowercase)
         var shiftLingers = false
         for key in keys {
             if !key.isUppercase { shiftLingers = false }
-            else if isKoreanShiftKey(key) { shiftLingers = true }
+            else if isKoreanShiftKey(key) { shiftLingers = hasLowercase }
             else if !shiftLingers { return true }
         }
         return false

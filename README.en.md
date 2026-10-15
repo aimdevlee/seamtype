@@ -290,7 +290,7 @@ Locally, in this order. A keystroke's preview takes at most ~3 ms and a word's f
      - These split only when the Korean side breaks, so ordinary Japanese phrases stay whole.
 3. **Rules:** shift on a letter with no shifted jamo (`Hello`, `API`) is English, except when it
    lingers from a double consonant onto the next key (`djEJs` → `어떤`, `qkRNl` → `바뀌`): those
-   go by the scores.
+   go by the scores. An acronym typed in capitals throughout (`TM`, `RN`) stays English.
 4. **Heuristic:** the keys are scored per keystroke in all three languages, plus a nudge toward the
    previous word's language.
    - English: character trigrams, and a floor for words in the SCOWL list, by how common they are

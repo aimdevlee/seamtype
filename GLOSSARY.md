@@ -12,7 +12,8 @@ _Avoid_: double-consonant key, QWERTOP
 
 **Lingering Shift** (늦게 뗀 Shift):
 Shift still held after a Korean shift key, so the next key arrives as a capital with no shifted
-jamo (어떤 typed fast is `djEJs`). Read as Korean typed fast, not as English.
+jamo (어떤 typed fast is `djEJs`). It happens between lowercase keys: a word typed in capitals
+throughout (`TM`) is an acronym, not a lingering Shift.
 _Avoid_: stray Shift, Shift leak
 
 **English-only capital**:
