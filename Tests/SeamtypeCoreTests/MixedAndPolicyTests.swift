@@ -18,6 +18,14 @@ let splitting = SplittingEngine(base: sharedEngine, english: sharedEngine.englis
         #expect(d.output == expected)
     }
 
+    // A lingering Shift (ㄲ then ㅜ as N) doesn't make the front a name: no split.
+    @Test(arguments: [("RNfdmf", "꿀을"), ("qkRNleh", "바뀌도"), ("djEJsrj", "어떤거")])
+    func lingeringShiftIsNotAName(keys: String, expected: String) {
+        let d = splitting.decide(keys, context: DecisionContext())
+        #expect(d.language == .korean, "\(keys) → \(d.output) \(d.explanation)")
+        #expect(d.output == expected)
+    }
+
     // A whole Korean word straight after an English one, no space.
     @Test(arguments: [
         ("hellodnjfem", "hello월드"), ("githubtjqj", "github서버"), ("loginghkaus", "login화면"),

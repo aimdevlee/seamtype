@@ -178,8 +178,9 @@ public final class SplittingEngine: DecisionEngine, @unchecked Sendable {
         }
     }
 
+    /// A capital no lingering Shift explains (RNl, 꿀 typed fast, isn't a name).
     static func hasEnglishOnlyCapital(_ front: String) -> Bool {
-        front.contains { $0.isUppercase && !DubeolsikLayout.isKoreanShiftKey($0) }
+        DubeolsikLayout.hasEnglishOnlyCapital(front)
     }
 
     private func readsAsKorean(_ keys: String) -> Bool {

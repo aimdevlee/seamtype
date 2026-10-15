@@ -288,7 +288,9 @@ Locally, in this order. A keystroke's preview takes at most ~3 ms and a word's f
        `kyouhaehtlfkrdms` → `きょうは도시락은`. The Japanese part is committed on the spot, so with
        live conversion it goes in as `履歴를`, `今日は도시락은`.
      - These split only when the Korean side breaks, so ordinary Japanese phrases stay whole.
-3. **Rules:** shift on a letter with no shifted jamo (`Hello`, `API`) is English.
+3. **Rules:** shift on a letter with no shifted jamo (`Hello`, `API`) is English, except when it
+   lingers from a double consonant onto the next key (`djEJs` → `어떤`, `qkRNl` → `바뀌`): those
+   go by the scores.
 4. **Heuristic:** the keys are scored per keystroke in all three languages, plus a nudge toward the
    previous word's language.
    - English: character trigrams, and a floor for words in the SCOWL list, by how common they are

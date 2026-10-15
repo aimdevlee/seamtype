@@ -62,6 +62,20 @@ public enum DubeolsikLayout {
     /// letter is a signal the user is typing English.
     public static func isKoreanShiftKey(_ key: Character) -> Bool { shifted[key] != nil }
 
+    /// A capital on a key with no shifted jamo, not counting a lingering Shift: a run of
+    /// capitals that starts on a Korean shift key (어떤 typed fast is djEJs, 바뀌 is qkRNl:
+    /// Shift was still down for the vowel after ㄸ or ㄲ). Such keys read as Korean or
+    /// English by their scores; any other capital (Hello, API, dHello) is only ever English.
+    public static func hasEnglishOnlyCapital(_ keys: String) -> Bool {
+        var shiftLingers = false
+        for key in keys {
+            if !key.isUppercase { shiftLingers = false }
+            else if isKoreanShiftKey(key) { shiftLingers = true }
+            else if !shiftLingers { return true }
+        }
+        return false
+    }
+
     /// The jamo a key produces, or nil for non-letters.
     /// Uppercase letters without a shifted jamo fall back to the lowercase jamo,
     /// mirroring how the macOS 2-set keyboard behaves.

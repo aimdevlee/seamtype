@@ -30,6 +30,26 @@ let sharedEngine = HeuristicEngine()
         #expect(d.output == expected)
     }
 
+    // Shift held a key too long after a double consonant (어떤's ㄸ, 바뀌's ㄲ) capitalizes the
+    // next key, which has no shifted jamo. That is Korean typed fast, not English.
+    @Test(arguments: [
+        ("djEJs", "어떤"), ("qkRNl", "바뀌"), ("qkRNleh", "바뀌도"), ("RNfdmf", "꿀을"),
+        ("EKfktj", "따라서"), ("TkdRjvnf", "쌍꺼풀"), ("TKdRJvnf", "쌍꺼풀"),
+    ])
+    func lingeringShiftAfterDoubleConsonantStaysKorean(keys: String, expected: String) {
+        let d = sharedEngine.decide(keys, context: DecisionContext())
+        #expect(d.language == .korean, "\(keys) → \(d.output) \(d.explanation)")
+        #expect(d.output == expected)
+    }
+
+    // A capital that no lingering Shift explains is still only ever English.
+    @Test(arguments: ["Hello", "API", "TV", "OK", "QA", "WE", "QUICK", "TEst", "iPhone", "GitHub", "dHello"])
+    func capitalsOutsideKoreanShiftKeysStayEnglish(word: String) {
+        let d = sharedEngine.decide(word, context: DecisionContext())
+        #expect(d.language == .english, "\(word) → \(d.output) \(d.explanation)")
+        #expect(d.output == word)
+    }
+
     @Test func mixedSentence() {
         #expect(converter.convert("dkssudgktpdy, hello world!").output == "안녕하세요, hello world!")
         #expect(converter.convert("dlrjs github dp commit gkf rjdi").output == "이건 github 에 commit 할 거야")

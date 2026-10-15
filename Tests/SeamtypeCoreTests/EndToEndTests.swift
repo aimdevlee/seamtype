@@ -62,6 +62,13 @@ import Testing
         #expect(field.text == expected)
     }
 
+    /// Shift held a key too long after ㄸ or ㄲ (어떤 as djEJs) in a terminal, after English too.
+    @Test func lingeringShiftTypesKorean() {
+        session.activate(app: "test.terminal")
+        type("ok djEJs qkRNleh TkdRJvnf Hello API ")
+        #expect(field.text == "ok 어떤 바뀌도 쌍꺼풀 Hello API ")
+    }
+
     /// In a terminal (0.97), 어떻게 after an English word is 0.969 sure: what was shown is committed.
     @Test func spaceCommitsWhatThePreviewShows() {
         session.activate(app: "test.terminal")
