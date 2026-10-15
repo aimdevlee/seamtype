@@ -323,7 +323,7 @@ never used to build the models (`tools/prepare.sh`):
 
 | | Japanese off (en/ko) | Japanese on (en/ko/ja) |
 | --- | --- | --- |
-| Accuracy | 99.80% | 99.48% |
+| Accuracy | 99.82% | 99.50% |
 
 That set counts every word once and seldom puts it after the other language. But real text is
 mostly its most frequent words, and switching language mid-sentence is the point, so the 10,000
@@ -332,11 +332,11 @@ most frequent English and Korean words are also scored after each kind of word
 
 | | after nothing | after the same language | after the other | after Japanese |
 | --- | --- | --- | --- | --- |
-| Korean words | 9 / 42 | 2 / 16 | 16 / 159 | 9 / 46 |
+| Korean words | 9 / 33 | 2 / 15 | 14 / 63 | 9 / 34 |
 | English words | 2 / 47 | 0 / 21 | 8 / 71 | 2 / 86 |
 
 Before the SCOWL and Korean word lists and the switch-aware nudge, that was 94 / 785 in all; now
-it is 48 / 488. These lists were used while tuning those rules, so they're a guide, not a
+it is 46 / 370. These lists were used while tuning those rules, so they're a guide, not a
 held-out score. Many remaining misses are genuinely ambiguous keys: `so`/내, `go`/해, `did`/양.
 
 Kanji conversion, top candidate exactly matching the original text (held-out Tatoeba):
@@ -397,4 +397,5 @@ or copied into it in `Contents/Resources/ThirdPartyNotices.txt`, collected by
 - English/Korean frequency lists:
   [hermitdave/FrequencyWords](https://github.com/hermitdave/FrequencyWords), CC-BY-SA 4.0. Used
   for evaluation; the Korean list also ships as `korean_vocabulary.txt` (for splitting an English
-  word from a Korean one), under the same license, with its notice in the app.
+  word from a Korean one, and for Korean words Tatoeba's sentences lack: 혜택, 닥터), under the
+  same license, with its notice in the app.

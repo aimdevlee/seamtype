@@ -131,6 +131,10 @@ public final class HeuristicEngine: DecisionEngine, @unchecked Sendable {
     public var switchBiasFactor = 0.25
     /// Score floors for a Korean word seen in real text (two or more syllables, one), the
     /// counterpart of the English dictionary floor: 내가, 무슨 stay Korean after English.
+    /// A word only in the wider vocabulary (닥터, 했죠: too rare for Tatoeba's sentences), or a
+    /// noun the lists have only with a particle (혜택), gets the long floor too, unless the keys
+    /// are an English word: that list comes from subtitles, and work (재가) or ahem (모드) must
+    /// stay English.
     public var koreanKnownFloor = (long: -1.4, short: -2.0)
     /// How far Japanese must lead before a known English word is turned into kana
     /// outside Japanese text.
@@ -170,7 +174,10 @@ public final class HeuristicEngine: DecisionEngine, @unchecked Sendable {
         if keys.contains(where: { !$0.isLetter }) { e -= 3 } // "ra-men", "kan'i" aren't English
 
         var k = korean.score(keys: keys, partial: context.partial)
-        let knownKorean = k.map { $0.composition.strayJamo.isEmpty && korean.isKnownWord($0.composition.text) } ?? false
+        let knownKorean = k.map {
+            $0.composition.strayJamo.isEmpty && (korean.isKnownWord($0.composition.text)
+                || (!known && (korean.isVocabularyWord($0.composition.text) || korean.isKnownStem($0.composition.text))))
+        } ?? false
         if let score = k, knownKorean {
             let floor = score.composition.syllables.count >= 2 ? koreanKnownFloor.long : koreanKnownFloor.short
             k = KoreanModel.Score(averageLogProbability: max(score.averageLogProbability, floor), composition: score.composition)

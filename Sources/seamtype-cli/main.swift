@@ -108,15 +108,17 @@ case "--decide":
     exit(0)
 case "--type":
     // Each line's keys and a Space through a fresh InputSession (real engines, no converter):
-    // what ends up in the field, as typed.
+    // what ends up in the field, as typed. SEAMTYPE_THRESHOLD=0.97: as in a Strict app.
     let withJapanese = args.count > 1 && args[1] == "--japanese"
     let heuristic = HeuristicEngine(japanese: withJapanese ? JapaneseModel.shared : nil)
+    let threshold = ProcessInfo.processInfo.environment["SEAMTYPE_THRESHOLD"].flatMap(Double.init)
+    let policies = AppPolicies(overrides: threshold.map { ["*": AppPolicy.Override(conversionThreshold: $0)] } ?? [:])
     MainActor.assumeIsolated {
         let engine = LearningEngine(base: SplittingEngine(base: heuristic, english: heuristic.english, japanese: heuristic.segmenter),
                                     storeURL: FileManager.default.temporaryDirectory.appendingPathComponent("seamtype-type-\(UUID().uuidString).json"))
         while let keys = readLine() {
             let field = PlainTextField()
-            let session = InputSession(engine: engine, japaneseEnabled: withJapanese)
+            let session = InputSession(engine: engine, policies: policies, japaneseEnabled: withJapanese)
             for ch in keys + " " {
                 let handled = ch.isLetter ? session.handle(.letter(ch), client: field) : session.handle(.printable(ch), client: field)
                 if !handled { field.insertText(String(ch), replacing: nil) } // the app types keys passed on

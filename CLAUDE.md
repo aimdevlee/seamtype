@@ -43,7 +43,7 @@ is a thin IMK layer over it. `seamtype-cli` is for tuning and evaluation.
 made twice wins) → `SplittingEngine` (`MixedWord.swift`) → `HeuristicEngine`.
 - `SplittingEngine` handles English + Korean particle (`github에`), a single letter + particle
   (`xdp` → `x에`, not 도/나 after a lowercase letter), English + whole Korean word (`hello월드`,
-  using `Data/korean_vocabulary.txt`, which is only for this) and English + Japanese particle
+  using `Data/korean_vocabulary.txt`, which `HeuristicEngine` also uses for its Korean word floor) and English + Japanese particle
   (`githubで`). Its decisions have confidence 0.98 (`SplittingEngine.confidence`), above Strict
   (0.97), so they split in a strict app too.
 - English + particle, Korean or Japanese, is decided by `ParticleSplitter`: the split is one more

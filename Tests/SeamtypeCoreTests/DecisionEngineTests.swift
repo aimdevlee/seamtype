@@ -86,6 +86,24 @@ let sharedEngine = HeuristicEngine()
         #expect(converter.convert("dlrj go").output == "이거 해")
     }
 
+    /// A Korean word that Tatoeba's sentences lack (닥터, 했죠), or have only with a particle
+    /// (혜택 from 혜택을), is as sure after English as a Strict app needs. An English word whose
+    /// keys spell a listed one (work: 재가, ahem: 모드) stays English.
+    @Test(arguments: [("gPxor", "혜택"), ("ekrxj", "닥터"), ("goTwy", "했죠"), ("whwl", "조지")])
+    func vocabularyWordsAfterEnglish(keys: String, expected: String) {
+        let d = sharedEngine.decide(keys, context: DecisionContext(previousLanguage: .english))
+        #expect(d.language == .korean && d.output == expected, "\(keys) → \(d.output) \(d.explanation)")
+        #expect(d.confidence >= AppPolicy.strictThreshold, "\(keys) \(d.explanation)")
+    }
+
+    @Test(arguments: ["work", "ahem", "claus"])
+    func englishWordsSpellingVocabularyStayEnglish(word: String) {
+        for previous in [nil, Language.korean] {
+            let d = sharedEngine.decide(word, context: DecisionContext(previousLanguage: previous))
+            #expect(d.language == .english, "\(word) after \(String(describing: previous)) → \(d.output) \(d.explanation)")
+        }
+    }
+
     @Test func learningOverridesBase() throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("seamtype-test-\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: url) }

@@ -60,10 +60,36 @@ public struct KoreanModel: Sendable {
     /// A word that occurs in real Korean text (the composed Hangul, not the keys).
     public func isKnownWord(_ hangul: String) -> Bool { words.contains(hangul) }
 
-    /// A word in the wider vocabulary (loanwords like 월드, 서버), for English + Korean splits.
+    /// A word in the wider vocabulary (loanwords like 월드, 서버; 혜택), for English + Korean splits
+    /// and the heuristic's Korean word floor.
     public func isVocabularyWord(_ hangul: String) -> Bool {
         words.contains(hangul) || Self.vocabulary.contains(hangul)
     }
+
+    /// A noun the lists only have with a case particle (혜택 from 혜택을, 혜택으로): they
+    /// count words with their particles, so a bare noun can be missing from both.
+    public func isKnownStem(_ hangul: String) -> Bool { Self.stems.contains(hangul) }
+
+    /// Case particles, by what the noun must end in: a final consonant (을), none (를), or either.
+    private static let particles: [(String, Bool?)] = [
+        ("을", true), ("은", true), ("이", true), ("과", true), ("으로", true),
+        ("를", false), ("는", false), ("가", false), ("와", false),
+        ("에", nil), ("의", nil), ("도", nil), ("에서", nil), ("만", nil),
+    ]
+
+    private static let stems: Set<String> = {
+        var stems = Set<String>()
+        for word in corpusWords.union(vocabulary) {
+            for (particle, final) in particles where word.hasSuffix(particle) {
+                let stem = word.dropLast(particle.count)
+                guard stem.count >= 2, let last = stem.last?.unicodeScalars.first?.value,
+                      (0xAC00...0xD7A3).contains(last) else { continue }
+                let hasFinal = (last - 0xAC00) % 28 != 0
+                if final == nil || final == hasFinal { stems.insert(String(stem)) }
+            }
+        }
+        return stems
+    }()
 
     private static let vocabulary: Set<String> = {
         guard let url = Resources.koreanVocabulary, let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }

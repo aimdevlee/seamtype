@@ -85,6 +85,14 @@ import Testing
         #expect(field.text == "esc 어떻게 생각해?")
     }
 
+    /// In a terminal, a noun the word lists have only with a particle (혜택) still converts
+    /// after an English word.
+    @Test func terminalKoreanNounAfterEnglish() {
+        session.activate(app: "test.terminal")
+        type("hello gPxor ")
+        #expect(field.text == "hello 혜택 ")
+    }
+
     /// In a terminal Esc belongs to the app (vim): the word goes in as shown and Esc goes on.
     @Test func terminalEscapeGoesToTheApp() {
         session.activate(app: "test.terminal")
