@@ -298,7 +298,9 @@ public final class LearningEngine: DecisionEngine, @unchecked Sendable {
 
     public func decide(_ keys: String, context: DecisionContext) -> Decision {
         if let learned = lock.withLock({ store.learned[keys] }) {
-            return Decision(language: learned, confidence: 1, output: render(keys, as: learned), explanation: "learned")
+            // Rendered by the base engine: this engine's own render(.mixed) would ask it to
+            // decide the keys again, find them learned, and so on without end.
+            return Decision(language: learned, confidence: 1, output: base.render(keys, as: learned), explanation: "learned")
         }
         return base.decide(keys, context: context)
     }

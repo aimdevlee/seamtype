@@ -30,6 +30,20 @@ import Testing
         }
     }
 
+    /// A word learned as mixed (gitlabdp → gitlab에) renders through the base engine: through
+    /// the learning engine itself it came back as learned again, without end (a stack overflow
+    /// while typing, 2026-10-15).
+    @Test func learnedMixedWordRendersWithoutRecursing() {
+        learning.learn("gitlabdp", as: .mixed, engineChoice: .english)
+        learning.learn("gitlabdp", as: .mixed, engineChoice: .english)
+        #expect(learning.learned["gitlabdp"] == .mixed)
+        let d = learning.decide("gitlabdp", context: DecisionContext())
+        #expect(d.language == .mixed)
+        #expect(d.output == "gitlab에")
+        type("gitlabdp ")
+        #expect(field.text == "gitlab에 ")
+    }
+
     /// The engine is unsure about "so" (English, 0.55): an Esc to 내 must still count.
     @Test func escWhileTypingIsLearnedTheSecondTime() {
         type("so⎋ ")
