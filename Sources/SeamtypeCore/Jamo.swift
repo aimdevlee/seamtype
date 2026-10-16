@@ -82,8 +82,9 @@ public enum DubeolsikLayout {
     /// a double consonant comes a vowel (djEJs, 어떤), or, when the double consonant is a final one
     /// (a vowel key before it), the next syllable's consonant (dlTDj, 있어). After ㅒ or ㅖ typed on a
     /// consonant comes a consonant (dPFmf, 예를); at the start of a word (PDF, OAuth) nothing lingers.
+    /// The key before has to be lowercase: a capital there (RPA, TPS) was Shift on purpose.
     private static func lingers(after shiftKey: Character, twoBack: Character?, on key: Character) -> Bool {
-        let before = twoBack.flatMap(jamo(for:))
+        let before = twoBack.flatMap { $0.isLowercase ? jamo(for: $0) : nil }
         switch shifted[shiftKey] {
         case "ㅃ", "ㅉ", "ㄸ", "ㄲ", "ㅆ":
             if isVowelKey(key) { return true }
