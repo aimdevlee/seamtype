@@ -20,13 +20,22 @@ let splitting = SplittingEngine(base: sharedEngine, english: sharedEngine.englis
         #expect(d.output == expected)
     }
 
-    // A lingering Shift (ㄲ then ㅜ as N) doesn't make the front a name: no split. A word that
-    // reads as Korean throughout stays Korean even when its first two keys spell an acronym
-    // (TM, TL): 쓰정책 and 씨서버 are what TMwjdcor and TLtjqj give, the one shape that can't be told apart.
-    @Test(arguments: [("RNfdmf", "꿀을"), ("qkRNleh", "바뀌도"), ("djEJsrj", "어떤거"), ("TMfkrh", "쓰라고"),
-                      ("EKfktj", "따라서"), ("RJsoek", "꺼내다"), ("WHroek", "쪼개다"), ("TMfprl", "쓰레기"),
-                      ("RUdksrh", "껴안고"), ("ELehdrkq", "띠동갑"), ("TMwjdcor", "쓰정책"), ("TLtjqj", "씨서버")])
+    // A lingering Shift (ㄲ then ㅜ as N) doesn't make the front a name: no split.
+    @Test(arguments: [("RNfdmf", "꿀을"), ("qkRNleh", "바뀌도"), ("djEJsrj", "어떤거"), ("TMfkrh", "쓰라고")])
     func lingeringShiftIsNotAName(keys: String, expected: String) {
+        let d = splitting.decide(keys, context: DecisionContext())
+        #expect(d.language == .korean, "\(keys) → \(d.output) \(d.explanation)")
+        #expect(d.output == expected)
+    }
+
+    // Fast-typed Korean whose first two keys spell an acronym stays Korean: it reads as Korean
+    // throughout (따라서 as EKfktj), or no known Korean word follows the would-be acronym (뾰족한 as
+    // QYwhrgks, 뾰 being a syllable the model hardly knows). 쓰정책 and 씨서버 are what TMwjdcor and
+    // TLtjqj give: the acronym + Korean word shape that can't be told from Korean.
+    @Test(arguments: [("EKfktj", "따라서"), ("RJsoek", "꺼내다"), ("WHroek", "쪼개다"), ("TMfprl", "쓰레기"),
+                      ("RUdksrh", "껴안고"), ("ELehdrkq", "띠동갑"), ("QYwhrgks", "뾰족한"), ("QLdpfh", "삐에로"),
+                      ("TMwjdcor", "쓰정책"), ("TLtjqj", "씨서버")])
+    func acronymShapedKoreanStaysKorean(keys: String, expected: String) {
         let d = splitting.decide(keys, context: DecisionContext())
         #expect(d.language == .korean, "\(keys) → \(d.output) \(d.explanation)")
         #expect(d.output == expected)
@@ -42,7 +51,8 @@ let splitting = SplittingEngine(base: sharedEngine, english: sharedEngine.englis
         // ㅒ/ㅖ after a capital (RPA, TPS): the key before was typed with Shift too, so not a syllable.
         ("RPAdlswmd", "RPA인증"), ("TPSvkdlf", "TPS파일"),
         // An acronym whose capitals a lingering Shift could explain (EU as ㄸ+ㅕ) still splits when
-        // the whole token doesn't read as Korean: 뗘, 쎠, 쓔 are syllables nobody types.
+        // the whole token doesn't read as Korean (뗘, 쎠, 쓔 are syllables nobody types) and a known
+        // Korean word follows.
         ("EUwjdcor", "EU정책"), ("TUtjqj", "TU서버"), ("TBvkdlf", "TB파일"), ("ETLwjdcor", "ETL정책"), ("TTLtjfwjd", "TTL설정"),
     ])
     func splitsEnglishPlusKoreanWord(keys: String, expected: String) {

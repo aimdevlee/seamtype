@@ -262,6 +262,7 @@ Vim(8.2 이상, `+job`)은 [`scripts/vim/seamtype.vim`](scripts/vim/seamtype.vim
      전체가 영어와 전혀 닮지 않았으면 흔한 음절로 된 한글도 나눕니다. `hellodnjfem` → `hello월드`,
      `githubtjqj` → `github서버`. 약어도 같습니다(`PDFvkdlf` → `PDF파일`, `EUwjdcor` → `EU정책`). 단
      전체가 한국어로 읽히는 키는 한국어입니다: `TMwjdcor`는 `쓰정책`이고, `TM 정책`처럼 띄어 칩니다.
+     약어 뒤가 단어 목록에 없는 한글이면 나누지 않습니다(`QYwhrgks`는 빨리 친 `뾰족한`).
    - 한국어 뒤에 붙인 영어 단어: `dhsmfdmsgoogledptj` → `오늘은google에서`. 한국어 부분을 먼저 확정하고
      나머지를 이어서 칩니다.
    - 일본어를 켰을 때:

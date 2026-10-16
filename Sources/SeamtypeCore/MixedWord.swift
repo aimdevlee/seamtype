@@ -154,25 +154,28 @@ public final class SplittingEngine: DecisionEngine, @unchecked Sendable {
         guard spelling < mixedWordSpellingCeiling, !RomajiComposer.compose(keys).isClean else { return nil }
         // Capitals count only when one has no Korean meaning (ThkT is 쐈, not a name). Judged on
         // the whole token: the front alone has no lowercase to show a lingering Shift (TMfkrh is
-        // 쓰라고, not TM라고).
-        let certainlyEnglish = Self.hasEnglishOnlyCapital(keys)
+        // 쓰라고, not TM라고). Keys that read as Korean throughout are Korean unless such a capital
+        // says otherwise.
+        let englishOnlyCapital = Self.hasEnglishOnlyCapital(keys)
+        guard englishOnlyCapital || !readsAsKorean(keys) else { return nil }
         for start in stride(from: chars.count - 2, through: 2, by: -1) {
             let front = String(chars[..<start]), back = String(chars[start...])
-            // An acronym a lingering Shift could explain (EU as ㄸ+ㅕ, TB as ㅆ+ㅠ) still counts when
-            // the whole token spells syllables nobody types (뗘정책): then it wasn't Korean. 쓰정책
-            // (TMwjdcor) reads as Korean and stays so; that shape can't be told apart.
-            let acronym = Self.isAcronym(front) && Self.hasEnglishOnlyCapital(front)
-            guard (certainlyEnglish && (acronym || Self.isCapitalizedName(front)))
-                    || (acronym && !readsAsKorean(keys))
-                    || (front.count >= 3 && english.isKnownWord(front)),
-                  back.first.map(DubeolsikLayout.startsSyllable) == true,
+            guard back.first.map(DubeolsikLayout.startsSyllable) == true,
                   let composed = HangulComposer.compose(keys: back), composed.strayJamo.isEmpty,
-                  composed.syllables.count >= 2,
-                  isKoreanWordOrWordWithParticle(composed.text)
+                  composed.syllables.count >= 2 else { continue }
+            let knownKorean = isKoreanWordOrWordWithParticle(composed.text)
+            guard knownKorean
                     || (spelling < unknownWordSpellingCeiling
                         && composed.syllables.allSatisfy { korean.syllableLogProbability($0) > KoreanModel.unknownSyllableLogP })
             else { continue }
-            guard certainlyEnglish || !readsAsKorean(keys) else { return nil }
+            // An acronym a lingering Shift could explain (EU as ㄸ+ㅕ) counts when the token doesn't
+            // read as Korean (뗘정책) and a known Korean word follows: 뾰족한 typed fast (QYwhrgks)
+            // isn't QY족한. 쓰정책 (TMwjdcor) reads as Korean and stays so.
+            let acronym = Self.isAcronym(front)
+            guard (englishOnlyCapital && (acronym || Self.isCapitalizedName(front)))
+                    || (acronym && knownKorean)
+                    || (front.count >= 3 && english.isKnownWord(front))
+            else { continue }
             return MixedWord(english: front, koreanKeys: back, korean: composed.text)
         }
         return nil
