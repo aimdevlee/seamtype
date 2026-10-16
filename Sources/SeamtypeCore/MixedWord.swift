@@ -158,6 +158,7 @@ public final class SplittingEngine: DecisionEngine, @unchecked Sendable {
         // says otherwise.
         let englishOnlyCapital = Self.hasEnglishOnlyCapital(keys)
         guard englishOnlyCapital || !readsAsKorean(keys) else { return nil }
+        let spellsSeenKorean = spellsSeenKorean(keys)
         for start in stride(from: chars.count - 2, through: 2, by: -1) {
             let front = String(chars[..<start]), back = String(chars[start...])
             guard back.first.map(DubeolsikLayout.startsSyllable) == true,
@@ -168,12 +169,13 @@ public final class SplittingEngine: DecisionEngine, @unchecked Sendable {
                     || (spelling < unknownWordSpellingCeiling
                         && composed.syllables.allSatisfy { korean.syllableLogProbability($0) > KoreanModel.unknownSyllableLogP })
             else { continue }
-            // An acronym a lingering Shift could explain (EU as ㄸ+ㅕ) counts when the token doesn't
-            // read as Korean (뗘정책) and a known Korean word follows: 뾰족한 typed fast (QYwhrgks)
-            // isn't QY족한. 쓰정책 (TMwjdcor) reads as Korean and stays so.
+            // An acronym a lingering Shift could explain (EU as ㄸ+ㅕ) counts when the token spells a
+            // syllable nobody has typed (뗘정책) and a known Korean word follows. Korean typed fast
+            // keeps its rare syllables (삐졌어 as QLwuTdj: 삐 is rare, but seen) and 쓰정책 (TMwjdcor)
+            // reads as Korean outright; both stay Korean.
             let acronym = Self.isAcronym(front)
             guard (englishOnlyCapital && (acronym || Self.isCapitalizedName(front)))
-                    || (acronym && knownKorean)
+                    || (acronym && knownKorean && !spellsSeenKorean)
                     || (front.count >= 3 && english.isKnownWord(front))
             else { continue }
             return MixedWord(english: front, koreanKeys: back, korean: composed.text)
@@ -192,6 +194,12 @@ public final class SplittingEngine: DecisionEngine, @unchecked Sendable {
     /// A capital no lingering Shift explains (RNl, 꿀 typed fast, isn't a name).
     static func hasEnglishOnlyCapital(_ front: String) -> Bool {
         DubeolsikLayout.hasEnglishOnlyCapital(front)
+    }
+
+    /// Whole Hangul of syllables the model has seen at all, however rarely (삐에로, not 뗘정책).
+    private func spellsSeenKorean(_ keys: String) -> Bool {
+        guard let composed = HangulComposer.compose(keys: keys), composed.strayJamo.isEmpty else { return false }
+        return composed.syllables.allSatisfy(korean.knowsSyllable)
     }
 
     private func readsAsKorean(_ keys: String) -> Bool {

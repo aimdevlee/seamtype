@@ -34,6 +34,7 @@ let splitting = SplittingEngine(base: sharedEngine, english: sharedEngine.englis
     // TLtjqj give: the acronym + Korean word shape that can't be told from Korean.
     @Test(arguments: [("EKfktj", "따라서"), ("RJsoek", "꺼내다"), ("WHroek", "쪼개다"), ("TMfprl", "쓰레기"),
                       ("RUdksrh", "껴안고"), ("ELehdrkq", "띠동갑"), ("QYwhrgks", "뾰족한"), ("QLdpfh", "삐에로"),
+                      ("QLwuTdj", "삐졌어"), ("WUajrek", "쪄먹다"), ("WUqjfuTdj", "쪄버렸어"), ("WlffjTdj", "찔렀어"),
                       ("TMwjdcor", "쓰정책"), ("TLtjqj", "씨서버")])
     func acronymShapedKoreanStaysKorean(keys: String, expected: String) {
         let d = splitting.decide(keys, context: DecisionContext())
