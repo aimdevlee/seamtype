@@ -260,9 +260,10 @@ Vim(8.2 이상, `+job`)은 [`scripts/vim/seamtype.vim`](scripts/vim/seamtype.vim
      흔한 끝(`heh`, `tsk`)이라 나누지 않습니다(대문자는 `X도`).
    - 영어 + 한국어 단어: 앞이 아는 영어 단어(또는 대문자로 친 이름)이고 뒤가 한국어 단어 목록에 있을 때.
      전체가 영어와 전혀 닮지 않았으면 흔한 음절로 된 한글도 나눕니다. `hellodnjfem` → `hello월드`,
-     `githubtjqj` → `github서버`. 약어도 같습니다(`PDFvkdlf` → `PDF파일`, `EUwjdcor` → `EU정책`). 단
-     전체가 한국어로 읽히는 키는 한국어입니다: `TMwjdcor`는 `쓰정책`이고, `TM 정책`처럼 띄어 칩니다.
-     약어 뒤가 단어 목록에 없는 한글이면 나누지 않습니다(`QYwhrgks`는 빨리 친 `뾰족한`).
+     `githubtjqj` → `github서버`. 약어도 같습니다(`PDFvkdlf` → `PDF파일`). 쌍자음 키로 시작해 Shift를
+     늦게 뗀 꼴과 같은 약어(`EU`는 `뗘`)는 그 글자가 한국어에 없고 뒤가 단어 목록의 단어일 때만 나눕니다:
+     `EUwjdcor` → `EU정책`. `TMwjdcor`는 `쓰정책`이고(쓰는 흔한 글자), `EUdlswmd`는 `뗘인증`입니다(인증은
+     목록에 없음). 그런 약어는 `TM 정책`처럼 띄어 칩니다.
    - 한국어 뒤에 붙인 영어 단어: `dhsmfdmsgoogledptj` → `오늘은google에서`. 한국어 부분을 먼저 확정하고
      나머지를 이어서 칩니다.
    - 일본어를 켰을 때:

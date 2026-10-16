@@ -29,12 +29,15 @@ let splitting = SplittingEngine(base: sharedEngine, english: sharedEngine.englis
     }
 
     // Fast-typed Korean whose first two keys spell an acronym stays Korean: it reads as Korean
-    // throughout (따라서 as EKfktj), or no known Korean word follows the would-be acronym (뾰족한 as
-    // QYwhrgks, 뾰 being a syllable the model hardly knows). 쓰정책 and 씨서버 are what TMwjdcor and
-    // TLtjqj give: the acronym + Korean word shape that can't be told from Korean.
+    // throughout (따라서 as EKfktj); its first syllable is rare but has been seen (삐졌어 as QLwuTdj,
+    // 쭈그리고 as WNrmflrh, from the word lists); or no known Korean word follows (뾰족한 as QYwhrgks).
+    // The word after may hold a rare syllable (또공룡이 as EHrhdfyddl): only the front is judged.
+    // 쓰정책 and 씨서버 are what TMwjdcor and TLtjqj give: the acronym + Korean word shape that can't
+    // be told from Korean.
     @Test(arguments: [("EKfktj", "따라서"), ("RJsoek", "꺼내다"), ("WHroek", "쪼개다"), ("TMfprl", "쓰레기"),
                       ("RUdksrh", "껴안고"), ("ELehdrkq", "띠동갑"), ("QYwhrgks", "뾰족한"), ("QLdpfh", "삐에로"),
                       ("QLwuTdj", "삐졌어"), ("WUajrek", "쪄먹다"), ("WUqjfuTdj", "쪄버렸어"), ("WlffjTdj", "찔렀어"),
+                      ("WNrmflrh", "쭈그리고"), ("EHrhdfyddl", "또공룡이"),
                       ("TMwjdcor", "쓰정책"), ("TLtjqj", "씨서버")])
     func acronymShapedKoreanStaysKorean(keys: String, expected: String) {
         let d = splitting.decide(keys, context: DecisionContext())

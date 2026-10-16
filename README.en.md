@@ -277,9 +277,10 @@ Locally, in this order. A keystroke's preview takes at most ~3 ms and a word's f
    - English + Korean word, when the front is a known English word (or a name typed with capitals)
      and the back is in the Korean word list. When the whole token spells nothing like English, any
      Hangul of common syllables splits too. `hellodnjfem` → `hello월드`, `githubtjqj` → `github서버`.
-     Acronyms too (`PDFvkdlf` → `PDF파일`, `EUwjdcor` → `EU정책`), except keys that read as Korean
-     throughout: `TMwjdcor` is `쓰정책`, so type `TM 정책` with a space. An acronym followed by Hangul
-     not in the word list doesn't split either (`QYwhrgks` is 뾰족한 typed fast).
+     Acronyms too (`PDFvkdlf` → `PDF파일`). One shaped like a double consonant with a lingering
+     Shift (`EU` is `뗘`) splits only when that syllable doesn't exist in Korean and a word from the
+     list follows: `EUwjdcor` → `EU정책`. `TMwjdcor` is `쓰정책` (쓰 is a common syllable) and
+     `EUdlswmd` is `뗘인증` (인증 isn't in the list); type such acronyms as `TM 정책`, with a space.
    - Korean, then an English word: `dhsmfdmsgoogledptj` → `오늘은google에서`. The Korean goes in
      and the rest keeps composing.
    - With Japanese on:
