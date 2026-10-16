@@ -276,7 +276,9 @@ Locally, in this order. A keystroke's preview takes at most ~3 ms and a word's f
      gives `X도`.
    - English + Korean word, when the front is a known English word (or a name typed with capitals)
      and the back is in the Korean word list. When the whole token spells nothing like English, any
-     Hangul of common syllables splits too. `hellodnjfem` → `hello월드`, `githubtjqj` → `github서버`
+     Hangul of common syllables splits too. `hellodnjfem` → `hello월드`, `githubtjqj` → `github서버`.
+     Acronyms too (`PDFvkdlf` → `PDF파일`, `EUwjdcor` → `EU정책`), except keys that read as Korean
+     throughout: `TMwjdcor` is `쓰정책`, so type `TM 정책` with a space.
    - Korean, then an English word: `dhsmfdmsgoogledptj` → `오늘은google에서`. The Korean goes in
      and the rest keeps composing.
    - With Japanese on:

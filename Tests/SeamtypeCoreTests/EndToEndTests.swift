@@ -69,6 +69,13 @@ import Testing
         #expect(field.text == "ok 어떤 바뀌도 쌍꺼풀 Hello API ")
     }
 
+    /// An acronym typed straight into a Korean word splits, and the same shape typed as fast Korean doesn't.
+    @Test func acronymBeforeKoreanWordSplits() {
+        session.activate(app: "test.terminal")
+        type("EUwjdcor TMfkrh TBvkdlf ")
+        #expect(field.text == "EU정책 쓰라고 TB파일 ")
+    }
+
     /// In a terminal (0.97), 어떻게 after an English word is 0.969 sure: what was shown is committed.
     @Test func spaceCommitsWhatThePreviewShows() {
         session.activate(app: "test.terminal")

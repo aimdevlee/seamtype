@@ -20,8 +20,12 @@ let splitting = SplittingEngine(base: sharedEngine, english: sharedEngine.englis
         #expect(d.output == expected)
     }
 
-    // A lingering Shift (ㄲ then ㅜ as N) doesn't make the front a name: no split.
-    @Test(arguments: [("RNfdmf", "꿀을"), ("qkRNleh", "바뀌도"), ("djEJsrj", "어떤거"), ("TMfkrh", "쓰라고")])
+    // A lingering Shift (ㄲ then ㅜ as N) doesn't make the front a name: no split. A word that
+    // reads as Korean throughout stays Korean even when its first two keys spell an acronym
+    // (TM, TL): 쓰정책 and 씨서버 are what TMwjdcor and TLtjqj give, the one shape that can't be told apart.
+    @Test(arguments: [("RNfdmf", "꿀을"), ("qkRNleh", "바뀌도"), ("djEJsrj", "어떤거"), ("TMfkrh", "쓰라고"),
+                      ("EKfktj", "따라서"), ("RJsoek", "꺼내다"), ("WHroek", "쪼개다"), ("TMfprl", "쓰레기"),
+                      ("RUdksrh", "껴안고"), ("ELehdrkq", "띠동갑"), ("TMwjdcor", "쓰정책"), ("TLtjqj", "씨서버")])
     func lingeringShiftIsNotAName(keys: String, expected: String) {
         let d = splitting.decide(keys, context: DecisionContext())
         #expect(d.language == .korean, "\(keys) → \(d.output) \(d.explanation)")
@@ -37,6 +41,9 @@ let splitting = SplittingEngine(base: sharedEngine, english: sharedEngine.englis
         ("PDFvkdlf", "PDF파일"), ("WWDCvhfja", "WWDC포럼"), ("OAuthdlswmd", "OAuth인증"),
         // ㅒ/ㅖ after a capital (RPA, TPS): the key before was typed with Shift too, so not a syllable.
         ("RPAdlswmd", "RPA인증"), ("TPSvkdlf", "TPS파일"),
+        // An acronym whose capitals a lingering Shift could explain (EU as ㄸ+ㅕ) still splits when
+        // the whole token doesn't read as Korean: 뗘, 쎠, 쓔 are syllables nobody types.
+        ("EUwjdcor", "EU정책"), ("TUtjqj", "TU서버"), ("TBvkdlf", "TB파일"), ("ETLwjdcor", "ETL정책"), ("TTLtjfwjd", "TTL설정"),
     ])
     func splitsEnglishPlusKoreanWord(keys: String, expected: String) {
         let d = splitting.decide(keys, context: DecisionContext())

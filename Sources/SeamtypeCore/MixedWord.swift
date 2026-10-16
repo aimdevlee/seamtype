@@ -152,12 +152,18 @@ public final class SplittingEngine: DecisionEngine, @unchecked Sendable {
         let spelling = english.averageLogProbability(keys)
         // Clean romaji (hasansowo, はさんそを) is Japanese, not English + Hangul.
         guard spelling < mixedWordSpellingCeiling, !RomajiComposer.compose(keys).isClean else { return nil }
+        // Capitals count only when one has no Korean meaning (ThkT is 쐈, not a name). Judged on
+        // the whole token: the front alone has no lowercase to show a lingering Shift (TMfkrh is
+        // 쓰라고, not TM라고).
+        let certainlyEnglish = Self.hasEnglishOnlyCapital(keys)
         for start in stride(from: chars.count - 2, through: 2, by: -1) {
             let front = String(chars[..<start]), back = String(chars[start...])
-            // Capitals count only when one has no Korean meaning (ThkT is 쐈, not a name). Judged
-            // on the whole token: the front alone has no lowercase to show a lingering Shift
-            // (TMfkrh is 쓰라고, not TM라고).
-            guard (Self.hasEnglishOnlyCapital(keys) && (Self.isAcronym(front) || Self.isCapitalizedName(front)))
+            // An acronym a lingering Shift could explain (EU as ㄸ+ㅕ, TB as ㅆ+ㅠ) still counts when
+            // the whole token spells syllables nobody types (뗘정책): then it wasn't Korean. 쓰정책
+            // (TMwjdcor) reads as Korean and stays so; that shape can't be told apart.
+            let acronym = Self.isAcronym(front) && Self.hasEnglishOnlyCapital(front)
+            guard (certainlyEnglish && (acronym || Self.isCapitalizedName(front)))
+                    || (acronym && !readsAsKorean(keys))
                     || (front.count >= 3 && english.isKnownWord(front)),
                   back.first.map(DubeolsikLayout.startsSyllable) == true,
                   let composed = HangulComposer.compose(keys: back), composed.strayJamo.isEmpty,
@@ -166,7 +172,7 @@ public final class SplittingEngine: DecisionEngine, @unchecked Sendable {
                     || (spelling < unknownWordSpellingCeiling
                         && composed.syllables.allSatisfy { korean.syllableLogProbability($0) > KoreanModel.unknownSyllableLogP })
             else { continue }
-            guard Self.hasEnglishOnlyCapital(keys) || !readsAsKorean(keys) else { return nil }
+            guard certainlyEnglish || !readsAsKorean(keys) else { return nil }
             return MixedWord(english: front, koreanKeys: back, korean: composed.text)
         }
         return nil
