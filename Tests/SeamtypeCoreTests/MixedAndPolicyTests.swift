@@ -32,6 +32,9 @@ let splitting = SplittingEngine(base: sharedEngine, english: sharedEngine.englis
     @Test(arguments: [
         ("hellodnjfem", "hello월드"), ("githubtjqj", "github서버"), ("loginghkaus", "login화면"),
         ("designvhsxm", "design폰트"), ("Reactzjavhsjsxm", "React컴포넌트"), ("VSCodetjfwjd", "VSCode설정"),
+        // An acronym or name starting on a Korean shift key (P, W, O) is still English: the Korean
+        // word's lowercase after it is no lingering Shift.
+        ("PDFvkdlf", "PDF파일"), ("WWDCvhfja", "WWDC포럼"), ("OAuthdlswmd", "OAuth인증"),
     ])
     func splitsEnglishPlusKoreanWord(keys: String, expected: String) {
         let d = splitting.decide(keys, context: DecisionContext())

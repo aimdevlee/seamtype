@@ -38,8 +38,12 @@ let sharedEngine = HeuristicEngine()
         // Reported on the PR (HyeonWooLee).
         ("djEJfRkdy", "어떨까요"), ("gkfRK", "할까"), ("wlsWK", "진짜"), ("TMfkrh", "쓰라고"),
         ("qkRNjTdj", "바꿨어"), ("ahtjflWHrdl", "모서리쪽이"), ("RKwl", "까지"),
+        // ㅒ/ㅖ on a consonant, Shift still down for the consonant after (예를 as dPFmf).
+        ("dPFmf", "예를"), ("rOSp", "걔네"), ("rPFks", "계란"), ("dPDhl", "예외"),
+        // ㅆ or ㄲ as a final consonant, so a consonant key comes next (있어 as dlTDj).
+        ("dlTDj", "있어"), ("dlTSp", "있네"), ("qkRDp", "밖에"),
     ])
-    func lingeringShiftAfterDoubleConsonantStaysKorean(keys: String, expected: String) {
+    func lingeringShiftAfterKoreanShiftKeyStaysKorean(keys: String, expected: String) {
         let d = sharedEngine.decide(keys, context: DecisionContext())
         #expect(d.language == .korean, "\(keys) → \(d.output) \(d.explanation)")
         #expect(d.output == expected)
@@ -47,15 +51,27 @@ let sharedEngine = HeuristicEngine()
 
     // A capital that no lingering Shift explains is still only ever English, after a Korean
     // word too. A Shift lingers between lowercase keys, so an acronym typed in capitals
-    // throughout (TM, RN, TL) keeps the rule even when it starts on a Korean shift key.
+    // throughout (TM, RN, TL) keeps the rule even when it starts on a Korean shift key, and so
+    // does a consonant key after a double consonant that begins a syllable (TFxla, PCqkd) or after
+    // ㅒ/ㅖ with no consonant before it (OAuth). tvOS is a lingering Shift by shape (ㅖ on ㅍ, then
+    // ㄴ) and stays English by its scores.
     @Test(arguments: ["Hello", "API", "TV", "OK", "QA", "WE", "QUICK", "TEst", "iPhone", "GitHub", "dHello",
-                      "TM", "EU", "RN", "TL", "THe", "WHat", "THis", "QUery"])
+                      "TM", "EU", "RN", "TL", "THe", "WHat", "THis", "QUery", "tvOS", "PCqkd", "OAuth", "TFxla"])
     func capitalsOutsideKoreanShiftKeysStayEnglish(word: String) {
         for previous in [nil, Language.english, .korean] {
             let d = sharedEngine.decide(word, context: DecisionContext(previousLanguage: previous))
             #expect(d.language == .english, "\(word) after \(String(describing: previous)) → \(d.output) \(d.explanation)")
             #expect(d.output == word)
         }
+    }
+
+    // The rule, not the scores: an English-only capital is as sure after a Korean word as anywhere
+    // (PCqkd had fallen to 0.70 when every capital after a Korean shift key was a lingering Shift).
+    @Test(arguments: ["PCqkd", "OAuth", "TFxla", "PDF", "WWDC"])
+    func englishOnlyCapitalIsCertainAfterKorean(word: String) {
+        let d = sharedEngine.decide(word, context: DecisionContext(previousLanguage: .korean))
+        #expect(d.language == .english)
+        #expect(d.confidence >= 0.99, "\(word) → \(d.confidence) \(d.explanation)")
     }
 
     @Test func mixedSentence() {

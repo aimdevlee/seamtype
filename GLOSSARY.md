@@ -11,9 +11,12 @@ O P (ㅒ ㅖ). A capital on any other key has no Korean meaning.
 _Avoid_: double-consonant key, QWERTOP
 
 **Lingering Shift** (늦게 뗀 Shift):
-Shift still held after a Korean shift key, so the next key arrives as a capital with no shifted
-jamo (어떤 typed fast is `djEJs`). It happens between lowercase keys: a word typed in capitals
-throughout (`TM`) is an acronym, not a lingering Shift.
+Shift still held for the one key right after a Korean shift key, so that key arrives as a capital
+with no shifted jamo: a vowel after a double consonant (어떤 typed fast is `djEJs`), the next
+consonant after a final ㅆ/ㄲ (있어 as `dlTDj`), or a consonant after ㅒ/ㅖ typed on a consonant
+(예를 as `dPFmf`). It happens between lowercase keys: a word typed in capitals throughout (`TM`) is
+an acronym, and ㅒ/ㅖ with no consonant before it (`PDF파일` as `PDFvkdlf`, `OAuth`) is English, not
+a lingering Shift.
 _Avoid_: stray Shift, Shift leak
 
 **English-only capital**:
