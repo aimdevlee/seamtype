@@ -77,6 +77,18 @@ import Testing
         #expect(converter.learned == ["今日はいい天気ですね"])
     }
 
+    /// A short word shown as kana converts on Space, though once it ends it reads as English
+    /// (zio showed じお, then went in as "zio"); an English word still goes in as typed.
+    @Test func spaceConvertsAShortWordShownAsKana() {
+        type("zio")
+        #expect(field.text == "じお")
+        type(" ")
+        #expect(session.conversion != nil)
+        #expect(session.handle(.enter, client: field))
+        type("taco ")
+        #expect(field.text == "じおtaco ")
+    }
+
     @Test func spaceCyclesCandidatesAndNumbersPick() {
         type("henkan ")
         #expect(field.text == "変換")
@@ -503,6 +515,19 @@ import Testing
         #expect(field.text == word)
         #expect(session.handle(.enter, client: field))
         #expect(field.text == word)
+    }
+
+    /// A short token the threshold keeps English still converts when its kana are on screen.
+    @Test func spaceConvertsAShortTokenShownAsKana() {
+        let lex = FileManager.default.temporaryDirectory.appendingPathComponent("seamtype-sj-\(UUID().uuidString).json")
+        let engine = LearningEngine(base: SplittingEngine(base: trilingual, english: trilingual.english, japanese: trilingual.segmenter), storeURL: lex)
+        let session = InputSession(engine: engine, policies: AppPolicies(overrides: [AppPolicies.defaultKey: .init(conversionThreshold: AppPolicy.strictThreshold)]),
+                                   converter: FakeConverter(), japaneseEnabled: true)
+        let field = FakeTextField()
+        for ch in "ka" { _ = session.handle(.letter(ch), client: field) }
+        #expect(field.text == "か")
+        #expect(session.handle(.printable(" "), client: field))
+        #expect(session.conversion != nil)
     }
 }
 
