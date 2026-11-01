@@ -580,8 +580,10 @@ Locally, in this order. A keystroke's preview takes at most ~3 ms and a word's f
 2. **Mixed words**: two languages run together, like `github에`, `PDF파일` or `githubで`, are split,
    in an app set to Strict too. Digits, `-` and `_` typed into a word don't end it:
    `k8s`, `utf-8` and `안녕1` stay under one underline and a switch key changes them whole (`ㅏ8ㄴ`, and
-   `ㅕㅅㄹ-8` shown as Korean back to `utf-8`). What follows a digit or mark is read on its own, Korean only
-   for a particle or a Korean word (`mp3fmf` → `mp3를`, `React-기반`, `안녕-hello`).
+   `ㅕㅅㄹ-8` shown as Korean back to `utf-8`). The pieces around digits and marks are read one by one, Korean
+   only where the Korean score leads by enough, or for a particle (`옵션1`, `보고서_최종`, `제1장`, `mp3fmf` →
+   `mp3를`, `React-기반`). Code names whose pieces a single syllable could be stay as typed (`cmd0`, `en_s2c`,
+   `src_dir`, not `층0`, `두_s2c`, `src_약`).
 3. **Rules**: what the keys alone settle, like a capital typed with Shift.
 4. **Heuristic**: the keys are scored per keystroke in all three languages, plus a nudge toward the
    previous word's language.

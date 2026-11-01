@@ -160,10 +160,10 @@ public final class SplittingEngine: DecisionEngine, @unchecked Sendable {
     }
 
     /// A word that kept the digits and `-`/`_` typed into it (`InputSession`: k8s, utf-8, 안녕1),
-    /// read piece by piece between them: the first letters as the engine reads them alone (utf
-    /// English, dkssud 안녕), each later piece English unless it reads as a Korean word or particle
-    /// (mp3를, k8s에, React-기반, 안녕1하세요; not gpt-4o, h2o, snake_case: no jamo or kana); not a
-    /// Japanese phrase, clean romaji throughout (ra-men, kyou3ji).
+    /// read piece by piece between them, each English unless it reads as Korean by enough
+    /// (`readsAsKoreanPiece`: 옵션1, 보고서_최종, 제1장; not cmd0, en_s2c, src_dir) or is a particle
+    /// after the last of them (mp3를, k8s에); not a Japanese phrase, clean romaji throughout
+    /// (ra-men, kyou3ji).
     func decideJoined(_ keys: String, context: DecisionContext) -> Decision? {
         guard !KoreanLayout.current.isSebeolsik, keys.first?.isLetter == true,
               keys.contains(where: Self.joinsWord) else { return nil }
@@ -186,23 +186,17 @@ public final class SplittingEngine: DecisionEngine, @unchecked Sendable {
         var output = "", languages = Set<Language>(), confidence = Self.confidence
         for (index, piece) in pieces.enumerated() {
             guard piece.letters else { output += piece.text; continue }
-            if index == 0 {
-                // What the letters showed before the digit or mark (a single key shows a jamo but is
-                // the English word's: h2o).
-                var shown = context
-                shown.partial = true
-                let korean = piece.text.count > 1 && self.base.decide(piece.text, context: shown).language == .korean
-                // Only as sure as the letters alone are (as the word without the digit would go in), so
-                // a Strict app keeps an unsure one English.
-                if korean { confidence = min(confidence, self.base.decide(piece.text, context: context).confidence) }
-                output += korean ? HangulComposer.composeRuns(piece.text) : piece.text
-                languages.insert(korean ? .korean : .english)
-            } else if readsAsKoreanPiece(piece.text, after: languages.contains(.korean), context: context) {
+            let beforeDigit = pieces.indices.contains(index + 1) && pieces[index + 1].text.first?.isNumber == true
+            let afterDigit = index > 0 && pieces[index - 1].text.last?.isNumber == true
+            if readsAsKoreanPiece(piece.text, beforeDigit: beforeDigit, afterDigit: afterDigit) {
                 output += HangulComposer.composeRuns(piece.text)
                 languages.insert(.korean)
-            } else if index == lastLetters, let (front, particle) = particle(after: piece.text) {
-                // A particle one letter on (k8s + 에: sdp); not an English word there (merry-go: not 해,
-                // heh-heh: not 도), nor more of one (mani-pedi: not mani-pe야).
+                // Only as sure as the letters alone are (as the word without the digit would go in),
+                // so a Strict app keeps an unsure one English.
+                if index == 0 { confidence = min(confidence, self.base.decide(piece.text, context: context).confidence) }
+            } else if index > 0, index == lastLetters, let (front, particle) = particle(after: piece.text) {
+                // A particle after the last digit or mark or one letter on (mp3 + 를, k8s + 에: sdp); not
+                // an English word there (merry-go: not 해, heh-heh: not 도), nor more of one (mani-pedi).
                 output += front + particle
                 languages.insert(.korean)
                 if !front.isEmpty { languages.insert(.english) }
@@ -216,28 +210,55 @@ public final class SplittingEngine: DecisionEngine, @unchecked Sendable {
                         explanation: "joined \(output)")
     }
 
-    /// Letters after a digit or mark that are Korean of their own: clean syllables, no English
-    /// word (go, case, round), and a particle (를), a Korean word people use (기반, 하세요; not 새차
-    /// for tock, 디 for el), or after Korean Korean to the engine (제1회).
-    private func readsAsKoreanPiece(_ keys: String, after korean: Bool, context: DecisionContext) -> Bool {
-        guard keys.count >= 2, !english.isKnownWord(keys), keys.first.map(DubeolsikLayout.startsSyllable) == true,
-              let composed = HangulComposer.compose(keys: keys), composed.strayJamo.isEmpty else { return false }
-        if MixedWord.suffixes.contains(composed.text)
-            || (self.korean.isVocabularyWord(composed.text) && !self.korean.isRareVocabularyWord(composed.text)) { return true }
-        guard korean else { return false }
-        var afterKorean = context
-        afterKorean.previousLanguage = .korean
-        return base.decide(keys, context: afterKorean).language == .korean
+    /// Letters next to a digit, `-` or `_` are code more often than the same letters alone: Korean
+    /// only when the whole piece's Korean score leads its English score by `identifierCost`
+    /// (옵션1, 보고서_최종, 안녕1하세요; not en_s2c as 두_s2c), and a single syllable, rarely a word
+    /// in code, by `oneSyllableInIdentifier` more (not cmd0 as 층0, src_dir as src_약), unless it is
+    /// counted after a number (제1장, 3월5일) or one written before one (제1, 주3회, 표1).
+    func readsAsKoreanPiece(_ keys: String, beforeDigit: Bool, afterDigit: Bool) -> Bool {
+        guard let lead = koreanLead(keys), let composed = HangulComposer.compose(keys: keys) else { return false }
+        let w = particles.weights
+        let counted = afterDigit || beforeDigit && Self.numberWords.contains(composed.text)
+        return lead > w.identifierCost + (composed.syllables.count < 2 && !counted ? w.oneSyllableInIdentifier : 0)
     }
 
-    /// A particle starting one letter into `keys` (sdp: s + 에), unless `keys` is an English word.
+    /// The piece's Korean score less its English one, over all its keys (nil when it isn't clean
+    /// Hangul): `ParticleSplitter`'s readings, a vocabulary word floored, English as a known word
+    /// or spelled.
+    func koreanLead(_ keys: String) -> Double? {
+        guard keys.first.map(DubeolsikLayout.startsSyllable) == true,
+              let composed = HangulComposer.compose(keys: keys), composed.strayJamo.isEmpty else { return nil }
+        let w = particles.weights
+        let korean = particles.koreanScore(keys) * Double(keys.count)
+        guard korean.isFinite else { return nil }
+        let spelling = english.averageLogProbability(keys.lowercased()) * Double(keys.count)
+        let englishScore: Double
+        if let level = english.level(keys.lowercased()), level <= EnglishModel.knownLevel {
+            englishScore = max(spelling, w.knownBase - w.perLevel * Double(level))
+        } else if EnglishModel.acronyms.contains(keys.uppercased()) {
+            englishScore = max(spelling, w.acronym)
+        } else {
+            englishScore = spelling - w.unknownWord
+        }
+        return korean - englishScore
+    }
+
+    /// Syllables written right before a number (제1장, 주3회, 표1): Tatoeba's Korean has 제 and 주
+    /// there, and documents number 표, 장, 절, 항, 조 and 호.
+    static let numberWords: Set<String> = ["제", "주", "표", "장", "절", "항", "조", "호"]
+
+    /// A particle making up `keys` or starting one letter into it (fmf: 를, sdp: s + 에), unless
+    /// `keys` is an English word.
     private func particle(after keys: String) -> (front: String, particle: String)? {
-        guard keys.count >= 2, !english.isKnownWord(keys) else { return nil }
-        let suffix = String(keys.dropFirst())
-        guard suffix.first.map(DubeolsikLayout.startsSyllable) == true,
-              let composed = HangulComposer.compose(keys: suffix), composed.strayJamo.isEmpty,
-              MixedWord.suffixes.contains(composed.text) else { return nil }
-        return (String(keys.prefix(1)), composed.text)
+        guard !english.isKnownWord(keys) else { return nil }
+        for start in 0..<min(2, keys.count) {
+            let suffix = String(keys.dropFirst(start))
+            guard suffix.first.map(DubeolsikLayout.startsSyllable) == true,
+                  let composed = HangulComposer.compose(keys: suffix), composed.strayJamo.isEmpty,
+                  MixedWord.suffixes.contains(composed.text) else { continue }
+            return (String(keys.prefix(start)), composed.text)
+        }
+        return nil
     }
 
     /// What an English word keeps while it is typed: digits, `-` and `_`.

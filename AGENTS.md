@@ -75,10 +75,12 @@ guards; an entry limited to apps applies to the keys as a whole, by `DecisionCon
   using `Data/korean_vocabulary.txt` plus `KoreanModel.loanwords` (developer and product words the
   2018 subtitles lack: 깃허브, 노션), which `HeuristicEngine` also uses for its Korean word floor;
   its words seen under 10 times, `isRareVocabularyWord`, count for that floor only) and English + Japanese particle
-  (`githubで`), and a word that kept digits, `-` or `_` (`decideJoined`: k8s, utf-8, 안녕1, mp3 + 를, React-기반, read
-  piece by piece: the first letters as they showed, `partial`, each later piece English unless a particle,
-  a common Korean word, or after Korean Korean to the engine; `InputSession` keeps them in a word shown as
-  English or Korean, or a single letter, instead of committing; not on 3-set). Its decisions have confidence 0.98 (`SplittingEngine.confidence`), above Strict
+  (`githubで`), and a word that kept digits, `-` or `_` (`decideJoined`: k8s, utf-8, 안녕1, mp3 + 를, read piece by piece,
+  each English unless its Korean score leads its English one over all its keys by `Weights.identifierCost`,
+  plus `oneSyllableInIdentifier` for one syllable not counted around a number (`numberWords`: 제1장, 3월5일),
+  tuned on #39's kind of data: cmd0, en_s2c, src_dir stay as typed, 옵션1, 보고서_최종 don't; `InputSession`
+  keeps them in a word shown as English or Korean, kana still waiting for a vowel, or a single letter,
+  instead of committing; not on 3-set). Its decisions have confidence 0.98 (`SplittingEngine.confidence`), above Strict
   (0.97), so they split in a strict app too.
 - English + particle, Korean or Japanese, and English + Korean word are decided by
   `ParticleSplitter`: the split is one more reading, scored per keystroke against the whole token

@@ -50,6 +50,12 @@ public struct ParticleSplitter: Sendable {
         public var japaneseOffset = 1.4
         /// How far (per key) the split has to lead the best whole-token reading.
         public var margin = 0.3
+        /// How far a piece of a word with digits, `-` or `_` in it (`SplittingEngine.decideJoined`)
+        /// has to lead as Korean over English, over all its keys, and how much more a single
+        /// syllable: tuned on identifiers and words before digits made from en_50k, common
+        /// abbreviations and ko_50k (src_dir, cmd0, 보고서_최종, 옵션1), as in #39.
+        public var identifierCost = 2.5
+        public var oneSyllableInIdentifier = 20.0
 
         public init() {}
     }

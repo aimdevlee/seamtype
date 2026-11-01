@@ -1985,7 +1985,14 @@ public final class InputSession {
     /// whose marks are its own (`belongsToJapanesePhrase`), nor on 3-set, whose digit keys are jamo.
     private func keepsInWord(_ ch: Character) -> Bool {
         guard SplittingEngine.joinsWord(ch), !KoreanLayout.current.isSebeolsik, keys.first?.isLetter == true else { return false }
-        return [.english, .korean, .mixed].contains(forced ?? pinned ?? previewLanguage) || (keys.count == 1 && forced == nil)
+        if keys.count == 1, forced == nil { return true }
+        switch forced ?? pinned ?? previewLanguage {
+        case .english?, .korean?, .mixed?: return true
+        // Kana with a letter still waiting for its vowel (env: えんv) is no Japanese phrase to keep
+        // the mark in (`belongsToJapanesePhrase` took those), so the word goes on too.
+        case .japanese?: return forced == nil && !["", "n"].contains(RomajiComposer.compose(keys, partial: true).pending.lowercased())
+        case nil: return false
+        }
     }
 
     private func belongsToJapanesePhrase(_ ch: Character) -> Bool {
