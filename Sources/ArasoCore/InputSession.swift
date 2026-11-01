@@ -743,8 +743,8 @@ public final class InputSession {
                 updatePreview(client)
                 return true
             }
-            if !endsInURL, keepsInEnglishWord(ch) {
-                keys.append(ch) // k8s, mp3, utf-8: one word, read on as English (`SplittingEngine.decideJoined`)
+            if !endsInURL, keepsInWord(ch) {
+                keys.append(ch) // k8s, utf-8, 안녕1: one word, read piece by piece (`SplittingEngine.decideJoined`)
                 updatePreview(client)
                 return true
             }
@@ -1979,12 +1979,13 @@ public final class InputSession {
     /// word already read as Japanese ("hello." and "dho?" = 왜? stay what they were).
     /// The in-word marks ー and ' may also turn an English-looking start into Japanese
     /// ("ra" → "ra-" → らー), but never take a word away from Korean.
-    /// A digit, `-` or `_` typed into a word shown as English stays in it rather than committing it,
-    /// so k8s and utf-8 are one word to the switch key; a Korean word still ends there (안녕1). So
-    /// does a single letter shown as a jamo (h2o, l10n: not ㅗ2お). Not on 3-set, whose digit keys are jamo.
-    private func keepsInEnglishWord(_ ch: Character) -> Bool {
+    /// A digit, `-` or `_` typed into a word shown as English or Korean stays in it rather than
+    /// committing it, so k8s, utf-8 and 안녕1 are one word to the switch key (ㅕㅅㄹ-8 goes back to
+    /// utf-8 whole). So does a single letter shown as a jamo (h2o, l10n: not ㅗ2お). Not in Japanese,
+    /// whose marks are its own (`belongsToJapanesePhrase`), nor on 3-set, whose digit keys are jamo.
+    private func keepsInWord(_ ch: Character) -> Bool {
         guard SplittingEngine.joinsWord(ch), !KoreanLayout.current.isSebeolsik, keys.first?.isLetter == true else { return false }
-        return (forced ?? pinned ?? previewLanguage) == .english || (keys.count == 1 && forced == nil)
+        return [.english, .korean, .mixed].contains(forced ?? pinned ?? previewLanguage) || (keys.count == 1 && forced == nil)
     }
 
     private func belongsToJapanesePhrase(_ ch: Character) -> Bool {
@@ -2798,7 +2799,7 @@ public final class InputSession {
     private func preview(as language: Language) -> String? {
         switch language {
         case .english: return keys
-        case .korean: return hangul()
+        case .korean: return hangul() ?? (keys.contains(where: SplittingEngine.joinsWord) ? HangulComposer.composeRuns(keys) : nil)
         case .mixed:
             let text = engine.render(keys, as: .mixed)
             return text == keys ? nil : text

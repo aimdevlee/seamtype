@@ -2,9 +2,9 @@ import Foundation
 import Testing
 @testable import ArasoCore
 
-/// Digits, `-` and `_` typed into an English word stay in it (`SplittingEngine.decideJoined`): k8s,
-/// mp3 and utf-8 are one word, underlined to the end and switched whole, with a Korean particle
-/// after them split off (mp3를); a Korean word still ends at a digit (안녕1).
+/// Digits, `-` and `_` typed into an English or Korean word stay in it (`SplittingEngine.decideJoined`):
+/// k8s, utf-8 and 안녕1 are one word, underlined to the end and switched whole, with a Korean particle
+/// or word after them read as Korean (mp3를, React-기반).
 @MainActor @Suite struct JoinedWordTests {
     let field = FakeTextField()
     let session: InputSession
@@ -52,10 +52,36 @@ import Testing
         }
     }
 
-    @Test func aKoreanWordStillEndsAtADigit() {
+    @Test func aKoreanWordKeepsItsDigits() {
         type("dkssud1")
         #expect(field.text == "안녕1")
-        #expect(field.marked.location == NSNotFound)
+        #expect(field.marked == NSRange(location: 0, length: 3)) // still the word being typed
+        type(" ")
+        #expect(field.text == "안녕1 ")
+    }
+
+    @Test func aWordShownAsKoreanSwitchesToEnglishWhole() {
+        type("dkssud-1 ")
+        #expect(field.text == "안녕-1 ")
+        #expect(session.handle(.cycle, client: field))
+        #expect(field.text == "dkssud-1 ")
+    }
+
+    @Test func aWordShownAsKoreanKeepsTheRestToo() {
+        type("dbxm-8") // 유트-8, one word: the switch key takes it to dbxm-8 whole
+        #expect(field.marked == NSRange(location: 0, length: 4))
+        #expect(session.handle(.cycle, client: field))
+        #expect(field.text != "유트-8")
+        #expect(field.text.contains("dbxm-8") || field.text.contains("ㅇㅠㅌㅡ"), "\(field.text)")
+    }
+
+    @Test func piecesAfterTheMarkReadOnTheirOwn() {
+        for (keys, text) in [("React-rlqks ", "React-기반 "), ("dkssud1gktpdy ", "안녕1하세요 "),
+                             ("dkssud-hello ", "안녕-hello "), ("wp1ghl ", "제1회 ")] {
+            field.text = ""; field.cursor = 0
+            type(keys)
+            #expect(field.text == text, "\(keys)")
+        }
     }
 
     @Test func aJapanesePhraseKeepsItsReading() {
