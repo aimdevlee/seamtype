@@ -72,6 +72,12 @@ sleep $((3 + slow))
 
 field; xdotool type --delay 80 "dkssud hello "
 expect "Korean and English per word" "안녕 hello "
+# Digits and _ inside a word: code names as typed, Korean words in Korean, a particle split off,
+# and a word shown as Korean switched whole.
+field; xdotool type --delay 80 "cmd0 en_s2c src_dir dhqtus1 qhrhtj_chlwhd wp1wkd mp3fmf "
+expect "digits and _ inside a word" "cmd0 en_s2c src_dir 옵션1 보고서_최종 제1장 mp3를 "
+field; xdotool type --delay 80 "dkssud-1"; xdotool key Alt_R; xdotool type --delay 80 " "
+expect "a word with a digit switches whole" "dkssud-1 "
 
 field; xdotool type --delay 80 "githubdp dlTek."
 expect "English with a particle, then Korean with a period" "github에 있다."
