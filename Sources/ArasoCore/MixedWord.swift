@@ -183,13 +183,16 @@ public final class SplittingEngine: DecisionEngine, @unchecked Sendable {
             else { pieces.append((String(ch), letters)) }
         }
         var output = "", languages = Set<Language>(), confidence = Self.confidence
+        var previous: Language?  // how the last letters before this piece went in
         for (index, piece) in pieces.enumerated() {
             guard piece.letters else { output += piece.text; continue }
             let beforeDigit = pieces.indices.contains(index + 1) && pieces[index + 1].text.first?.isNumber == true
             let afterDigit = index > 0 && pieces[index - 1].text.last?.isNumber == true
-            if readsAsKoreanPiece(piece.text, beforeDigit: beforeDigit, afterDigit: afterDigit) {
+            if readsAsKoreanPiece(piece.text, beforeDigit: beforeDigit, afterDigit: afterDigit,
+                                  afterEnglish: previous == .english, atEnd: index == pieces.count - 1) {
                 output += HangulComposer.composeRuns(piece.text)
                 languages.insert(.korean)
+                previous = .korean
                 // Only as sure as the letters alone are (as the word without the digit would go in),
                 // so a Strict app keeps an unsure one English.
                 if index == 0 { confidence = min(confidence, self.base.decide(piece.text, context: context).confidence) }
@@ -203,6 +206,7 @@ public final class SplittingEngine: DecisionEngine, @unchecked Sendable {
             } else {
                 output += piece.text
                 languages.insert(.english)
+                previous = .english
             }
         }
         let language: Language = languages.count > 1 ? .mixed : languages.first ?? .english
@@ -215,12 +219,14 @@ public final class SplittingEngine: DecisionEngine, @unchecked Sendable {
     /// (옵션1, 보고서_최종, 안녕1하세요; not en_s2c as 두_s2c), and a single syllable, rarely a word
     /// in code, by `oneSyllableInIdentifier` more (not cmd0 as 층0, src_dir as src_약), unless it is
     /// counted after a number (제1장, 3월5일) or one written before one (제1, 주3회, 표1).
-    func readsAsKoreanPiece(_ keys: String, beforeDigit: Bool, afterDigit: Bool) -> Bool {
+    func readsAsKoreanPiece(_ keys: String, beforeDigit: Bool, afterDigit: Bool, afterEnglish: Bool, atEnd: Bool) -> Bool {
         guard let lead = koreanLead(keys), let composed = HangulComposer.compose(keys: keys) else { return false }
+        // After English a particle is the English word's, at the word's end only (mp3를, mp3에서; not
+        // mp3를-1, mp3에서-1); after Korean the same syllables are words of their own (해서_1, 같은_것).
+        let particle = afterEnglish && MixedWord.suffixes.contains(composed.text)
+        if particle, !atEnd { return false }
         let w = particles.weights
-        // A particle there is one only at the word's end (mp3를, not mp3를-1).
-        let counted = afterDigit && !MixedWord.suffixes.contains(composed.text)
-            || beforeDigit && Self.numberWords.contains(composed.text)
+        let counted = afterDigit && !particle || beforeDigit && Self.numberWords.contains(composed.text)
         return lead > w.identifierCost + (composed.syllables.count < 2 && !counted ? w.oneSyllableInIdentifier : 0)
     }
 
