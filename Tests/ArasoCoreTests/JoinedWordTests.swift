@@ -45,7 +45,7 @@ import Testing
     @Test func aKoreanParticleAfterTheDigitsSplits() {
         for (keys, text) in [("mp3fmf ", "mp3를 "), ("k8sdp ", "k8s에 "), ("utf-8dmf ", "utf-8을 "), ("gpt-4o ", "gpt-4o "),
                              ("h2o ", "h2o "), ("snake_case ", "snake_case "), ("merry-go ", "merry-go "),
-                             ("mani-pedi ", "mani-pedi ")] {
+                             ("mani-pedi ", "mani-pedi "), ("mp3fmf-1 ", "mp3fmf-1 ")] {
             field.text = ""; field.cursor = 0
             type(keys)
             #expect(field.text == text, "\(keys)")

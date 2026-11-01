@@ -182,7 +182,6 @@ public final class SplittingEngine: DecisionEngine, @unchecked Sendable {
             if let last = pieces.last, last.letters == letters { pieces[pieces.count - 1].text.append(ch) }
             else { pieces.append((String(ch), letters)) }
         }
-        let lastLetters = pieces.lastIndex(where: \.letters)
         var output = "", languages = Set<Language>(), confidence = Self.confidence
         for (index, piece) in pieces.enumerated() {
             guard piece.letters else { output += piece.text; continue }
@@ -194,9 +193,10 @@ public final class SplittingEngine: DecisionEngine, @unchecked Sendable {
                 // Only as sure as the letters alone are (as the word without the digit would go in),
                 // so a Strict app keeps an unsure one English.
                 if index == 0 { confidence = min(confidence, self.base.decide(piece.text, context: context).confidence) }
-            } else if index > 0, index == lastLetters, let (front, particle) = particle(after: piece.text) {
-                // A particle after the last digit or mark or one letter on (mp3 + 를, k8s + 에: sdp); not
-                // an English word there (merry-go: not 해, heh-heh: not 도), nor more of one (mani-pedi).
+            } else if index > 0, index == pieces.count - 1, let (front, particle) = particle(after: piece.text) {
+                // A particle ending the word after the last digit or mark, or one letter on (mp3 + 를,
+                // k8s + 에: sdp; not mp3fmf-1); not an English word there (merry-go: not 해, heh-heh: not
+                // 도), nor more of one (mani-pedi).
                 output += front + particle
                 languages.insert(.korean)
                 if !front.isEmpty { languages.insert(.english) }
@@ -218,7 +218,9 @@ public final class SplittingEngine: DecisionEngine, @unchecked Sendable {
     func readsAsKoreanPiece(_ keys: String, beforeDigit: Bool, afterDigit: Bool) -> Bool {
         guard let lead = koreanLead(keys), let composed = HangulComposer.compose(keys: keys) else { return false }
         let w = particles.weights
-        let counted = afterDigit || beforeDigit && Self.numberWords.contains(composed.text)
+        // A particle there is one only at the word's end (mp3를, not mp3를-1).
+        let counted = afterDigit && !MixedWord.suffixes.contains(composed.text)
+            || beforeDigit && Self.numberWords.contains(composed.text)
         return lead > w.identifierCost + (composed.syllables.count < 2 && !counted ? w.oneSyllableInIdentifier : 0)
     }
 
