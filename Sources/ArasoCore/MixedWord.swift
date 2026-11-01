@@ -183,7 +183,7 @@ public final class SplittingEngine: DecisionEngine, @unchecked Sendable {
             else { pieces.append((String(ch), letters)) }
         }
         let lastLetters = pieces.lastIndex(where: \.letters)
-        var output = "", languages = Set<Language>()
+        var output = "", languages = Set<Language>(), confidence = Self.confidence
         for (index, piece) in pieces.enumerated() {
             guard piece.letters else { output += piece.text; continue }
             if index == 0 {
@@ -192,6 +192,9 @@ public final class SplittingEngine: DecisionEngine, @unchecked Sendable {
                 var shown = context
                 shown.partial = true
                 let korean = piece.text.count > 1 && self.base.decide(piece.text, context: shown).language == .korean
+                // Only as sure as the letters alone are (as the word without the digit would go in), so
+                // a Strict app keeps an unsure one English.
+                if korean { confidence = min(confidence, self.base.decide(piece.text, context: context).confidence) }
                 output += korean ? HangulComposer.composeRuns(piece.text) : piece.text
                 languages.insert(korean ? .korean : .english)
             } else if readsAsKoreanPiece(piece.text, after: languages.contains(.korean), context: context) {
@@ -209,7 +212,7 @@ public final class SplittingEngine: DecisionEngine, @unchecked Sendable {
             }
         }
         let language: Language = languages.count > 1 ? .mixed : languages.first ?? .english
-        return Decision(language: language, confidence: Self.confidence, output: output,
+        return Decision(language: language, confidence: confidence, output: output,
                         explanation: "joined \(output)")
     }
 

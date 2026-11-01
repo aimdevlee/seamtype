@@ -71,8 +71,18 @@ import Testing
         type("dbxm-8") // 유트-8, one word: the switch key takes it to dbxm-8 whole
         #expect(field.marked == NSRange(location: 0, length: 4))
         #expect(session.handle(.cycle, client: field))
-        #expect(field.text != "유트-8")
-        #expect(field.text.contains("dbxm-8") || field.text.contains("ㅇㅠㅌㅡ"), "\(field.text)")
+        #expect(field.text == "dbxm-8")
+    }
+
+    /// A Korean front is only as sure as its letters alone (sk: 나 at 0.87), so a Strict app's
+    /// threshold applies to it as it does to the word without the digit.
+    @Test func aKoreanFrontKeepsItsConfidence() {
+        let engine = SplittingEngine(base: trilingual, english: trilingual.english, japanese: trilingual.segmenter)
+        let joined = engine.decide("sk-1", context: DecisionContext())
+        #expect(joined.language == .korean)
+        #expect(joined.confidence == trilingual.decide("sk", context: DecisionContext()).confidence)
+        #expect(joined.confidence < AppPolicy.strictThreshold)
+        #expect(engine.decide("dkssud-1", context: DecisionContext()).confidence >= AppPolicy.strictThreshold)
     }
 
     @Test func piecesAfterTheMarkReadOnTheirOwn() {
