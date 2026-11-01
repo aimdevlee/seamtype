@@ -100,6 +100,7 @@ import Testing
     @Test func codeNamesStayAsTyped() {
         for (keys, text) in [("cmd0 ", "cmd0 "), ("dir1 ", "dir1 "), ("en_s2c ", "en_s2c "), ("fn_x ", "fn_x "),
                              ("src_dir ", "src_dir "), ("app_cmd ", "app_cmd "), ("env_x ", "env_x "),
+                             ("Dkssud-1 ", "Dkssud-1 "), ("React-1 ", "React-1 "), // a capital no Shift explains
                              ("dhqtus1 ", "옵션1 "), ("qhrhtj_chlwhd ", "보고서_최종 "), ("ghldmlfhr_1023 ", "회의록_1023 "),
                              ("wp1wkd ", "제1장 "), ("wn3ghl ", "주3회 "), ("vy1 ", "표1 "), ("qhrhtj_wp1wkd ", "보고서_제1장 ")] {
             field.text = ""; field.cursor = 0
