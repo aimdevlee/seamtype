@@ -171,15 +171,20 @@ $created += $container.ExitCode -eq 0
 
 # Letters' scan codes on a US keyboard.
 $scans = @{}
-$rows = @(@("qwertyuiop", 0x10), @("asdfghjkl", 0x1E), @("zxcvbnm", 0x2C))
+$rows = @(@("1234567890-", 0x02), @("qwertyuiop", 0x10), @("asdfghjkl", 0x1E), @("zxcvbnm", 0x2C))
 foreach ($row in $rows) { for ($i = 0; $i -lt $row[0].Length; $i++) { $scans[[string]$row[0][$i]] = $row[1] + $i } }
 $scans[" "] = 0x39
+# Typed with left Shift (0x2A) held.
+$shifted = @{ "_" = 0x0C }
 
 function Send-Keys([string]$keys) {
     foreach ($ch in $keys.ToCharArray()) {
-        $scan = $scans[[string]$ch]
+        $shift = $shifted.ContainsKey([string]$ch)
+        $scan = if ($shift) { $shifted[[string]$ch] } else { $scans[[string]$ch] }
+        if ($shift) { [Keys]::Key(0x2A, $false, $false); Start-Sleep -Milliseconds 20 }
         [Keys]::Key($scan, $false, $false); Start-Sleep -Milliseconds 40
         [Keys]::Key($scan, $true, $false); Start-Sleep -Milliseconds 40
+        if ($shift) { [Keys]::Key(0x2A, $true, $false); Start-Sleep -Milliseconds 20 }
     }
 }
 
@@ -359,6 +364,10 @@ $results = @(
     # A classic app's Edit control, where the word is drawn at the caret and goes in whole.
     (Case "dkssud hello " "안녕 hello " $null $classic),
     (Case "gksrmf " "한글 " $null $classic),
+    # Digits and _ inside a word: code names as typed, Korean words in Korean, a particle split off,
+    # and a word shown as Korean switched whole.
+    (Case "cmd0 en_s2c src_dir dhqtus1 qhrhtj_chlwhd wp1wkd mp3fmf " "cmd0 en_s2c src_dir 옵션1 보고서_최종 제1장 mp3를 " $null "wpf"),
+    (Case "dkssud-1" "dkssud-1 " { Tap 0x38; Send-Keys " " } "wpf"),
     # Switched while typing, before the Space.
     (Case "hello" "ㅗ디ㅣㅐ " { Tap 0x38; Send-Keys " " } $classic),
     # Right Ctrl tapped alone pauses (0x1D extended): keys then go in as typed.
