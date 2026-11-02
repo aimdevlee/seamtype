@@ -9,6 +9,8 @@ first section (## 바뀐 것) in the app, so follow the rules in AGENTS.md (Rele
 -->
 ## 바뀐 것
 
+- **ん 입력**: `nn`은 이제 늘 ん이라 `rennai`가 れんあい가 됩니다. な행 앞의 ん은 n을 세 번 칩니다(`konnnichiha` → こんにちは, `onnna` → おんな). Windows·Google 일본어 입력기와 같습니다.
+
 ## 설치·업데이트
 
 설치 파일 [`Araso.pkg`](https://github.com/nyttastudio/araso/releases/latest/download/Araso.pkg)를 받아 열고 안내대로 설치하세요. Araso 0.2.1 이상이라면 입력 메뉴나 설정 창의 **정보**에서 바로 업데이트할 수 있습니다.

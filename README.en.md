@@ -247,7 +247,7 @@ While a word is being typed it is underlined and shows the language Araso expect
 
 | Key | English / Korean word | Japanese phrase |
 | --- | --- | --- |
-| letters | extend the word | extend the phrase (kana preview) |
+| letters | extend the word | extend the phrase (kana preview). `nn` is always `ん`, so `rennai` is れんあい and ん before the な row takes three n's (`konnnichiha`, `onnna`), as in Microsoft's and Google's Japanese input |
 | letters with Caps Lock on | read as if Caps Lock were off (`GKAUS` → `하면`); English goes in in capitals (`OUTPUT`), and so do keys that would be loose jamo throughout, two or more (`RST`, `RD`, chat jamo too: `ZZ`); a word in the dictionary keeps its language. Toggled inside a word, a new word starts there | same |
 | **[Language switch keys](#language-switch-keys)** (by default right ⌥ tapped on its own, and ⇧Esc) | switch reading: English → English+particle → Korean → Japanese | same (with live conversion, the kana first) |
 | Esc | commit; the app gets the Esc (when chosen as a switch key, as above) | with live conversion, the kana first; on the kana, cancel the phrase (the app doesn't get it) |
