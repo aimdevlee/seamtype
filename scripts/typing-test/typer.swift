@@ -29,13 +29,14 @@ do {
 }
 var shellTerminal = termios()
 tcgetattr(ptySlave, &shellTerminal)
+/// 🔒 and 🅡 set the terminal's pty, 🔏 the loose one, each leaving the other as it is; 🔓 both.
 func setTerminal(_ ch: Character) {
-    var t = shellTerminal, loose = shellTerminal
+    var t = shellTerminal
     if ch == "🔒" { t.c_lflag &= ~tcflag_t(ECHO) }
     if ch == "🅡" { t.c_lflag &= ~tcflag_t(ECHO | ICANON) }
-    if ch == "🔏" { loose.c_lflag &= ~tcflag_t(ECHO) }
-    tcsetattr(ptySlave, TCSANOW, &t)
-    tcsetattr(looseSlave, TCSANOW, &loose)
+    if ch == "🔏" { t.c_lflag &= ~tcflag_t(ECHO) }
+    if ch != "🔏" { tcsetattr(ptySlave, TCSANOW, &t) }
+    if ch == "🔏" || ch == "🔓" { tcsetattr(looseSlave, TCSANOW, &t) }
     usleep(100_000)
 }
 
