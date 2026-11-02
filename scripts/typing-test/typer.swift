@@ -5,21 +5,38 @@
 // usage: typer <cases.tsv> <Araso.app> [probe]    each line: script<TAB>expected
 // probe: the keys of 안녕 + Space on the suite's layout (dkssud on 2-set, the default).
 // script: characters as typed; ⏎ Return, ⎋ Esc, ⇧ Shift+Esc, ⌫ Delete, ← → arrows;
-// 🔒 a terminal starts waiting for a password, 🅡 a full-screen program (vim), 🔓 neither (a shell).
+// 🔒 a terminal starts waiting for a password, 🅡 a full-screen program (vim), 🔓 neither (a shell);
+// 🔏 a pty nobody's terminal is in a password's mode (WebDriverAgent's output, #83), until 🔓.
 import AppKit
 import Carbon
 
 // A pty this process holds open, set as a terminal would be: Araso reads every one of the user's
 // ttys (`PasswordPrompt`). 🔒 a line read with echo off (sudo), 🅡 raw keys, 🔓 a line with echo.
-var ptyMaster: Int32 = 0, ptySlave: Int32 = 0
+// A shell in a session of its own has it as its controlling terminal, as a terminal tab's does,
+// until this process ends. 🔏 sets a second pty, which no process controls, as 🔒 would.
+var ptyMaster: Int32 = 0, ptySlave: Int32 = 0, looseMaster: Int32 = 0, looseSlave: Int32 = 0
 precondition(openpty(&ptyMaster, &ptySlave, nil, nil, nil) == 0)
+precondition(openpty(&looseMaster, &looseSlave, nil, nil, nil) == 0)
+do {
+    var attr: posix_spawnattr_t?
+    posix_spawnattr_init(&attr)
+    posix_spawnattr_setflags(&attr, Int16(POSIX_SPAWN_SETSID))
+    let script = "exec 3<\"$0\"; while kill -0 $1 2>/dev/null; do sleep 1; done"
+    var argv = ["/bin/sh", "-c", script, String(cString: ttyname(ptySlave)), String(getpid())].map { strdup($0) } + [nil]
+    var pid: pid_t = 0
+    precondition(posix_spawn(&pid, "/bin/sh", nil, &attr, &argv, environ) == 0)
+    usleep(300_000)
+}
 var shellTerminal = termios()
 tcgetattr(ptySlave, &shellTerminal)
+/// 🔒 and 🅡 set the terminal's pty, 🔏 the loose one, each leaving the other as it is; 🔓 both.
 func setTerminal(_ ch: Character) {
     var t = shellTerminal
     if ch == "🔒" { t.c_lflag &= ~tcflag_t(ECHO) }
     if ch == "🅡" { t.c_lflag &= ~tcflag_t(ECHO | ICANON) }
-    tcsetattr(ptySlave, TCSANOW, &t)
+    if ch == "🔏" { t.c_lflag &= ~tcflag_t(ECHO) }
+    if ch != "🔏" { tcsetattr(ptySlave, TCSANOW, &t) }
+    if ch == "🔏" || ch == "🔓" { tcsetattr(looseSlave, TCSANOW, &t) }
     usleep(100_000)
 }
 
@@ -46,7 +63,7 @@ let keyCodes: [Character: (CGKeyCode, Bool)] = {
 }()
 
 func press(_ ch: Character) {
-    if "🔒🅡🔓".contains(ch) { return setTerminal(ch) }
+    if "🔒🅡🔓🔏".contains(ch) { return setTerminal(ch) }
     guard let (code, shift) = keyCodes[ch] else { fatalError("no key for \(ch)") }
     key(code, shift ? .maskShift : [])
     // Conversion (Space/Return in Japanese) and word commits take a moment.

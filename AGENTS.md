@@ -215,7 +215,8 @@ tests use `FakeTextField`). It owns the preview and hysteresis, commits, Esc rea
   tells the input method so where the terminal doesn't turn Secure Event Input on (Orca, Claude's):
   `PasswordPrompt.isWaiting` (asked by `InputController` after `MaskedField`, every key, 1–2 ms)
   sees one of the user's `/dev/ttys*` reading a line with echo off (ICANON on, ECHO off; vim is
-  raw). It can't tell which tab has focus, so another tab's prompt passes keys in every app until
+  raw) that is some process's controlling terminal (`controlsAProcess`, KERN_PROC_TTY: a pty only
+  written to, WebDriverAgent's under xcodebuild, sat in that mode for hours, #83). It can't tell which tab has focus, so another tab's prompt passes keys in every app until
   it ends; ssh's far side isn't seen (the local tty is raw). The prompt can start mid-word, with
   focus unchanged: its first key commits what was being typed (`passingPassword`), else the
   app's insert replaced the underlined word, and starts a new context; a switch tap does nothing
