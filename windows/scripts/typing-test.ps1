@@ -287,7 +287,14 @@ function Case([string]$keys, [string]$expected, [scriptblock]$after, [string]$ki
 
 # Switching the word just committed comes after a person's pause (300 ms here): in a classic app the
 # word and its space reach the Edit control through posted messages, a moment after they go in, and
-# a switch before that finds the text before the caret not yet the word.
+# a switch before that finds the text before the caret not yet the word. On CI's ARM64 runner that
+# moment ran past 300 ms: wait for the field (Case's) to hold the word first, then pause.
+function Wait-Typed([string]$text) {
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    while ((& $field.read) -ne $text -and $clock.Elapsed.TotalSeconds -lt 3) { Start-Sleep -Milliseconds 50 }
+    Start-Sleep -Milliseconds 300
+}
+
 function Press-Virtual([int]$vk) {
     [Keys]::Virtual($vk, $false); Start-Sleep -Milliseconds 60
     [Keys]::Virtual($vk, $true); Start-Sleep -Milliseconds 200
@@ -377,12 +384,12 @@ $results = @(
     # Right Ctrl tapped alone pauses (0x1D extended): keys then go in as typed.
     (Case "" "dkssud " { Tap 0x1D; Send-Keys "dkssud " } $classic),
     # A Korean keyboard's 한/영 (VK_HANGUL) switches as it goes down; 한자 (VK_HANJA) pauses.
-    (Case "hello " "ㅗ디ㅣㅐ " { Start-Sleep -Milliseconds 300; Press-Virtual 0x15 } $classic),
+    (Case "hello " "ㅗ디ㅣㅐ " { Wait-Typed "hello "; Press-Virtual 0x15 } $classic),
     (Case "" "dkssud " { Press-Virtual 0x19; Send-Keys "dkssud " } $classic)
 )
 # Reported, not required: switching the word just committed in a classic app, whose text Araso
 # edits only through Windows' compatibility layer.
-Case "hello " "ㅗ디ㅣㅐ " { Start-Sleep -Milliseconds 300; Tap 0x38 } $classic | Out-Null
+Case "hello " "ㅗ디ㅣㅐ " { Wait-Typed "hello "; Tap 0x38 } $classic | Out-Null
 # Reported, not required: a Korean 103-key keyboard's own scan codes for 한/영 (0xF2) and 한자
 # (0xF1), which Windows turns into VK_HANGUL and VK_HANJA only with that keyboard type set.
 Case "hello " "ㅗ디ㅣㅐ " { [Keys]::Key(0xF2, $false, $false); Start-Sleep -Milliseconds 200 } $classic | Out-Null
