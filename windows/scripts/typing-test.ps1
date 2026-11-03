@@ -216,7 +216,15 @@ function Open-Field([string]$kind) {
         $process = [Diagnostics.Process]::Start($start)
         for ($i = 0; $i -lt 60 -and $process.MainWindowHandle -eq [IntPtr]::Zero; $i++) { Start-Sleep -Milliseconds 250; $process.Refresh() }
         Start-Sleep -Seconds 2 # the window draws, then focuses the box
-        return @{ process = $process; window = $process.MainWindowHandle; read = { if (Test-Path $out) { [IO.File]::ReadAllText($out) } else { "" } }.GetNewClosure() }
+        # The field rewrites the file as its text changes, also while Wait-Typed reads it: shared,
+        # so that write never fails, and a read that meets one is read as nothing yet.
+        $read = {
+            try {
+                $stream = [IO.File]::Open($out, "Open", "Read", "ReadWrite, Delete")
+                try { (New-Object IO.StreamReader $stream, ([Text.Encoding]::UTF8)).ReadToEnd() } finally { $stream.Dispose() }
+            } catch [IO.IOException] { "" }
+        }
+        return @{ process = $process; window = $process.MainWindowHandle; read = $read.GetNewClosure() }
     }
     $process = Start-Process notepad -PassThru
     Start-Sleep -Seconds 3
