@@ -281,7 +281,9 @@ function Case([string]$keys, [string]$expected, [scriptblock]$after, [string]$ki
         if ($after) { & $after }
         Start-Sleep -Milliseconds 800
         if ([Keys]::GetForegroundWindow() -ne $window) { Write-Host "${kind}: no longer in front after the keys" }
-        $text = & $field.read
+        # Read again for a moment while it differs: a read that met the field's write is read as nothing.
+        $clock = [Diagnostics.Stopwatch]::StartNew()
+        while (($text = & $field.read) -ne $expected -and $clock.Elapsed.TotalSeconds -lt 3) { Start-Sleep -Milliseconds 100 }
         Stop-Process -Id $field.process.Id -Force
         Write-Host "$kind typed '$keys' → '$text'"
         if ($text -eq $expected -or $attempt -ge $attempts) { return $text -eq $expected }
