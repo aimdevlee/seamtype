@@ -635,7 +635,7 @@ final class Harness {
         pick.index = english
         h.send(pick)
         #expect(h.document.text == "hello ")
-        #expect(h.ui?.readings?.texts[h.ui?.readings?.selected ?? -1] == "hello")
+        #expect(h.ui?.readings == nil) // picked: the list closes, as after a digit
     }
 
     @Test func maskedKeysGoThroughUnchangedWhenDisabled() throws {

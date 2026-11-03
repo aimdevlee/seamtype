@@ -337,17 +337,10 @@ public final class ServiceRuntime {
                 queue(id) { session, field in session.choose(index, client: field) }
             }
         case .pick:
-            // As macOS's strip does: the switch key pressed until that reading is on screen, once
-            // round the readings at most (they can change as the word does).
-            if let index = request.index, let readings = session.readings, readings.languages.indices.contains(index),
-               index != readings.selected {
+            // As its digit would, as macOS's strip does (`InputSession.pickReading`).
+            if let index = request.index, let readings = session.readings, readings.languages.indices.contains(index) {
                 let language = readings.languages[index]
-                queue(id) { session, field in
-                    for _ in 0..<4 {
-                        guard let readings = session.readings, readings.languages[readings.selected] != language else { break }
-                        _ = session.handle(.cycle, client: field)
-                    }
-                }
+                queue(id) { session, field in session.pickReading(language, client: field) }
             }
         default:
             break

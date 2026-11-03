@@ -146,18 +146,14 @@ import Testing
         #expect(session.fixing == nil)
     }
 
-    /// The caret moved onto a word Araso wasn't sure of (ths, 손 at the start of a line): its
-    /// readings are listed, as the switch key would go through them; not for a sure one.
-    @Test func caretOnAnUnsureWordListsItsReadings() {
+    /// The caret moved onto a word Araso wasn't sure of (ths, 손): nothing is listed until a switch
+    /// key is pressed.
+    @Test func caretOnAnUnsureWordListsNothing() {
         type("ths hello ")
         caret(at: 1)
-        #expect(session.caretMoved(client: field) == NSRange(location: 0, length: 1)) // 손, as it is in the field
-        #expect(session.readings?.texts == ["ths", "손"])
-        #expect(session.readings?.selected == 1)
-        caret(at: 5) // hello
-        session.handle(.other, client: field) // any key puts the list away
+        session.caretMoved(client: field)
         #expect(session.readings == nil)
-        #expect(session.caretMoved(client: field) == nil)
+        #expect(session.fixing == nil)
     }
 
     /// Where the composition can only be at the caret (fcitx5), a word earlier in the line stays.
@@ -168,7 +164,7 @@ import Testing
         session.handle(.cycle, client: field)
         #expect(field.text == "hello world ")
         #expect(session.fixing == nil)
-        #expect(session.caretMoved(client: field) == nil)
+        session.caretMoved(client: field)
     }
 
     /// A second fix after a first one changed the length of the line: the words after it moved.
@@ -269,7 +265,8 @@ import Testing
         #expect(field.marked.location == NSNotFound)
         #expect(field.cursor == (field.text as NSString).length)
         caret(at: 0)
-        #expect(session.caretMoved(client: field) == nil) // hello is sure: no list
+        session.caretMoved(client: field)
+        #expect(session.readings == nil)
     }
 
     /// The words after the fixed one are never written while it is fixed, only once it goes in, over
@@ -356,6 +353,23 @@ import Testing
         #expect(!session.handle(.left, client: field)) // ← puts world in and goes to the app
         #expect(field.text.hasSuffix(" world"))
         #expect(session.fixing == nil)
+    }
+
+    /// A field that doesn't give its marked text back (Chrome) still lets ⇧← fix the word being
+    /// typed, from the text the session marked: before, ⇧← went to the app, which selected the
+    /// word, and the next key typed over it.
+    @Test func shiftLeftFixesInAFieldThatCantBeRead() throws {
+        type("helloab")
+        let shown = field.text
+        field.readable = false
+        #expect(session.handle(.shiftLeft, client: field))
+        session.handle(.shiftLeft, client: field)
+        #expect(session.fixing?.cut == 5)
+        #expect(field.text == shown)
+        session.handle(.enter, client: field)
+        session.handle(.enter, client: field)
+        #expect(field.text == shown)
+        #expect(field.marked.location == NSNotFound)
     }
 
     /// After a switch key changed the word being typed, ← and → change how much of it is fixed, as
@@ -459,7 +473,7 @@ import Testing
         #expect(!session.handle(.left, client: field))
         #expect(session.fixing == nil)
         field.cursor -= 1 // the app's ←: before the space
-        #expect(session.caretMoved(client: field) == nil)
+        session.caretMoved(client: field)
         let fixing = try #require(session.fixing)
         #expect(fixing.cut == 4)
         #expect(field.marked.location == 6)
@@ -478,6 +492,52 @@ import Testing
         type("x") // before the caret move was seen
         #expect(session.fixing == nil)
         #expect(session.engine.correctedOnce("again", app: nil) == .korean)
+    }
+
+    /// → there goes to the app too, which at the line's end leaves the caret where it was: the word is
+    /// marked whole from there, as → makes the fix at once elsewhere, and ← then cuts it. Return
+    /// confirmed the word the same.
+    @Test(arguments: [true, false]) func rightAfterASwitchOnTheWordJustCommittedWaitsForTheCaret(space: Bool) throws {
+        field.marksFromCaret = true
+        field.insertsFromCaret = true
+        field.insertsRightAfterAnInsert = false
+        type(space ? "hello world " : "hello world")
+        if !space { session.handle(.enter, client: field) }
+        session.handle(.cycle, client: field)
+        let world = korean("world")
+        #expect(!session.handle(.right, client: field))
+        #expect(session.fixing == nil)
+        session.caretMoved(client: field) // the app's → at the line's end: the caret stays
+        let fixing = try #require(session.fixing)
+        #expect(fixing.cut == nil)
+        #expect(field.marked.location == 6)
+        #expect(session.readings?.numbered == true)
+        session.handle(.left, client: field)
+        #expect(session.fixing?.cut == 4)
+        session.handle(.right, client: field)
+        session.handle(.enter, client: field)
+        #expect(field.text == "hello \(world)" + (space ? " " : ""))
+        #expect(field.marked.location == NSNotFound)
+        #expect(field.cursor == (field.text as NSString).length)
+        #expect(session.engine.correctedOnce("world", app: nil) == .korean)
+    }
+
+    /// With text after the word the app's → goes into it, where the caret can't be put back before
+    /// that text: no fix, the switch only learned.
+    @Test func rightAfterASwitchWithTextAfterStartsNone() {
+        field.marksFromCaret = true
+        field.insertsFromCaret = true
+        field.insertsRightAfterAnInsert = false
+        type("hello world ")
+        session.handle(.cycle, client: field)
+        let switched = field.text
+        field.text += "x" // typed after it elsewhere, say
+        #expect(!session.handle(.right, client: field))
+        field.cursor += 1 // the app's →
+        session.caretMoved(client: field)
+        #expect(session.fixing == nil)
+        #expect(field.text == switched + "x")
+        #expect(session.engine.correctedOnce("world", app: nil) == .korean)
     }
 
     /// Right after a fix of the line's last word went in, the switch key changes that word again as
@@ -569,7 +629,7 @@ import Testing
         let world = korean("world")
         #expect(!session.handle(.left, client: field))
         field.cursor -= 1 // the app's ←: after the comma
-        #expect(session.caretMoved(client: field) == nil)
+        session.caretMoved(client: field)
         let fixing = try #require(session.fixing)
         #expect(fixing.cut == 4)
         #expect(field.marked.location == 6)
@@ -605,7 +665,7 @@ import Testing
         } else {
             #expect(!session.handle(.left, client: field))
             field.cursor -= 1 // the app's ←: before the last letter
-            #expect(session.caretMoved(client: field) == nil)
+            session.caretMoved(client: field)
         }
         let fixing = try #require(session.fixing)
         #expect(fixing.cut == 4)
@@ -628,7 +688,7 @@ import Testing
         #expect(!session.handle(.left, client: field))
         session.togglePause(client: field)
         field.cursor -= 1 // the app's ←
-        #expect(session.caretMoved(client: field) == nil)
+        session.caretMoved(client: field)
         #expect(session.fixing == nil)
         #expect(field.text == switched)
         #expect(field.marked.location == NSNotFound)
@@ -646,7 +706,7 @@ import Testing
         let switched = field.text
         #expect(!session.handle(.left, client: field))
         field.cursor -= 1 // the app's ←: inside ", "
-        #expect(session.caretMoved(client: field) == nil)
+        session.caretMoved(client: field)
         let fixing = try #require(session.fixing)
         #expect(fixing.cut == 4)
         #expect(field.marked.location == 0)
@@ -722,7 +782,7 @@ import Testing
         #expect(field.text == "gksrmf.")
         #expect(!session.handle(.left, client: field))
         field.cursor -= 1 // the app's ←: before the period
-        #expect(session.caretMoved(client: field) == nil)
+        session.caretMoved(client: field)
         #expect(session.fixing?.cut == 5)
         #expect(field.marked.location == 1)
         session.handle(.left, client: field)
@@ -747,7 +807,7 @@ import Testing
         #expect(field.text != line)
         #expect(!session.handle(.left, client: field))
         field.cursor -= 1 // the app's ←
-        #expect(session.caretMoved(client: field) == nil)
+        session.caretMoved(client: field)
         _ = try #require(session.fixing)
         session.handle(.escape, client: field)
         #expect(field.text == line)
@@ -795,21 +855,31 @@ import Testing
         #expect(session.readings?.selected == 1)
     }
 
-    /// While fixing, a digit picks that reading of the clause, numbered in the strip; a digit past
-    /// the list confirms and is typed.
-    @Test func digitsPickAReading() {
+    /// While fixing, a digit picks that reading of the clause, numbered in the strip, and goes on as
+    /// Return does, as in the candidate window: the fix is in, or a cut's front settles and the rest
+    /// is the clause. A digit past the list confirms and is typed.
+    @Test func digitsPickAReading() throws {
         type("hello world ")
         caret(at: 0)
         session.handle(.cycle, client: field)
         #expect(session.readings?.numbered == true)
-        #expect(session.handle(.printable("1"), client: field)) // hello, English
-        #expect(field.text == "hello world ")
-        #expect(session.fixing?.language == .english)
-        session.handle(.printable("2"), client: field)
+        #expect(session.handle(.printable("2"), client: field)) // hello, Korean
+        #expect(session.fixing == nil)
+        #expect(session.readings == nil)
         #expect(field.text == "\(korean("hello")) world ")
+
+        field.text = ""
+        field.cursor = 0
+        type("helloab")
+        session.handle(.shiftLeft, client: field)
+        session.handle(.shiftLeft, client: field) // hello|ab
+        let korean5 = try #require(session.readings?.languages.firstIndex(of: .korean))
+        #expect(session.handle(.printable(Character(String(korean5 + 1))), client: field))
+        #expect(session.fixing?.settled == korean("hello"))
+        #expect(session.fixing?.cut == nil)
         #expect(!session.handle(.printable("7"), client: field)) // none: confirmed, and the app types it
         #expect(session.fixing == nil)
-        #expect(field.text == "\(korean("hello")) world ")
+        #expect(field.text.hasPrefix(korean("hello")))
     }
 
     /// A reading chosen with the switch key on the word being typed, then fixed with the arrows and
@@ -953,6 +1023,71 @@ import Testing
         #expect(!session.handle(.printable("9"), client: field)) // none: the app types it
         type("the 2")
         #expect(field.text.hasSuffix(" 2")) // no switch before it: the digit goes in
+    }
+
+    /// A reading chosen from the list, by a digit or a click, is where the word stays: ←/→ after it
+    /// move the caret as after any word, not make the word a fix.
+    @Test func arrowsAfterAPickMoveTheCaret() throws {
+        type("hello ")
+        #expect(session.handle(.cycle, client: field))
+        #expect(session.handle(.printable("1"), client: field)) // back to English
+        #expect(!session.handle(.left, client: field)) // the app moves the caret
+        #expect(session.fixing == nil)
+        #expect(field.marked.location == NSNotFound)
+        #expect(field.text == "hello ")
+
+        type("world")
+        #expect(session.handle(.cycle, client: field))
+        let picked = field.text
+        let readings = try #require(session.readings)
+        session.pickReading(readings.languages[readings.selected], client: field) // a click in the strip
+        #expect(field.text == picked)
+        #expect(field.marked.location == NSNotFound) // confirmed
+        #expect(!session.handle(.left, client: field)) // the app takes the ←
+        #expect(session.fixing == nil)
+        #expect(field.text == picked)
+    }
+
+    /// A digit or a click on the strip a switch key put under the word being typed picks that reading
+    /// and confirms the word, as a digit in the candidate window does; the switch key still changes
+    /// it after, as after Return. On 3-set the digit keys are jamo: no numbers there.
+    @Test func aPickConfirmsTheWordBeingTyped() throws {
+        type("dkssud")
+        session.handle(.cycle, client: field)
+        let readings = try #require(session.readings)
+        #expect(readings.numbered)
+        let korean = try #require(readings.languages.firstIndex(of: .korean))
+        #expect(session.handle(.printable(Character(String(korean + 1))), client: field))
+        #expect(field.text == "안녕")
+        #expect(field.marked.location == NSNotFound)
+        #expect(session.keys.isEmpty)
+        #expect(session.readings == nil)
+        #expect(session.handle(.cycle, client: field)) // the word just committed
+        #expect(field.text != "안녕")
+
+        KoreanLayout.$override.withValue(.sebeolsikFinal) {
+            type(" hello")
+            session.handle(.cycle, client: field)
+            #expect(session.readings?.numbered == false)
+        }
+    }
+
+    /// A click on the strip while fixing picks as its digit does, the reading already shown too: the
+    /// fix is in.
+    @Test func aClickWhileFixingGoesOnAsADigit() throws {
+        type("hello world ")
+        caret(at: 0)
+        session.handle(.cycle, client: field)
+        session.pickReading(.korean, client: field)
+        #expect(session.fixing == nil)
+        #expect(field.text == "\(korean("hello")) world ")
+
+        caret(at: 0)
+        session.handle(.cycle, client: field)
+        let shown = try #require(session.fixing?.language)
+        session.pickReading(shown, client: field)
+        #expect(session.fixing == nil)
+        #expect(field.marked.location == NSNotFound)
     }
 
     /// ⇧Space while fixing, where it types a full-width space (Japanese on): the fix goes in first, and

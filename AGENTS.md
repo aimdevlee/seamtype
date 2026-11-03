@@ -167,26 +167,31 @@ tests use `FakeTextField`). It owns the preview and hysteresis, commits, Esc rea
   `Committed.inLine` updates its `recent` entry when the window closes). ⇧← on the word being typed,
   or ←/→ right after a switch key changed it, makes it a fix (`startFixingTyped`; `Key.shiftLeft`/
   `.shiftRight`, elsewhere ←/→). So does ←/→ right after a switch key changed the word just
-  committed (`startFixingCommitted`: marked as it reads; its boundary too only where what is taken
+  committed (`startFixingCommitted`: marked as it reads; not once a reading was picked from the list, by a digit or a click (`pickReading`): that closes the list, and they move the caret; its boundary too only where what is taken
   away must end at the caret, `marksFromCaret`, or a switch changes it, 3-set's symbol,
   `Fixing.lastBoundaryMarked`, as a boundary is marked anywhere in a fix; learned when the fix goes in,
   as a typed piece).
   Not in macOS text views (`TextClient.insertsRightAfterAnInsert`): an insert sent with the key
   right after the switch key's went in at the caret, and the mark with it (Notes, real keys,
   2026-10-30; the typing pane before), while after a caret move the app made (a click) the same
-  marking landed. There only ← does it, as `deferFixing`: the app takes the ←, putting the caret at
+  marking landed. There the arrow waits, as `deferFixing`: the app takes the ←, putting the caret at
   the word's end, and `caretMoved` (which `InputController` calls after it) marks it there with
-  `startFixing(asIs:cut:)`; any key before that only learns the switch. Windows' text service asks
+  `startFixing(asIs:cut:)`; the app's → at the line's end leaves the caret past the word, where
+  `caretMoved` marks it whole (`startFixingCommitted(afterCaretMove:)`; with text after it the caret
+  went into that text and no fix starts; the typing pane, real keys, 2026-11-03); any key before that only learns the switch. Windows' text service asks
   (`test`) before it sends a key, and an arrow with nothing typed went to the app untried: there
   `InputSession.takesArrow` keeps ←/→ right after the switch (Windows ARM VM, real keys, 2026-10-30). Making the switch key itself
   start a fix broke the learned capsule, Caps Lock and 3-set boundaries. Only through the field itself
   (`uncased`: Caps Lock's client would change the rest of the line). The strip lists the clause's readings
-  (`clauseReadings`), numbered (`Readings.numbered`): a digit picks one. `caretMoved` lists an unsure
-  word's readings (`fixHintConfidence`) after an arrow the app took, under the word's range it returns:
-  with nothing marked only `firstRect` places it, whose origin comes at the line's top through IMK
-  (TextEdit and Notes, against `attributes(forCharacterIndex:)` for the same marked text, 2026-10-29;
-  the list covered the line), so `InputController.firstRect` moves it down by its height, for the
-  caret's place (`PauseHUD`) too. fcitx5's preedit is always at the caret too, and deletions and
+  (`clauseReadings`), numbered (`Readings.numbered`): a digit or a click picks one and goes on as Return does, as in the
+  candidate window (a cut's front settles, else the fix is in). Digits and clicks share `pickReading`
+  everywhere the strip shows: the word being typed is confirmed reading that way (`pickTyped`, as Return
+  confirms it; numbered except on 3-set, whose digit keys are jamo), the word just committed switches
+  (`pickCommitted`). Windows' and Linux's strips draw no numbers yet, though digits pick there too. The strip shows only for a switch key: the caret
+  merely coming to an unsure word lists nothing (an automatic list there, until 0.4.5, wasn't wanted).
+  With nothing marked only `firstRect` gives a place, whose origin comes at the line's top through IMK
+  (TextEdit and Notes, against `attributes(forCharacterIndex:)` for the same marked text, 2026-10-29),
+  so `InputController.firstRect` moves it down by its height, for the caret's place (`PauseHUD`). fcitx5's preedit is always at the caret too, and deletions and
   commits around it go where they say, so the addon sends `TextContext.marksFromCaret` and is fixed
   as a macOS text view is; Windows' text service and the addon send the rest of the line after the
   caret (up to 4096 units), for the caret anywhere in the word and back at the line's end (`FakeDocument`'s
