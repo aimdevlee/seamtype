@@ -87,6 +87,20 @@ public static class Keys {
         if (thread != 0 && thread != own) AttachThreadInput(own, thread, false);
         return done;
     }
+    [StructLayout(LayoutKind.Sequential)] struct COPYDATASTRUCT { public IntPtr dwData; public int cbData; public IntPtr lpData; }
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr FindWindow(string cls, string title);
+    [DllImport("user32.dll")] static extern IntPtr SendMessageTimeout(IntPtr window, uint message, IntPtr w, ref COPYDATASTRUCT l, uint flags, uint timeout, out IntPtr result);
+    /// Has the host read its files again, as the settings window does after a change (kCopyReload).
+    public static bool Reload() {
+        IntPtr host = FindWindow("ArasoHostWindow", null);
+        if (host == IntPtr.Zero) return false;
+        IntPtr data = Marshal.AllocHGlobal(1);
+        try {
+            var copy = new COPYDATASTRUCT { dwData = (IntPtr)1, cbData = 0, lpData = data };
+            IntPtr result;
+            return SendMessageTimeout(host, 0x4A /* WM_COPYDATA */, IntPtr.Zero, ref copy, 0x2 /* SMTO_ABORTIFHUNG */, 2000, out result) != IntPtr.Zero;
+        } finally { Marshal.FreeHGlobal(data); }
+    }
     public static string Text(IntPtr edit) {
         int length = (int)SendMessage(edit, 0x0E /* WM_GETTEXTLENGTH */, IntPtr.Zero, IntPtr.Zero);
         var text = new StringBuilder(length + 1);
@@ -260,12 +274,25 @@ function Ready($field, [string]$kind) {
     Write-Host "${kind}: in front $front, layout $layout, ArasoTip.dll $(if ($loaded) { $loaded.FileName } else { 'not loaded' })"
 }
 
+# Every case starts with nothing learned. A switch is a correction, and the cases switch hello
+# again and again: two were learned, after which hello went in as ㅗ디ㅣㅐ and the next case's
+# switch (한/영 on the word just committed, right Alt) took it back to hello, as it should. Which
+# switches were learned depended on the order of the cases and on whether a key came after the
+# switch before the field closed, so cases failed on one runner and not the other: 한/영 while
+# typing in Notepad on x64 every time (PR #88, cd0aa06), though the text service kept the key and
+# the host switched the word each time (aimdevlee/windows-hangul-classic-debug's log).
+function Forget-Learned {
+    Remove-Item (Join-Path $env:APPDATA "Araso\dictionary.json") -ErrorAction SilentlyContinue
+    if (-not [Keys]::Reload()) { Write-Host "host: no window to reload" }
+}
+
 # CI's ARM64 runner, fresh from its first sign-in, still opens windows of its own over the field now
 # and then (WSL's first run, again after it was closed) and its x64 host may answer a key late: there a
 # case that comes out wrong is typed once more, in a new field, and has to come out right then.
 function Case([string]$keys, [string]$expected, [scriptblock]$after, [string]$kind = "notepad") {
     $attempts = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { 2 } else { 1 }
     for ($attempt = 1; ; $attempt++) {
+        Forget-Learned
         $field = Open-Field $kind
         $window = $field.window
         Ready $field $kind
@@ -372,7 +399,9 @@ $results = @(
     (Case "hello" "ㅗ디ㅣㅐ " { Tap 0x38; Send-Keys " " } $classic),
     # Right Ctrl tapped alone pauses (0x1D extended): keys then go in as typed.
     (Case "" "dkssud " { Tap 0x1D; Send-Keys "dkssud " } $classic),
-    # A Korean keyboard's 한/영 (VK_HANGUL) switches as it goes down; 한자 (VK_HANJA) pauses.
+    # A Korean keyboard's 한/영 (VK_HANGUL) switches as it goes down, the word being typed or the
+    # word just committed; 한자 (VK_HANJA) pauses.
+    (Case "hello" "ㅗ디ㅣㅐ " { Press-Virtual 0x15; Send-Keys " " } $classic),
     (Case "hello " "ㅗ디ㅣㅐ " { Start-Sleep -Milliseconds 300; Press-Virtual 0x15 } $classic),
     (Case "" "dkssud " { Press-Virtual 0x19; Send-Keys "dkssud " } $classic)
 )
