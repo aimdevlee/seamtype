@@ -307,6 +307,7 @@ void TextService::SeeModifier(ITfContext *context, WPARAM wParam, LPARAM lParam)
 
 STDMETHODIMP TextService::OnTestKeyDown(ITfContext *context, WPARAM wParam, LPARAM lParam, BOOL *eaten) {
     *eaten = FALSE;
+    if (wParam == 0x15 || wParam == 0x20) Log("DEBUG test down vk 0x%x lParam 0x%lx composing %d", (unsigned)wParam, (unsigned long)lParam, composition_ ? 1 : 0);
     if (!Takes(wParam, true) || replayed_.Is(wParam, 0)) return S_OK;
     if (IsModifier(wParam)) {
         SeeModifier(context, wParam, lParam);
@@ -319,6 +320,7 @@ STDMETHODIMP TextService::OnTestKeyDown(ITfContext *context, WPARAM wParam, LPAR
 
 STDMETHODIMP TextService::OnKeyDown(ITfContext *context, WPARAM wParam, LPARAM lParam, BOOL *eaten) {
     *eaten = FALSE;
+    if (wParam == 0x15 || wParam == 0x20) Log("DEBUG down vk 0x%x lParam 0x%lx composing %d", (unsigned)wParam, (unsigned long)lParam, composition_ ? 1 : 0);
     if (!Takes(wParam, true)) return S_OK;
     if (replayed_.Is(wParam, 0)) {
         replayed_.valid = false; // the app's now
@@ -339,6 +341,7 @@ STDMETHODIMP TextService::OnKeyDown(ITfContext *context, WPARAM wParam, LPARAM l
 }
 
 STDMETHODIMP TextService::OnTestKeyUp(ITfContext *, WPARAM wParam, LPARAM lParam, BOOL *eaten) {
+    if (wParam == 0x15) Log("DEBUG test up vk 0x15 lParam 0x%lx kept %d", (unsigned long)lParam, keptDown_[0x15] ? 1 : 0);
     if (keptDown_[wParam & 0xFF]) {
         *eaten = TRUE;
         return S_OK;
@@ -349,6 +352,7 @@ STDMETHODIMP TextService::OnTestKeyUp(ITfContext *, WPARAM wParam, LPARAM lParam
 
 STDMETHODIMP TextService::OnKeyUp(ITfContext *context, WPARAM wParam, LPARAM lParam, BOOL *eaten) {
     *eaten = FALSE;
+    if (wParam == 0x15) Log("DEBUG up vk 0x15 lParam 0x%lx kept %d", (unsigned long)lParam, keptDown_[0x15] ? 1 : 0);
     if (keptDown_[wParam & 0xFF]) {
         keptDown_[wParam & 0xFF] = false;
         *eaten = TRUE;

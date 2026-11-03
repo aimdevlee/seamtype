@@ -43,6 +43,34 @@ public static class Keys {
         input[0].ki.dwFlags = SCANCODE | (up ? KEYUP : 0) | (extended ? EXTENDED : 0);
         SendInput(1, input, Marshal.SizeOf(typeof(INPUT)));
     }
+    public static void VirtualScan(ushort vk, ushort scan, bool up, bool extended) {
+        var input = new INPUT[1];
+        input[0].type = 1;
+        input[0].ki.wVk = vk;
+        input[0].ki.wScan = scan;
+        input[0].ki.dwFlags = (up ? KEYUP : 0) | (extended ? EXTENDED : 0);
+        SendInput(1, input, Marshal.SizeOf(typeof(INPUT)));
+    }
+    [DllImport("imm32.dll")] public static extern IntPtr ImmGetDefaultIMEWnd(IntPtr window);
+    [DllImport("imm32.dll")] public static extern bool ImmGetHotKey(uint id, out uint modifiers, out uint vk, out IntPtr hkl);
+    [DllImport("user32.dll")] public static extern short GetKeyState(int vk);
+    [DllImport("user32.dll")] public static extern IntPtr GetFocus();
+    /// IMM's open status and conversion mode of a window (WM_IME_CONTROL to its default IME window).
+    public static string Imm(IntPtr window) {
+        IntPtr ime = ImmGetDefaultIMEWnd(window);
+        if (ime == IntPtr.Zero) return "no IME window";
+        long open = (long)SendMessage(ime, 0x283, (IntPtr)5, IntPtr.Zero);
+        long mode = (long)SendMessage(ime, 0x283, (IntPtr)1, IntPtr.Zero);
+        return "open " + open + ", conversion 0x" + mode.ToString("X");
+    }
+    public static string HotKeys() {
+        var text = new StringBuilder();
+        foreach (uint id in new uint[] { 0x10, 0x11, 0x12, 0x50, 0x51, 0x52, 0x70, 0x71, 0x72 }) {
+            uint m, v; IntPtr h;
+            if (ImmGetHotKey(id, out m, out v, out h)) text.AppendFormat("0x{0:X}: vk 0x{1:X} mod 0x{2:X} hkl 0x{3:X}; ", id, v, m, h.ToInt64());
+        }
+        return text.ToString();
+    }
     /// A key by its virtual-key code, as a Korean keyboard's 한/영 and 한자 keys arrive.
     public static void Virtual(ushort vk, bool up) {
         var input = new INPUT[1];
@@ -359,6 +387,43 @@ Start-Sleep -Seconds 2
 # (CI's ARM64 runner) stayed in English through every language request.
 Ready $warm "warm-up wpf"
 Stop-Process -Id $warm.process.Id -Force
+
+# DEBUG (aimdevlee/windows-hangul-classic-debug): 한/영 while typing in a classic app.
+function Mark([string]$text) { Add-Content -Path $log -Value "=== $text" ; Write-Host "=== $text" }
+function Imm-State($field, [string]$when) {
+    $thread = [Keys]::GetWindowThreadProcessId($field.window, [IntPtr]::Zero)
+    $layout = "{0:X8}" -f [Keys]::GetKeyboardLayout($thread).ToInt64()
+    Mark "$when : imm $([Keys]::Imm($field.window)), layout $layout"
+}
+function Diag([string]$name, [string]$keys, [scriptblock]$after, [string]$kind) {
+    Mark "case $name ($kind) begin"
+    $start = (Get-Content $log).Count
+    $field = Open-Field $kind
+    Ready $field $kind
+    Imm-State $field "before"
+    Send-Keys $keys
+    Imm-State $field "after letters"
+    if ($after) { & $after }
+    Imm-State $field "after switch"
+    Send-Keys " "
+    Start-Sleep -Milliseconds 800
+    Imm-State $field "after space"
+    $text = & $field.read
+    Stop-Process -Id $field.process.Id -Force
+    Mark "case $name → '$text'"
+    Get-Content $log | Select-Object -Skip $start | Select-String -NotMatch "scan code" | Out-Host
+}
+Write-Host "IMM hotkeys: $([Keys]::HotKeys())"
+Diag "ralt" "hello" { Tap 0x38 } $classic
+Diag "vk15 scan0" "hello" { Press-Virtual 0x15 } $classic
+Diag "ralt after vk15" "hello" { Tap 0x38 } $classic
+Diag "plain after vk15" "dkssud" $null $classic
+Diag "vk15 scan0x72" "hello" { [Keys]::VirtualScan(0x15, 0x72, $false, $false); Start-Sleep -Milliseconds 60; [Keys]::VirtualScan(0x15, 0x72, $true, $false); Start-Sleep -Milliseconds 200 } $classic
+Diag "vk15 scan0x38ext" "hello" { [Keys]::VirtualScan(0x15, 0x38, $false, $true); Start-Sleep -Milliseconds 60; [Keys]::VirtualScan(0x15, 0x38, $true, $true); Start-Sleep -Milliseconds 200 } $classic
+Diag "vk15 wpf" "hello" { Press-Virtual 0x15 } "wpf"
+Diag "vk15 host" "hello" { Press-Virtual 0x15 } "host"
+Diag "ralt end" "hello" { Tap 0x38 } $classic
+exit 0
 
 $results = @(
     # A WPF TextBox: a TSF text store, where the word is composed in the text.
