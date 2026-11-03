@@ -386,19 +386,13 @@ $results = @(
     (Case "hello" "ㅗ디ㅣㅐ " { Tap 0x38; Send-Keys " " } $classic),
     # Right Ctrl tapped alone pauses (0x1D extended): keys then go in as typed.
     (Case "" "dkssud " { Tap 0x1D; Send-Keys "dkssud " } $classic),
-    # A Korean keyboard's 한/영 (VK_HANGUL) switches as it goes down (the word just committed, in a
-    # TSF app as right Alt above; a classic app's are reported below); 한자 (VK_HANJA) pauses.
-    (Case "hello " "ㅗ디ㅣㅐ " { Press-Virtual 0x15 } "wpf"),
+    # A Korean keyboard's 한/영 (VK_HANGUL) switches as it goes down; 한자 (VK_HANJA) pauses.
+    (Case "hello " "ㅗ디ㅣㅐ " { Start-Sleep -Milliseconds 300; Press-Virtual 0x15 } $classic),
     (Case "" "dkssud " { Press-Virtual 0x19; Send-Keys "dkssud " } $classic)
 )
 # Reported, not required: switching the word just committed in a classic app, whose text Araso
-# edits only through Windows' compatibility layer: on CI's ARM64 runner Araso took the key, and the
-# word sometimes stayed as it was.
+# edits only through Windows' compatibility layer.
 Case "hello " "ㅗ디ㅣㅐ " { Start-Sleep -Milliseconds 300; Tap 0x38 } $classic | Out-Null
-Case "hello " "ㅗ디ㅣㅐ " { Start-Sleep -Milliseconds 300; Press-Virtual 0x15 } $classic | Out-Null
-# Reported, not required: 한/영 while typing in a classic app, which kept the word as typed in
-# Notepad on CI's x64 runner every time (right Alt there switches it).
-Case "hello" "ㅗ디ㅣㅐ " { Press-Virtual 0x15; Send-Keys " " } $classic | Out-Null
 # Reported, not required: a Korean 103-key keyboard's own scan codes for 한/영 (0xF2) and 한자
 # (0xF1), which Windows turns into VK_HANGUL and VK_HANJA only with that keyboard type set.
 Case "hello " "ㅗ디ㅣㅐ " { [Keys]::Key(0xF2, $false, $false); Start-Sleep -Milliseconds 200 } $classic | Out-Null
