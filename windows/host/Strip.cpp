@@ -803,7 +803,7 @@ void StripWindow::Click(int x, int y) {
         if (mode_ == Mode::card && choose_) {
             auto choose = choose_;
             choose(pageStart_ + static_cast<int>(i));
-        } else if (mode_ == Mode::row && pick_ && static_cast<int>(i) != selected_) {
+        } else if (mode_ == Mode::row && pick_) {
             auto pick = pick_;
             pick(static_cast<int>(i));
         }

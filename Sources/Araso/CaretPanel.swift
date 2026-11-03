@@ -746,7 +746,7 @@ private final class StripCell: NSView {
         guard !settling, let index = cells.firstIndex(where: { $0.frame.contains(point) }) else { return }
         if let choose {
             choose(pageStart + index)
-        } else if let pick, index != selected, languages.indices.contains(index) {
+        } else if let pick, languages.indices.contains(index) {
             pick(languages[index])
         }
     }

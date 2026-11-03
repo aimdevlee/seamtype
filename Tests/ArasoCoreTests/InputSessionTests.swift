@@ -124,13 +124,13 @@ final class FakeTextField: TextClient {
         #expect(field.text == "hello hello ")
     }
 
-    /// A switch key lists the word's readings, the one now shown selected, while it is being
-    /// typed and right after it went in; the next key puts the list away.
+    /// A switch key lists the word's readings, numbered, the one now shown selected, while it is
+    /// being typed and right after it went in; the next key puts the list away.
     @Test func switchKeyListsTheReadings() {
         type("dkssud")
         #expect(session.readings == nil)
         session.handle(.escape, client: field)
-        #expect(session.readings == InputSession.Readings(texts: ["dkssud", "안녕"], languages: [.english, .korean], selected: 0, own: 1))
+        #expect(session.readings == InputSession.Readings(texts: ["dkssud", "안녕"], languages: [.english, .korean], selected: 0, own: 1, numbered: true))
         type(" ")
         #expect(session.readings == nil)
         session.handle(.escape, client: field)

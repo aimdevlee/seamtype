@@ -317,7 +317,10 @@ they are **right ⌥ tapped alone** and **⇧Esc**. A key not chosen goes to the
 Pressing one shows the word's readings in a one-line strip under it (`dkssud · 안녕`). The reading on
 screen sits in a blue capsule like the one macOS shows under the caret when you switch input sources,
 and the others sit beside it as they would go in, so you see what more presses bring; any other key puts
-the strip away at once, and a click on a reading switches to it. Long readings are cut at 140 pt, and
+the strip away at once. The readings are numbered: a digit or a click picks one, as in the candidate
+window, confirming the word being typed that way (as Return does, no space after it; a switch key still
+changes it) or switching the word just committed to it. On 3-set the digit keys are jamo, so the word
+being typed gets no numbers. Long readings are cut at 140 pt, and
 near the bottom of the screen the strip shows above the word. The motion is over within 0.2 s, and there
 is none with Reduce motion on in System Settings.
 
@@ -342,7 +345,7 @@ Right after a word is committed with Space or punctuation (or only confirmed wit
 next reading, and pressing it again keeps cycling. More symbols, digits and a space after the punctuation
 (`world. `, `world?! `, `안녕.12`) or deleting the space or punctuation first keep that chance; any other key ends it. This needs the caret still right after the word, and an app that
 lets Araso read the text there. Right after such a switch the strip is numbered, and a digit picks that
-reading (a digit typed without a switch goes in as usual).
+reading and closes it, as a click in the strip does; ←/→ then move the caret (a digit typed without a switch goes in as usual).
 
 A word earlier in the line can be fixed too. Put the caret anywhere in it (click, ⌥←, ⌥→) and tap
 right ⌥ (or ⇧Esc, or ⌥Space if chosen): that word alone is underlined again, read the next way,
@@ -353,15 +356,16 @@ Japanese conversion the thick underline is the part being fixed: → makes it a 
 the next word past the end of one (`dkssud gktpdy` → `안녕 하세요`, the underline growing with it); ← makes it shorter, and a cut
 inside a word leaves the rest of its keys to be read on their own (`hellofmf` → `hello` + `를`). A word ← gives
 back reads as it was but keeps a thin underline.
-The strip under it follows, listing the readings of the part being fixed, numbered: a digit
-switches to that reading, as in the candidate window. Return on such a front
+The strip under it follows, listing the readings of the part being fixed, numbered: a digit or a click
+picks that reading and goes on as Return does, as in the candidate window: a cut front part settles
+and the rest is fixed next, else the fix is done. Return on such a front
 part settles it and goes on with the rest. ⇧←/⇧→ do the same. The word being
 typed can be cut the same way: after a switch key changed its reading ←/→ do it, before that ⇧←
 (`helloab`, ⇧←⇧← → `hello` | `ab`; ← before a switch puts the word in and moves the caret, as
 before). A whole word fixed as Japanese opens the candidate window on Space, chosen as for a word
 being typed (Space and ↑/↓ for candidates, ←/→ resize the clause, Return or a digit picks and ends
 the fix, Esc goes back to the kana). A word just committed with Space or Return becomes such a fix too
-when ← (→ too on Windows and Linux) follows a switch key that changed it (before one, ⌥← to its start, then the switch key). Return or any other key puts the
+when ← or → follows a switch key that changed it (on a Mac, → only when the word ends the line; before a switch, ⌥← to its start, then the switch key). Return or any other key puts the
 fix in and takes the caret back to the end of the line (⌘Z takes two: one selects the rest of the
 line, the next puts the fix back). When the fix was of the line's last word, whole (not cut), a switch key right after
 changes it again, as it does a word just committed. Esc (where it isn't a switch key) and Delete
@@ -370,8 +374,7 @@ the switch; a word just committed goes back to how it went in, and a switch key 
 underline covers the word alone, not the space or symbol after it (except 3-set's symbols, which a
 switch changes, and where the caret's place makes it go with the word: a comma and a space right after
 a commit on macOS and Linux). A whole word fixed
-is learned as a correction right after the commit is; a cut word isn't. When an arrow key leaves the
-caret on a word Araso wasn't sure of, its readings show in the strip under it first. Words before a
+is learned as a correction right after the commit is; a cut word isn't. Words before a
 Return can't be fixed, nor words changed by hand since. It works the same on Windows and on Linux
 (fcitx5), except in Windows apps where Araso keeps the word itself (the ones that show it
 underlined in a small window at the caret, as Windows 10's Notepad does): there an underline can
