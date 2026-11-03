@@ -394,7 +394,11 @@ if ($env:ARASO_SCREENSHOTS -and $env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
     # for them before the window, as they start under the word's first letter).
     function Shot([string]$name, [IntPtr]$window, [int]$below = 0, [int]$left = 0) {
         $rect = New-Object Keys+RECT
-        [Keys]::GetWindowRect($window, [ref]$rect) | Out-Null
+        # A window that never came up is reported, not failed: the shots are for looking at the design.
+        if ($window -eq [IntPtr]::Zero -or -not [Keys]::GetWindowRect($window, [ref]$rect)) {
+            Write-Host "screenshot: $name (no window)"
+            return
+        }
         $width = $rect.Right - $rect.Left + $left
         $height = $rect.Bottom - $rect.Top + $below
         $bitmap = New-Object System.Drawing.Bitmap $width, $height
@@ -478,7 +482,10 @@ if ($env:ARASO_SCREENSHOTS -and $env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
         [Keys]::Front($process.MainWindowHandle) | Out-Null
         Start-Sleep -Seconds 2
         Shot "settings-$tab" $process.MainWindowHandle
+        # Gone before the next tab: a settings window still there takes the next tab itself, and
+        # the new process quits without a window of its own.
         Stop-Process -Id $process.Id -Force
+        $process.WaitForExit(5000) | Out-Null
     }
     $f = Kept "host"
     Send-Keys "dkssud hello kyouha "; Start-Sleep -Milliseconds 900
