@@ -414,15 +414,19 @@ function Diag([string]$name, [string]$keys, [scriptblock]$after, [string]$kind) 
     Get-Content $log | Select-Object -Skip $start | Select-String -NotMatch "scan code" | Out-Host
 }
 Write-Host "IMM hotkeys: $([Keys]::HotKeys())"
-Diag "ralt" "hello" { Tap 0x38 } $classic
-Diag "vk15 scan0" "hello" { Press-Virtual 0x15 } $classic
-Diag "ralt after vk15" "hello" { Tap 0x38 } $classic
-Diag "plain after vk15" "dkssud" $null $classic
-Diag "vk15 scan0x72" "hello" { [Keys]::VirtualScan(0x15, 0x72, $false, $false); Start-Sleep -Milliseconds 60; [Keys]::VirtualScan(0x15, 0x72, $true, $false); Start-Sleep -Milliseconds 200 } $classic
-Diag "vk15 scan0x38ext" "hello" { [Keys]::VirtualScan(0x15, 0x38, $false, $true); Start-Sleep -Milliseconds 60; [Keys]::VirtualScan(0x15, 0x38, $true, $true); Start-Sleep -Milliseconds 200 } $classic
-Diag "vk15 wpf" "hello" { Press-Virtual 0x15 } "wpf"
-Diag "vk15 host" "hello" { Press-Virtual 0x15 } "host"
-Diag "ralt end" "hello" { Tap 0x38 } $classic
+Diag "1 ralt typing" "hello" { Tap 0x38 } $classic
+Diag "2 vk15 typing (before pauses)" "hello" { Press-Virtual 0x15 } $classic
+Diag "3 rctrl pause" "" { Tap 0x1D; Send-Keys "dkssud" } $classic
+Diag "4 vk15 committed wpf (after rctrl pause)" "hello " { Start-Sleep -Milliseconds 300; Press-Virtual 0x15 } "wpf"
+Diag "5 hanja pause" "" { Press-Virtual 0x19; Send-Keys "dkssud" } $classic
+Diag "6 vk15 committed wpf (after hanja)" "hello " { Start-Sleep -Milliseconds 300; Press-Virtual 0x15 } "wpf"
+Diag "7 ralt committed notepad" "hello " { Start-Sleep -Milliseconds 300; Tap 0x38 } $classic
+Diag "8 vk15 typing notepad" "hello" { Press-Virtual 0x15 } $classic
+Diag "9 ralt typing" "hello" { Tap 0x38 } $classic
+Diag "10 plain korean" "dkssud" $null $classic
+Diag "11 vk15 scan0x72 typing" "hello" { [Keys]::VirtualScan(0x15, 0x72, $false, $false); Start-Sleep -Milliseconds 60; [Keys]::VirtualScan(0x15, 0x72, $true, $false); Start-Sleep -Milliseconds 200 } $classic
+Diag "12 vk15 typing wpf" "hello" { Press-Virtual 0x15 } "wpf"
+Diag "13 ralt typing end" "hello" { Tap 0x38 } $classic
 exit 0
 
 $results = @(
