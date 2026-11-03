@@ -278,6 +278,10 @@ function Case([string]$keys, [string]$expected, [scriptblock]$after, [string]$ki
         Write-Host "$kind typed '$keys' → '$text'"
         if ($text -eq $expected -or $attempt -ge $attempts) { return $text -eq $expected }
         Write-Host "${kind}: again"
+        # Without what the attempt taught: a switch made in both attempts is a correction made twice,
+        # learned, and the word went in switched in every case after (hello as ㅗ디ㅣㅐ).
+        Remove-Item (Join-Path $env:APPDATA "Araso\dictionary.json") -ErrorAction SilentlyContinue
+        Start-Host
     }
 }
 
