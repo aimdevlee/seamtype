@@ -200,7 +200,7 @@ tests use `FakeTextField`). It owns the preview and hysteresis, commits, Esc rea
 - One slip of the fingers in a Korean word (#85, `SlipGuesser`, 2-set only): the keys with one
   slip undone (two neighbours swapped, a key extra or missing, Shift on a ㅃㅉㄸㄲㅆㅒㅖ key, the
   key next to it on QWERTY's seats) that compose to a word of the lists, by list, then how common.
-  A switch key held half a second (`Key.guess`, `InputController.switchTapChanged`) lists them for
+  A switch key held half a second (`Key.guess`, `InputController.switchTapChanged`; `LongPressRing` by the caret on macOS while it is held, where `canGuess`) lists them for
   the word just committed (the word being typed is confirmed first): `guesses`, kept in `guessing`
   while the keys of the candidate window pick one (`pickGuess` for clicks), Esc and Delete put the
   word back; a guess picked teaches nothing but forgets keys the dictionary remembers. With

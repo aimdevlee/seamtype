@@ -154,6 +154,15 @@ public struct SlipGuesser: Sendable {
         }
     }
 
+    /// Which characters of `guess` differ from `typed`, the keys' own reading: what lies between what
+    /// they share at the start and at the end (누ㅜ를 → 누구를: 구). Empty where the guess only drops some.
+    public static func changed(from typed: String, to guess: String) -> Range<Int> {
+        let a = Array(typed), b = Array(guess)
+        let start = zip(a, b).prefix { $0 == $1 }.count
+        let end = zip(a.dropFirst(start).reversed(), b.dropFirst(start).reversed()).prefix { $0 == $1 }.count
+        return start..<(b.count - end)
+    }
+
     /// The word ends on jamo typed for chat: ㅠ or ㅜ, or two or more of `KoreanModel.chatJamo`
     /// (고마워ㅠ, 좋아ㅋㅋ). A single consonant left over (치다ㅏㄱ) is a slip.
     static func endsInChat(_ composed: HangulComposer.Result) -> Bool {

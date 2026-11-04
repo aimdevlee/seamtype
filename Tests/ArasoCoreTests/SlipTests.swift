@@ -80,6 +80,13 @@ import Testing
         #expect(guesser.autoFix("dlrj", afterKorean: true) == nil) // too short
     }
 
+    @Test func marksWhatAGuessChanged() {
+        #expect(SlipGuesser.changed(from: "엉어", to: "영어") == 0..<1)
+        #expect(SlipGuesser.changed(from: "누ㅜ를", to: "누구를") == 1..<2)
+        #expect(SlipGuesser.changed(from: "치다ㅏㄱ", to: "치다가") == 2..<3)
+        #expect(SlipGuesser.changed(from: "안녕ㄱ", to: "안녕").isEmpty)
+    }
+
     @Test func shiftIsFixedOnFinalsOnly() {
         #expect(guesser.autoFix("ckftmdPdy", afterKorean: true) == nil) // 찰스예요, not 에요
         #expect(guesser.autoFix("tlwkrgksmsrjdPdy", afterKorean: true) == nil) // 시작하는거예요
@@ -183,7 +190,7 @@ import Testing
         type("djddj ◆")
         #expect(field.text == "영어 ")
         #expect(session.guesses?.texts.first == "영어")
-        #expect(session.guesses?.typed == "엉어")
+        #expect(session.guesses?.changed.first == 0..<1)
         type("↓")
         #expect(field.text == session.guesses.map { $0.texts[1] + " " })
         type("⎋")

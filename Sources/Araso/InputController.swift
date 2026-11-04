@@ -15,7 +15,9 @@ final class InputController: IMKInputController {
     private var pauseTapDown: Date?
     /// Which switch key (right ⌥ or right ⇧, in `AppPolicy.switchKeys`) went down and when,
     /// while no other key has been pressed with it: a tap switches the word's language.
-    private var switchTapDown: (key: UInt16, at: Date)?
+    private var switchTapDown: (key: UInt16, at: Date)? {
+        didSet { if switchTapDown == nil { MainActor.assumeIsolated { LongPressRing.hide() } } }
+    }
     /// A terminal was waiting for a password at the last key (`PasswordPrompt`): its keys went to
     /// the app as typed, and what was being typed went in before the first of them.
     private var passingPassword = false
@@ -266,6 +268,7 @@ final class InputController: IMKInputController {
             // and its tap belongs to whatever the user bound it to.
             let others = event.modifierFlags.intersection([.command, .control, .option, .shift]).subtracting(flag)
             switchTapDown = others.isEmpty ? (event.keyCode, Date()) : nil
+            if switchTapDown != nil, session.canGuess { LongPressRing.start(caret: caretRect(client)) }
             return
         }
         guard let down = switchTapDown, down.key == event.keyCode else { return }

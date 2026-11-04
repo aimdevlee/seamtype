@@ -187,12 +187,12 @@ public final class InputSession {
     }
 
     /// The long press's guesses for the word just committed (`Key.guess`): each as it goes in, the
-    /// one in the word's place selected, and the word as typed, for the list's foot. No texts: there
-    /// was nothing to guess.
+    /// one in the word's place selected, and which characters of each differ from the keys' own
+    /// reading (`SlipGuesser.changed`). No texts: there was nothing to guess.
     public struct Guesses: Equatable {
         public let texts: [String]
         public let selected: Int
-        public let typed: String
+        public let changed: [Range<Int>]
     }
 
     /// A correction the dictionary just took: the first one (the engine leans that way from now
@@ -1062,6 +1062,13 @@ public final class InputSession {
         return undone
     }
 
+    /// Whether a long press of the switch key has a word to guess at, for the ring that says it is
+    /// being held.
+    public var canGuess: Bool {
+        KoreanLayout.current == .dubeolsik && fixing == nil && conversion == nil && !inVimNormalMode
+            && (!keys.isEmpty || lastCommit != nil)
+    }
+
     /// The long press: the word being typed goes in as shown (as Return confirms it), then the word
     /// just committed shows its first guess in its place, the rest listed (`guesses`). With nothing to
     /// guess the list is empty, for the input method to say so, and the key goes nowhere.
@@ -1071,7 +1078,7 @@ public final class InputSession {
         guard keys.isEmpty, let pending = lastCommit else { return true }
         let list = Self.slipGuesser.guesses(for: pending.keys)
         guard !list.isEmpty else {
-            guesses = Guesses(texts: [], selected: 0, typed: String(pending.text.dropLast(pending.boundary.count)))
+            guesses = Guesses(texts: [], selected: 0, changed: [])
             return true
         }
         guessing = (list, 0, pending)
@@ -1140,8 +1147,9 @@ public final class InputSession {
         lastCommit = shown
         state.selected = index
         guessing = state
+        let own = HangulComposer.compose(keys: base.keys)?.text ?? base.keys
         guesses = Guesses(texts: state.list.map(\.text), selected: index,
-                          typed: String(base.text.dropLast(base.boundary.count)))
+                          changed: state.list.map { SlipGuesser.changed(from: own, to: $0.text) })
     }
 
     /// The guess shown stays, and the list closes. Picked by hand, it teaches nothing, except that keys
