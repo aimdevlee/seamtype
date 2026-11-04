@@ -215,7 +215,7 @@ tests use `FakeTextField`). It owns the preview and hysteresis, commits, Esc rea
   On Windows and Linux `TapTracker.up` returns `.guess` for a switch key held past the tap's half
   second, `UIState.guesses` and `typoFixed` carry the list (`changed` in UTF-16 units) and the note,
   and a click comes back as `pickGuess`; `StripWindow::ShowGuesses`, and fcitx5's numbered list (the changed
-  letters as an underline format, which its classic UI doesn't draw), show it. No ring there, and no hold on 한/영, which acts on key down.
+  letters as an underline format, which its classic UI doesn't draw), show it. No ring there, and no hold on a 한/영 key of its own, which acts on key down; right Alt arriving as `VK_HANGUL` (Korean keyboard types, scan 0x38 extended, `IsRightAltHangul` in the text service) is `.rightAlt` and can be held.
 - Return on an underlined word only confirms it (`returnConfirmsOnly`, on by default); off, the
   app gets the Return too, except after Japanese. A word only confirmed is the word just committed,
   with no boundary (the macOS ← after a switch then leaves the caret before its last character, where

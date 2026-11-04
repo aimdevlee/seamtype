@@ -76,6 +76,9 @@ public enum KeyMapper {
             return key.vk == vkRMenu || key.extended ? .rightAlt : .leftAlt
         case vkLWin: return .leftWin
         case vkRWin: return .rightWin
+        // Right Alt where the Korean keyboard type makes it 한/영: it has a release, so it can be
+        // held. A 한/영 key of its own, which may have none, stays a key that acts going down.
+        case vkHangul where key.scan == 0x38 && key.extended: return .rightAlt
         default: return nil
         }
     }
