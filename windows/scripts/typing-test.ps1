@@ -87,6 +87,20 @@ public static class Keys {
         if (thread != 0 && thread != own) AttachThreadInput(own, thread, false);
         return done;
     }
+    [StructLayout(LayoutKind.Sequential)] struct COPYDATASTRUCT { public IntPtr dwData; public int cbData; public IntPtr lpData; }
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr FindWindow(string cls, string title);
+    [DllImport("user32.dll")] static extern IntPtr SendMessageTimeout(IntPtr window, uint message, IntPtr w, ref COPYDATASTRUCT l, uint flags, uint timeout, out IntPtr result);
+    /// Has the host read its files again, as the settings window does after a change (kCopyReload).
+    public static bool Reload() {
+        IntPtr host = FindWindow("ArasoHostWindow", null);
+        if (host == IntPtr.Zero) return false;
+        IntPtr data = Marshal.AllocHGlobal(1);
+        try {
+            var copy = new COPYDATASTRUCT { dwData = (IntPtr)1, cbData = 0, lpData = data };
+            IntPtr result;
+            return SendMessageTimeout(host, 0x4A /* WM_COPYDATA */, IntPtr.Zero, ref copy, 0x2 /* SMTO_ABORTIFHUNG */, 2000, out result) != IntPtr.Zero;
+        } finally { Marshal.FreeHGlobal(data); }
+    }
     public static string Text(IntPtr edit) {
         int length = (int)SendMessage(edit, 0x0E /* WM_GETTEXTLENGTH */, IntPtr.Zero, IntPtr.Zero);
         var text = new StringBuilder(length + 1);
@@ -216,7 +230,15 @@ function Open-Field([string]$kind) {
         $process = [Diagnostics.Process]::Start($start)
         for ($i = 0; $i -lt 60 -and $process.MainWindowHandle -eq [IntPtr]::Zero; $i++) { Start-Sleep -Milliseconds 250; $process.Refresh() }
         Start-Sleep -Seconds 2 # the window draws, then focuses the box
-        return @{ process = $process; window = $process.MainWindowHandle; read = { if (Test-Path $out) { [IO.File]::ReadAllText($out) } else { "" } }.GetNewClosure() }
+        # The field rewrites the file as its text changes, also while Case reads it again: shared,
+        # so that write never fails, and a read that meets one is read as nothing yet.
+        $read = {
+            try {
+                $stream = [IO.File]::Open($out, "Open", "Read", "ReadWrite, Delete")
+                try { (New-Object IO.StreamReader $stream, ([Text.Encoding]::UTF8)).ReadToEnd() } finally { $stream.Dispose() }
+            } catch [IO.IOException] { "" }
+        }
+        return @{ process = $process; window = $process.MainWindowHandle; read = $read.GetNewClosure() }
     }
     $process = Start-Process notepad -PassThru
     Start-Sleep -Seconds 3
@@ -258,24 +280,62 @@ function Ready($field, [string]$kind) {
     $loaded = (Get-Process -Id $field.process.Id -ErrorAction SilentlyContinue).Modules | Where-Object { $_.ModuleName -eq "ArasoTip.dll" } | Select-Object -First 1
     if (-not $front) { Write-Host "${kind}: $(Front-Window) is in front" }
     Write-Host "${kind}: in front $front, layout $layout, ArasoTip.dll $(if ($loaded) { $loaded.FileName } else { 'not loaded' })"
+    return $front
+}
+
+# Every case starts with nothing learned. A switch is a correction, and the cases switch hello
+# again and again: two were learned, after which hello went in as ㅗ디ㅣㅐ and the next case's
+# switch (한/영 on the word just committed, right Alt) took it back to hello, as it should. Which
+# switches were learned depended on the order of the cases and on whether a key came after the
+# switch before the field closed, so cases failed on one runner and not the other: 한/영 while
+# typing in Notepad on x64 every time (PR #88, cd0aa06), though the text service kept the key and
+# the host switched the word each time (aimdevlee/windows-hangul-classic-debug's log).
+function Forget-Learned {
+    Remove-Item (Join-Path $env:APPDATA "Araso\dictionary.json") -ErrorAction SilentlyContinue
+    if (-not [Keys]::Reload()) { Write-Host "host: no window to reload" }
 }
 
 # CI's ARM64 runner, fresh from its first sign-in, still opens windows of its own over the field now
-# and then (WSL's first run, again after it was closed) and its x64 host may answer a key late: there a
-# case that comes out wrong is typed once more, in a new field, and has to come out right then.
+# and then (WSL's first run, again after it was closed), and on both runners the host may answer the
+# first key of Try Typing late, which loses it ('kssud hello ', "host didn't answer (995)": ARM since
+# 2026-11-03, x64 on 2026-11-04): a case that comes out wrong is typed once more, in a new field, and
+# has to come out right then. Every try starts with nothing learned, so a retry teaches nothing.
+# A field that never came to the front gets no keys: they would go to whatever is in front (the
+# runner's agent console, 2026-11-03) and the case read as Araso typing nothing. Such a try is
+# typed again, up to twice, on either runner, and a case that never got the front is the runner's.
+# A try that comes out wrong shows the log written during it: the log's end alone, printed once at
+# the end, had long lost an early case's lines.
+$script:unfocused = @()
+function Log-Length { if (Test-Path $log) { @(Get-Content $log).Count } else { 0 } }
 function Case([string]$keys, [string]$expected, [scriptblock]$after, [string]$kind = "notepad") {
-    $attempts = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { 2 } else { 1 }
+    $attempts = 2
+    $unready = 0
     for ($attempt = 1; ; $attempt++) {
+        Forget-Learned
+        $mark = Log-Length
         $field = Open-Field $kind
         $window = $field.window
-        Ready $field $kind
+        if (-not (Ready $field $kind)) {
+            Stop-Process -Id $field.process.Id -Force
+            Write-Host "$kind typed '$keys': not sent, the field never came to the front"
+            if (++$unready -le 2) { $attempt--; continue }
+            $script:unfocused += "$kind '$keys'"
+            return $false
+        }
         Send-Keys $keys
         if ($after) { & $after }
         Start-Sleep -Milliseconds 800
         if ([Keys]::GetForegroundWindow() -ne $window) { Write-Host "${kind}: no longer in front after the keys" }
-        $text = & $field.read
+        # Read again for a moment while it differs: a read that met the field's write is read as nothing.
+        $clock = [Diagnostics.Stopwatch]::StartNew()
+        while (($text = & $field.read) -ne $expected -and $clock.Elapsed.TotalSeconds -lt 3) { Start-Sleep -Milliseconds 100 }
         Stop-Process -Id $field.process.Id -Force
         Write-Host "$kind typed '$keys' → '$text'"
+        if ($text -ne $expected -and (Test-Path $log)) {
+            Write-Host "--- araso.log while it was typed"
+            Get-Content $log | Select-Object -Skip $mark | Select-String -NotMatch "scan code" | Select-Object -First 200 | Out-Host
+            Write-Host "---"
+        }
         if ($text -eq $expected -or $attempt -ge $attempts) { return $text -eq $expected }
         Write-Host "${kind}: again"
     }
@@ -343,7 +403,7 @@ $warm = Open-Field "wpf"
 Start-Sleep -Seconds 2
 # Brought forward in Korean too: the first window to load the text service after the first sign-in
 # (CI's ARM64 runner) stayed in English through every language request.
-Ready $warm "warm-up wpf"
+Ready $warm "warm-up wpf" | Out-Null
 Stop-Process -Id $warm.process.Id -Force
 
 $results = @(
@@ -373,12 +433,15 @@ $results = @(
     # Right Ctrl tapped alone pauses (0x1D extended): keys then go in as typed.
     (Case "" "dkssud " { Tap 0x1D; Send-Keys "dkssud " } $classic),
     # A Korean keyboard's 한/영 (VK_HANGUL) switches as it goes down; 한자 (VK_HANJA) pauses.
-    (Case "hello " "ㅗ디ㅣㅐ " { Start-Sleep -Milliseconds 300; Press-Virtual 0x15 } $classic),
+    (Case "hello" "ㅗ디ㅣㅐ " { Press-Virtual 0x15; Send-Keys " " } $classic),
     (Case "" "dkssud " { Press-Virtual 0x19; Send-Keys "dkssud " } $classic)
 )
 # Reported, not required: switching the word just committed in a classic app, whose text Araso
-# edits only through Windows' compatibility layer.
+# edits only through Windows' compatibility layer. With nothing learned the word stays as it went in,
+# by right Alt and 한/영 alike, on both CI runners; 한/영's case passed while it was required only
+# because hello had been learned as ㅗ디ㅣㅐ by then, so the switch had nothing to do.
 Case "hello " "ㅗ디ㅣㅐ " { Start-Sleep -Milliseconds 300; Tap 0x38 } $classic | Out-Null
+Case "hello " "ㅗ디ㅣㅐ " { Start-Sleep -Milliseconds 300; Press-Virtual 0x15 } $classic | Out-Null
 # Reported, not required: a Korean 103-key keyboard's own scan codes for 한/영 (0xF2) and 한자
 # (0xF1), which Windows turns into VK_HANGUL and VK_HANJA only with that keyboard type set.
 Case "hello " "ㅗ디ㅣㅐ " { [Keys]::Key(0xF2, $false, $false); Start-Sleep -Milliseconds 200 } $classic | Out-Null
@@ -394,7 +457,11 @@ if ($env:ARASO_SCREENSHOTS -and $env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
     # for them before the window, as they start under the word's first letter).
     function Shot([string]$name, [IntPtr]$window, [int]$below = 0, [int]$left = 0) {
         $rect = New-Object Keys+RECT
-        [Keys]::GetWindowRect($window, [ref]$rect) | Out-Null
+        # A window that never came up is reported, not failed: the shots are for looking at the design.
+        if ($window -eq [IntPtr]::Zero -or -not [Keys]::GetWindowRect($window, [ref]$rect)) {
+            Write-Host "screenshot: $name (no window)"
+            return
+        }
         $width = $rect.Right - $rect.Left + $left
         $height = $rect.Bottom - $rect.Top + $below
         $bitmap = New-Object System.Drawing.Bitmap $width, $height
@@ -404,7 +471,7 @@ if ($env:ARASO_SCREENSHOTS -and $env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
         $graphics.Dispose(); $bitmap.Dispose()
         Write-Host "screenshot: $name"
     }
-    function Kept([string]$kind) { $f = Open-Field $kind; Ready $f $kind; return $f }
+    function Kept([string]$kind) { $f = Open-Field $kind; Ready $f $kind | Out-Null; return $f }
 
     # A classic app: the word drawn at the caret.
     $f = Kept $classic
@@ -478,7 +545,10 @@ if ($env:ARASO_SCREENSHOTS -and $env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
         [Keys]::Front($process.MainWindowHandle) | Out-Null
         Start-Sleep -Seconds 2
         Shot "settings-$tab" $process.MainWindowHandle
+        # Gone before the next tab: a settings window still there takes the next tab itself, and
+        # the new process quits without a window of its own.
         Stop-Process -Id $process.Id -Force
+        $process.WaitForExit(5000) | Out-Null
     }
     $f = Kept "host"
     Send-Keys "dkssud hello kyouha "; Start-Sleep -Milliseconds 900
@@ -487,13 +557,14 @@ if ($env:ARASO_SCREENSHOTS -and $env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
     Remove-Item $settings -ErrorAction SilentlyContinue
 }
 
-if (Test-Path $log) { Write-Host "--- araso.log"; Get-Content $log | Select-String -NotMatch "scan code" | Select-Object -Last 400 | Out-Host }
+if (Test-Path $log) { Write-Host "--- araso.log"; Get-Content $log | Select-String -NotMatch "scan code" | Select-Object -Last 100 | Out-Host }
 reg query "HKCU\Software\Microsoft\CTF\TIP" /s 2>$null | Select-String -Pattern "6D6C7D5F" | Out-Host
 reg query "HKLM\Software\Microsoft\CTF\TIP\{6D6C7D5F-3B7F-4F0E-9A2C-417261736F01}" /s 2>$null | Select-Object -First 20 | Out-Host
 Get-WinUserLanguageList | Format-List | Out-Host
 if ($created -contains $false) { throw "the text service couldn't be created" }
 if ($results -contains $false) {
     Get-ChildItem "$env:APPDATA\Araso" -ErrorAction SilentlyContinue | Select-Object Name | Out-Host
+    if ($script:unfocused) { Write-Host "never in front (the runner, not Araso): $($script:unfocused -join ', ')" }
     throw "typing test failed"
 }
 Write-Host "typing test: ok"
