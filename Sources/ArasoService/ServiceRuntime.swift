@@ -319,6 +319,10 @@ public final class ServiceRuntime {
                 _ = session.handle(.cycle, client: field)
                 // A lone Alt going up opens the app's menu bar: taken, so the app doesn't see it.
                 reply.handled = true
+            case .guess?:
+                guard session.canGuess else { break } // nothing to guess at: the app's, as before
+                _ = session.handle(.guess, client: field)
+                reply.handled = true
             case nil:
                 break
             }
@@ -341,6 +345,10 @@ public final class ServiceRuntime {
             if let index = request.index, let readings = session.readings, readings.languages.indices.contains(index) {
                 let language = readings.languages[index]
                 queue(id) { session, field in session.pickReading(language, client: field) }
+            }
+        case .pickGuess:
+            if let index = request.index {
+                queue(id) { session, field in session.pickGuess(index, client: field) }
             }
         default:
             break
@@ -443,6 +451,7 @@ public final class ServiceRuntime {
             // A word being typed, converted or fixed (an earlier one, marked again) takes its keys:
             // ←/→, digits, Delete and Return mean something there.
             if !session.keys.isEmpty || session.conversion != nil || session.fixing != nil { return true }
+            if session.guesses?.texts.isEmpty == false { return true } // as in the candidate card
             // ←/→ right after a switch key changed the word just committed make it the fix.
             if session.takesArrow(sessionKey) { return true }
             _ = session.handle(sessionKey, client: SnapshotClient.detached())
@@ -458,6 +467,7 @@ public final class ServiceRuntime {
         switch taps.up(modifier, pauseKey: settings.pauseKey) {
         case .pause?: return true
         case .cycle? where !session.inVimNormalMode: return true
+        case .guess? where session.canGuess: return true
         default: break
         }
         client.taps = taps
@@ -498,6 +508,15 @@ public final class ServiceRuntime {
                                            selected: readings.selected, remembered: readings.remembered,
                                            once: readings.once)
         }
+        if let guesses = session.guesses {
+            let changed = zip(guesses.texts, guesses.changed).map { text, range in
+                let characters = Array(text)
+                let start = String(characters.prefix(range.lowerBound)).utf16.count
+                return UIState.Guesses.Changed(start: start, end: start + String(characters[range]).utf16.count)
+            }
+            ui.guesses = UIState.Guesses(texts: guesses.texts, selected: guesses.selected, changed: changed)
+        }
+        if session.fixedSlip != nil { ui.typoFixed = true }
         if let learned = session.learned {
             let learning: String
             switch learned.learning {

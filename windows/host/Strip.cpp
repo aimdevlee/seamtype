@@ -151,7 +151,7 @@ D2D1_COLOR_F Mix(D2D1_COLOR_F a, D2D1_COLOR_F b, float t) {
 /// Araso's paper, as on the website and in the settings window: birch paper and navy ink, navy
 /// paper in the dark.
 struct Paper {
-    D2D1_COLOR_F background, ink2, line, reset, thumb;
+    D2D1_COLOR_F background, ink2, line, reset, thumb, spark;
     float shadow;
 
     static Paper Current() {
@@ -163,6 +163,8 @@ struct Paper {
         // The capsule of a word that went back to Araso's own reading: nothing remembered any more.
         paper.reset = theme.dark ? Rgb(0x636366) : Rgb(0x6e6e73);
         paper.thumb = FromColorRef(theme.accent);
+        // What marks a guess: what it changed, in this color with a wave under it.
+        paper.spark = theme.dark ? Rgb(0xf0b35a) : Rgb(0xb4690e);
         // The strip's shadow, deeper on dark paper.
         paper.shadow = theme.dark ? 0.45f : 0.14f;
         return paper;
@@ -306,6 +308,37 @@ void StripWindow::ShowReadings(const std::vector<std::wstring> &texts, const std
     }
     float width = 0;
     for (const auto &cell : cells) width = std::max(width, cell.frame.right - cell.frame.left);
+    int rows = static_cast<int>(cells.size());
+    footer_.clear();
+    footerLayout_ = Com<IDWriteTextLayout>();
+    Build(std::move(cells), Mode::list, std::ceil(width) + kInset * 2, rows, selected, word, 0);
+}
+
+void StripWindow::ShowGuesses(const std::vector<std::wstring> &texts, const std::vector<std::pair<int, int>> &changed,
+                              int selected, const RECT &word, std::function<void(int)> pick) {
+    if (texts.empty() || word.bottom <= word.top || !Factories()) return Hide(true);
+    pick_ = std::move(pick);
+    choose_ = nullptr;
+    selected = std::max(0, std::min(selected, static_cast<int>(texts.size()) - 1));
+    if (Up() && !settling_ && mode_ == Mode::list && texts == texts_ && marks_.empty()) {
+        Select(selected);
+        return;
+    }
+    settling_ = false;
+    pageStart_ = 0;
+    texts_ = texts;
+    marks_.clear();
+    std::vector<Cell> cells;
+    float width = 0;
+    for (size_t i = 0; i < texts.size(); i++) {
+        Cell cell = MakeCell(texts[i], static_cast<int>(i) + 1, Mark::none, false);
+        if (i < changed.size()) {
+            cell.changedStart = changed[i].first;
+            cell.changedEnd = changed[i].second;
+        }
+        width = std::max(width, cell.frame.right - cell.frame.left);
+        cells.push_back(std::move(cell));
+    }
     int rows = static_cast<int>(cells.size());
     footer_.clear();
     footerLayout_ = Com<IDWriteTextLayout>();
@@ -479,7 +512,8 @@ void StripWindow::Settle(const std::wstring &text, const std::string &learning, 
     bool hasWord = word.bottom > word.top;
     int index;
     RECT under = word;
-    if (Up() && !settling_ && mode_ == Mode::list && selected_ < static_cast<int>(cells_.size())) {
+    bool note = learning == "note";
+    if (!note && Up() && !settling_ && mode_ == Mode::list && selected_ < static_cast<int>(cells_.size())) {
         index = selected_;
         under = word_;
         hasWord = true;
@@ -504,10 +538,10 @@ void StripWindow::Settle(const std::wstring &text, const std::string &learning, 
     Cell &cell = cells_[index];
     const D2D1_RECT_F start = cell.frame;
     const char *said = learning == "once" ? "Noted" : learning == "forGood" ? "Learned" : "Reset";
-    outcome_ = Layout(L(said), g_outcomeFormat, 1000);
+    outcome_ = note ? Com<IDWriteTextLayout>() : Layout(L(said), g_outcomeFormat, 1000);
     markX_ = cell.textX + cell.textWidth + 5;
     outcomeX_ = markX_ + kMarkSide + 6;
-    float width = outcomeX_ + WidthOf(outcome_.get()) + kPad;
+    float width = note ? start.right - start.left : outcomeX_ + WidthOf(outcome_.get()) + kPad;
 
     // Where the capsule goes: under the word's first letter, as wide as what it says. The window
     // grows to cover it at once, nothing moving on screen, so the strip can travel there.
@@ -771,11 +805,36 @@ void StripWindow::DrawCell(ID2D1RenderTarget *target, ID2D1SolidColorBrush *brus
     target->DrawTextLayout(D2D1::Point2F(cell.textX, kBaseline - BaselineOf(cell.layout.get())), cell.layout.get(), brush,
                            D2D1_DRAW_TEXT_OPTIONS_CLIP);
 
+    // What a guess changed: in the spark's color (white stays on the thumb), a wave under it.
+    if (cell.changedEnd > cell.changedStart) {
+        FLOAT from = 0, to = 0, y = 0;
+        DWRITE_HIT_TEST_METRICS metrics = {};
+        cell.layout->HitTestTextPosition(cell.changedStart, FALSE, &from, &y, &metrics);
+        cell.layout->HitTestTextPosition(cell.changedEnd, FALSE, &to, &y, &metrics);
+        float left = cell.textX + from, right = cell.textX + to;
+        D2D1_COLOR_F spark = Faded(paper.spark, alpha);
+        if (!on) {
+            target->PushAxisAlignedClip(D2D1::RectF(left, 0, right, kHeight), D2D1_ANTIALIAS_MODE_ALIASED);
+            brush->SetColor(&spark);
+            target->DrawTextLayout(D2D1::Point2F(cell.textX, kBaseline - BaselineOf(cell.layout.get())), cell.layout.get(), brush,
+                                   D2D1_DRAW_TEXT_OPTIONS_CLIP);
+            target->PopAxisAlignedClip();
+        }
+        D2D1_COLOR_F wave = on ? D2D1::ColorF(1, 1, 1, alpha * 0.85f) : spark;
+        brush->SetColor(&wave);
+        float line = kBaseline + 3, step = 2;
+        bool up = true;
+        for (float x = left; x < right; x += step, up = !up) {
+            float next = std::min(x + step, right);
+            target->DrawLine(D2D1::Point2F(x, line + (up ? 1.0f : -1.0f)), D2D1::Point2F(next, line + (up ? -1.0f : 1.0f)), brush, 1);
+        }
+    }
+
     // The mark: a check where the dictionary remembers the reading, a pencil where it was
     // corrected once; on the settled one, what the correction did, moving about its center.
     Glyph glyph = cell.mark == Mark::remembered ? Glyph::check : cell.mark == Mark::once ? Glyph::pencil : Glyph::none;
     float scale = 1, turn = 0, opacity = 1, drawn = 1;
-    if (settled) {
+    if (settled && learning_ != "note") {
         double t = now - (settleStart_ + settleSay_);
         if (ReduceMotion() && t >= 0) t = 10;
         if (t >= 0) {

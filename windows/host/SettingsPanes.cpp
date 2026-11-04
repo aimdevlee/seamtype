@@ -141,6 +141,10 @@ void BuildKeys() {
           [](bool on) { ChangeSettings([on](Json &s) { s.set("returnConfirmsOnly", on); }); });
     Note(L("Return on an underlined word confirms it; press it again for a new line. Japanese is always only confirmed."), S(20));
 
+    Check(L("Fix typos"), settings["fixSlips"].asBool(false), true,
+          [](bool on) { ChangeSettings([on](Json &s) { s.set("fixSlips", on); }); });
+    Note(L("A Korean word with one key slipped (치다ㅏㄱ) goes in as the word meant (치다가); Delete right after undoes it. Hold the switch key for guesses either way."), S(20));
+
     Heading(L("Pause"));
     // Off, the right-hand taps (Ctrl plays ⌘'s part on Windows), and a recorded shortcut.
     std::vector<std::wstring> items = {L("Off"), L("Right Ctrl tap (한자 on Korean keyboards)"), L("Right Alt tap"),

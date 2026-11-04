@@ -347,9 +347,9 @@ the next key is hit. Composed as Hangul, that leaves loose jamo (`clekkr` → `�
 (`djddj` → `엉어`).
 
 - **Hold a language switch key for half a second, then let go**: the words one slip away from the word just
-  committed (or being typed) are listed like kanji candidates, the first put in its place (`엉어` → `영어`). While you hold, a ring by the caret fills to show when to let go; what each guess changed is colored with a wavy underline. Hold
+  committed (or being typed) are listed like kanji candidates, the first put in its place (`엉어` → `영어`). While you hold, a ring by the caret fills to show when to let go (macOS); what each guess changed is colored with a wavy underline (on Linux, just underlined). Hold
   again or ↓·↑ for another, a digit, a click or Return to pick one; Esc and Delete put the word back. Any other key
-  keeps what is shown and goes on. With nothing to guess, "No guesses" shows for a moment. 2-set only, one slip only.
+  keeps what is shown and goes on. With nothing to guess, "No guesses" shows for a moment. 2-set only, one slip only. The 한/영 key, which acts as it goes down, can't be held for this (Windows, Linux).
 - **Fix typos** (Settings → Keys, `fixSlips`, off by default): where it is clear, the word is fixed as it ends
   (Space, punctuation) and "✦ Typo fixed" shows for a moment (`clekkr` → `치다가`). Only when the keys as typed
   leave loose jamo or a syllable nobody types (a word of syllables only, only for Shift on a final: `햇어요` → `했어요`), don't

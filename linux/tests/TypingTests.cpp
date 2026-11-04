@@ -23,11 +23,13 @@
 #include <dlfcn.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
 #include <functional>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "Document.h"
@@ -72,6 +74,15 @@ public:
         KeyEvent down(this, key, false);
         if (!keyEvent(down)) typeItself(sym, states);
         KeyEvent up(this, Key(sym, states, evdev + 8), true);
+        keyEvent(up);
+    }
+
+    /// The right Alt switch key held past the tap's half second, then let go.
+    void holdSwitchKey() {
+        KeyEvent down(this, Key(FcitxKey_Alt_R, KeyStates(), 100 + 8), false);
+        keyEvent(down);
+        std::this_thread::sleep_for(std::chrono::milliseconds(600));
+        KeyEvent up(this, Key(FcitxKey_Alt_R, KeyStates{KeyState::Alt}, 100 + 8), true);
         keyEvent(up);
     }
 
@@ -339,6 +350,29 @@ int main(int argc, char **argv) {
              Expect(list && list->size() > 0, "candidates after Space", field->preedit);
              field->type("⏎");
              Check(field, "kyouha Space ⏎", "今日は");
+             delete field;
+         }},
+        {"A held switch key lists guesses, a digit picks one", [](Instance &instance) {
+             auto *field = Open(instance, "gedit");
+             field->type("clekkr ");
+             field->holdSwitchKey();
+             auto list = field->inputPanel().candidateList();
+             Expect(list && list->size() > 0, "guesses after a long press", field->shown());
+             if (list && list->size() > 0) {
+                 Expect(list->candidate(0).text().toString() == "치다가", "first guess 치다가", list->candidate(0).text().toString());
+             }
+             Check(field, "the first guess in place", "치다가 ");
+             field->type("1");
+             Check(field, "1 picks it", "치다가 ");
+             Expect(!field->inputPanel().candidateList(), "the list goes", field->shown());
+             delete field;
+         }},
+        {"A typo fixed at a word's end says so", [](Instance &instance) {
+             WriteSettings(R"({"fixSlips": true})");
+             auto *field = Open(instance, "gedit");
+             field->type("clekkr ");
+             Check(field, "clekkr Space", "치다가 ");
+             Expect(field->inputPanel().auxUp().toString().find("✦") == 0, "the note", field->inputPanel().auxUp().toString());
              delete field;
          }},
     };

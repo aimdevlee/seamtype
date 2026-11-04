@@ -4,6 +4,7 @@
 
 #include <fcitx-utils/log.h>
 #include <fcitx-utils/misc.h>
+#include <fcitx-utils/utf8.h>
 #include <fcitx-config/rawconfig.h>
 #include <fcitx/candidatelist.h>
 #include <fcitx/globalconfig.h>
@@ -47,17 +48,21 @@ uint64_t Now() { return fcitx::now(CLOCK_MONOTONIC); }
 /// A candidate in the card; chosen with a click (the keys go to the session).
 class ChoiceWord : public fcitx::CandidateWord {
 public:
-    ChoiceWord(Engine *engine, int index, fcitx::Text text, bool reading)
-        : fcitx::CandidateWord(std::move(text)), engine_(engine), index_(index), reading_(reading) {}
+    enum class Kind { candidate, reading, guess };
+    ChoiceWord(Engine *engine, int index, fcitx::Text text, Kind kind)
+        : fcitx::CandidateWord(std::move(text)), engine_(engine), index_(index), kind_(kind) {}
     void select(fcitx::InputContext *ic) const override {
-        if (reading_) engine_->pick(ic, index_);
-        else engine_->choose(ic, index_);
+        switch (kind_) {
+        case Kind::reading: engine_->pick(ic, index_); break;
+        case Kind::guess: engine_->pickGuess(ic, index_); break;
+        case Kind::candidate: engine_->choose(ic, index_); break;
+        }
     }
 
 private:
     Engine *engine_;
     int index_;
-    bool reading_;
+    Kind kind_;
 };
 
 /// The tag a reading shows, in the user's language (the strip's EN, KO, JA, MIX).
@@ -249,6 +254,7 @@ void Engine::drawPanel(fcitx::InputContext *ic, State *st, const Json &ui) {
     auto &panel = ic->inputPanel();
     const Json &candidates = ui["candidates"];
     const Json &readings = ui["readings"];
+    const Json &guesses = ui["guesses"];
     if (candidates.isObject()) {
         // The candidate card: nine to a page, numbered, the reading under them.
         auto list = std::make_unique<fcitx::CommonCandidateList>();
@@ -257,7 +263,7 @@ void Engine::drawPanel(fcitx::InputContext *ic, State *st, const Json &ui) {
         list->setLayoutHint(fcitx::CandidateLayoutHint::Vertical);
         const auto &texts = candidates["texts"].items();
         for (size_t i = 0; i < texts.size(); ++i) {
-            list->append<ChoiceWord>(this, static_cast<int>(i), fcitx::Text(texts[i].asString()), false);
+            list->append<ChoiceWord>(this, static_cast<int>(i), fcitx::Text(texts[i].asString()), ChoiceWord::Kind::candidate);
         }
         int selected = candidates["selected"].asInt();
         if (!texts.empty()) {
@@ -287,23 +293,41 @@ void Engine::drawPanel(fcitx::InputContext *ic, State *st, const Json &ui) {
             if (static_cast<int>(i) == remembered) tag += " ✓";
             if (static_cast<int>(i) == once) tag += " ✎";
             text.append(tag, fcitx::TextFormatFlag::DontCommit);
-            list->append<ChoiceWord>(this, static_cast<int>(i), std::move(text), true);
+            list->append<ChoiceWord>(this, static_cast<int>(i), std::move(text), ChoiceWord::Kind::reading);
         }
         if (!texts.empty()) list->setGlobalCursorIndex(std::max(0, readings["selected"].asInt()));
+        panel.setCandidateList(std::move(list));
+        panel.setAuxDown(fcitx::Text());
+    } else if (guesses.isObject() && guesses["texts"].size() > 0) {
+        // The long press's guesses, numbered, what each changed underlined: fcitx5's list has no
+        // color or wave of its own. `changed` counts UTF-16 units; Hangul and jamo are one each.
+        auto list = std::make_unique<fcitx::CommonCandidateList>();
+        const auto &texts = guesses["texts"].items();
+        list->setPageSize(std::max<int>(1, static_cast<int>(texts.size())));
+        list->setLabels({"1. ", "2. ", "3. ", "4. ", "5. ", "6. ", "7. ", "8. ", "9. "});
+        list->setLayoutHint(fcitx::CandidateLayoutHint::Vertical);
+        for (size_t i = 0; i < texts.size(); ++i) {
+            std::string whole = texts[i].asString();
+            size_t start = static_cast<size_t>(guesses["changed"][i]["start"].asInt());
+            size_t end = static_cast<size_t>(guesses["changed"][i]["end"].asInt());
+            size_t from = fcitx::utf8::ncharByteLength(whole.begin(), start);
+            size_t length = fcitx::utf8::ncharByteLength(whole.begin() + static_cast<std::ptrdiff_t>(from), end - start);
+            fcitx::Text text;
+            text.append(whole.substr(0, from));
+            text.append(whole.substr(from, length), fcitx::TextFormatFlag::Underline);
+            text.append(whole.substr(from + length));
+            list->append<ChoiceWord>(this, static_cast<int>(i), std::move(text), ChoiceWord::Kind::guess);
+        }
+        list->setGlobalCursorIndex(std::max(0, guesses["selected"].asInt()));
         panel.setCandidateList(std::move(list));
         panel.setAuxDown(fcitx::Text());
     } else {
         panel.setCandidateList(nullptr);
         panel.setAuxDown(fcitx::Text());
     }
-    const Json &learned = ui["learned"];
-    if (learned.isObject()) {
-        // What a correction did, for a moment: Noted after the first, Learned once for good, Reset
-        // when switching back to Araso's own reading forgot the word.
-        std::string learning = learned["learning"].asString();
-        const char *said = learning == "once" ? "Noted" : learning == "forGood" ? "Learned" : "Reset";
-        const char *mark = learning == "once" ? "✎ " : learning == "forGood" ? "✓ " : "↺ ";
-        panel.setAuxUp(fcitx::Text(mark + learned["text"].asString() + " · " + L(said)));
+    // Something said by the word for a moment.
+    auto sayForAMoment = [&](const std::string &said) {
+        panel.setAuxUp(fcitx::Text(said));
         auto reference = ic->watch();
         learnedTimer_ = instance_->eventLoop().addTimeEvent(
             CLOCK_MONOTONIC, Now() + kLearnedShown, 0, [this, reference](fcitx::EventSourceTime *, uint64_t) {
@@ -314,6 +338,17 @@ void Engine::drawPanel(fcitx::InputContext *ic, State *st, const Json &ui) {
                 learnedTimer_.reset();
                 return true;
             });
+    };
+    if (guesses.isObject() && guesses["texts"].size() == 0) sayForAMoment(L("No guesses"));
+    if (ui["typoFixed"].isBool()) sayForAMoment("✦ " + L("Typo fixed"));
+    const Json &learned = ui["learned"];
+    if (learned.isObject()) {
+        // What a correction did, for a moment: Noted after the first, Learned once for good, Reset
+        // when switching back to Araso's own reading forgot the word.
+        std::string learning = learned["learning"].asString();
+        const char *said = learning == "once" ? "Noted" : learning == "forGood" ? "Learned" : "Reset";
+        const char *mark = learning == "once" ? "✎ " : learning == "forGood" ? "✓ " : "↺ ";
+        sayForAMoment(mark + learned["text"].asString() + " · " + L(said));
     }
     (void)st;
     ic->updateUserInterface(fcitx::UserInterfaceComponent::InputPanel);
@@ -465,6 +500,14 @@ void Engine::pick(fcitx::InputContext *ic, int index) {
     Json extra = Json::object();
     extra.set("index", index);
     answer(ic, st, request("pick", ic, st, extra));
+}
+
+void Engine::pickGuess(fcitx::InputContext *ic, int index) {
+    auto *st = state(ic);
+    if (!attached(ic, st)) return;
+    Json extra = Json::object();
+    extra.set("index", index);
+    answer(ic, st, request("pickGuess", ic, st, extra));
 }
 
 // MARK: Outside requests

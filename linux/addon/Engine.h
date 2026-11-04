@@ -63,6 +63,7 @@ public:
     void menuSelect(fcitx::InputContext *ic, const std::string &item);
     void choose(fcitx::InputContext *ic, int index);
     void pick(fcitx::InputContext *ic, int index);
+    void pickGuess(fcitx::InputContext *ic, int index);
 
     /// A request from outside (`ime` socket: the settings window's `reload` and
     /// `activeByDefault`, vim's mode).
