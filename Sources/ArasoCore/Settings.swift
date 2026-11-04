@@ -18,6 +18,10 @@ public struct Settings: Codable, Equatable, Sendable {
     /// Return on an underlined word only confirms it, like a Japanese IME; off, the app gets the
     /// Return too (a Japanese phrase is still only confirmed).
     public var returnConfirmsOnly: Bool = true
+    /// A Korean word that can't be Korean as typed, one slip of the fingers from a word (치다ㅏㄱ for
+    /// 치다가), goes in as that word at its end (`SlipGuesser.autoFix`); Delete right after undoes it.
+    /// Off, the switch key held still lists the guesses.
+    public var fixSlips: Bool = false
     /// Once a day, ask GitHub for the latest release's version (nothing else is sent), and offer
     /// it in the input menu and About when it is newer.
     public var checkForUpdates: Bool = true
@@ -43,8 +47,9 @@ public struct Settings: Codable, Equatable, Sendable {
                 returnConfirmsOnly: Bool = true, checkForUpdates: Bool = true, japaneseEngine: String = "apple",
                 fullWidthDigits: Bool = false, fullWidthSpace: Bool = false, latinLayout: LatinLayout = .qwerty,
                 koreanLayout: KoreanLayout = .dubeolsik, japaneseLayout: LatinLayout? = nil,
-                displayLanguage: String? = nil) {
+                displayLanguage: String? = nil, fixSlips: Bool = false) {
         self.displayLanguage = displayLanguage
+        self.fixSlips = fixSlips
         self.latinLayout = latinLayout
         self.koreanLayout = koreanLayout
         self.japaneseLayout = japaneseLayout
@@ -70,6 +75,7 @@ public struct Settings: Codable, Equatable, Sendable {
         let rightCommandPause = ((try? legacy?.decodeIfPresent(Bool.self, forKey: .rightCommandPause)) ?? nil) ?? true
         pauseKey = value(.pauseKey, rightCommandPause ? .standard : .off)
         returnConfirmsOnly = value(.returnConfirmsOnly, true)
+        fixSlips = value(.fixSlips, false)
         checkForUpdates = value(.checkForUpdates, true)
         japaneseEngine = value(.japaneseEngine, "apple")
         fullWidthDigits = value(.fullWidthDigits, false)

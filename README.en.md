@@ -60,7 +60,7 @@ Hello, worldhasaishonopuroguramudesu␣.           →  Hello, worldは最初の
 
 - [Why](#why)
 - [Install](#install) · [Updates](#updates) · [Moving from an earlier name](#moving-from-seamtype) · [Uninstall](#uninstall)
-- [Keys](#keys) · [Language switch keys](#language-switch-keys) · [Undo after commit, and learning](#undo-after-commit-and-learning) · [Text replacements](#text-replacements) · [Pause](#pause) · [vim](#vim)
+- [Keys](#keys) · [Language switch keys](#language-switch-keys) · [Typo guesses](#typo-guesses) · [Undo after commit, and learning](#undo-after-commit-and-learning) · [Text replacements](#text-replacements) · [Pause](#pause) · [vim](#vim)
 - [Settings](#settings) · [Settings files](#settings-files)
 - [How it decides](#how-it-decides) · [Held-out results](#held-out-results)
 - [Known limits](#known-limits)
@@ -250,6 +250,7 @@ While a word is being typed it is underlined and shows the language Araso expect
 | letters | extend the word | extend the phrase (kana preview) |
 | letters with Caps Lock on | read as if Caps Lock were off (`GKAUS` → `하면`); English goes in in capitals (`OUTPUT`), and so do keys that would be loose jamo throughout, two or more (`RST`, `RD`, chat jamo too: `ZZ`); a word in the dictionary keeps its language. Toggled inside a word, a new word starts there | same |
 | **[Language switch keys](#language-switch-keys)** (by default right ⌥ tapped on its own, and ⇧Esc) | switch reading: English → English+particle → Korean → Japanese | same (with live conversion, the kana first) |
+| A language switch key held half a second, then let go | [typo guesses](#typo-guesses): what the word was if one key slipped | nothing |
 | Esc | commit; the app gets the Esc (when chosen as a switch key, as above) | with live conversion, the kana first; on the kana, cancel the phrase (the app doesn't get it) |
 | Delete | English: the last letter. Korean: the syllable being typed jamo by jamo, earlier ones whole (한국 → 한구 → 한ㄱ → 한 → gone, as the system's 2-set does) | one kana at a time (かんこく → かんこ); with live conversion the last clause goes back to kana less one, the ones before it staying as shown (今日はいい天気 → 今日はいいてん), as in macOS's Japanese input |
 | **Space** | commit, then a space | **convert to kanji** (candidate window) |
@@ -338,6 +339,26 @@ Esc out where it has to reach the app, as in an editor. The input menu's "Esc Sw
 adds or removes only Esc for the app in front. In the Japanese candidate window, and with live
 conversion while kanji are shown, Esc goes back to the kana first whatever keys are chosen; on a
 phrase live conversion leaves as kana (`たけ`), a switch key switches at once.
+
+### Typo guesses
+
+Typing fast, one key slips: two neighbouring keys swap, a key is missed or pressed twice, Shift comes late, or
+the next key is hit. Composed as Hangul, that leaves loose jamo (`clekkr` → `치다ㅏㄱ`) or other syllables
+(`djddj` → `엉어`).
+
+- **Hold a language switch key for half a second, then let go**: the words one slip away from the word just
+  committed (or being typed) are listed like kanji candidates, the first put in its place (`엉어` → `영어`). Hold
+  again or ↓·↑ for another, a digit, a click or Return to pick one; Esc and Delete put the word back. Any other key
+  keeps what is shown and goes on. With nothing to guess, "No guesses" shows for a moment. 2-set only, one slip only.
+- **Fix typos** (Settings → Keys, `fixSlips`, off by default): where it is clear, the word is fixed as it ends
+  (Space, punctuation) and "✦ Typo fixed" shows for a moment (`clekkr` → `치다가`). Only when the keys as typed
+  leave loose jamo or a syllable nobody types (a word of syllables only, only for Shift on a final: `햇어요` → `했어요`), don't
+  look English, don't end in chat jamo (`고마워ㅠ`), and the first guess is far more common than any other. Not
+  inside URLs and paths, in Strict apps, for keys the dictionary knows, or for a word switched with a switch key.
+- **Delete** right after a fix puts the word back as typed, the space kept. Left so (the next word typed, or
+  switched to another reading), the keys go into the dictionary and aren't fixed again; deleted further, nothing is
+  learned. A fix left in place teaches nothing.
+- Picking a guess for keys the dictionary remembers forgets them ("Reset"): they are fixed again.
 
 ### Undo after commit, and learning
 
@@ -524,6 +545,7 @@ restart the input method: `pkill -x Araso`.
 | `japanese` | **off** | Detect romaji Japanese and convert it. |
 | `liveConversion` | off | While you type a Japanese phrase, show its top kanji candidate (`今日はいい天気でs`); Return commits it as shown. Like macOS Live Conversion. |
 | `returnConfirmsOnly` | on | Return on an underlined word only confirms it. Off, the app gets that Return too (a Japanese phrase is still only confirmed). |
+| `fixSlips` | off | A word one slipped key away from a Korean word, which can't be Korean as typed, goes in as that word at its end ([typo guesses](#typo-guesses)). Delete right after undoes it. |
 | `pauseKey` | `"rightCommand"` | The pause key (see [Pause](#pause)): `"rightCommand"`, `"rightOption"`, `"rightShift"` or `"rightControl"` tapped alone, `"off"`, or a shortcut such as `{ "keyCode": 35, "modifiers": ["control", "option"], "key": "P" }`. The older `"rightCommandPause": false` reads as `"off"`. |
 | `fullWidthDigits` | off | Numbers after Japanese come out full-width (`１２３`, `０３－１２３４` in addresses and phone numbers), underlined, with Space offering `123` (half-width) or conversions like `三月`. |
 | `fullWidthSpace` | off | Space after Japanese types a full-width space (`　`). ⇧Space types the other width (full-width while this is off). |

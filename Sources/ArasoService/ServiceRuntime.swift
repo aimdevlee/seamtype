@@ -155,7 +155,7 @@ public final class ServiceRuntime {
         let session = InputSession(engine: engine, policies: AppPolicies.load(),
                                    converter: converter,
                                    japaneseEnabled: settings.japanese, liveConversion: settings.liveConversion,
-                                   returnConfirmsOnly: settings.returnConfirmsOnly)
+                                   returnConfirmsOnly: settings.returnConfirmsOnly, fixSlips: settings.fixSlips)
         session.replacements = replacements.entries
         session.fullWidthDigits = settings.fullWidthDigits
         session.fullWidthSpace = settings.fullWidthSpace

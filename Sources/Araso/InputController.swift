@@ -268,18 +268,19 @@ final class InputController: IMKInputController {
             switchTapDown = others.isEmpty ? (event.keyCode, Date()) : nil
             return
         }
-        guard let down = switchTapDown, down.key == event.keyCode,
-              Date().timeIntervalSince(down.at) < 0.5 else { return }
+        guard let down = switchTapDown, down.key == event.keyCode else { return }
         switchTapDown = nil
+        // Held half a second or more on its own, it lists what the word could have been meant as.
+        let key: InputSession.Key = Date().timeIntervalSince(down.at) < 0.5 ? .cycle : .guess
         guard !session.inVimNormalMode else { return } // vim's own keys
         // While a terminal waits for a password, the keys pass as typed: a tap before the first of
         // them would change the word, or the one just committed, in front of the prompt. It starts
         // the prompt as a key does: the word goes in, the strip goes away.
         guard !passwordPrompt(client) else { return }
         noteWordRect(client)
-        let handled = session.handle(.cycle, client: textClient(client))
+        let handled = session.handle(key, client: textClient(client))
         syncStrip(client)
-        log.debug("handle switchTap handled=\(handled) app=\(self.session.app ?? "?", privacy: .public)")
+        log.debug("handle switchTap held=\(key == .guess) handled=\(handled) app=\(self.session.app ?? "?", privacy: .public)")
     }
 
     /// The strip under the word: the candidates while a clause is converted, else the readings a
@@ -293,6 +294,14 @@ final class InputController: IMKInputController {
                 self.session.choose(index, client: self.textClient(input))
                 self.syncStrip(input)
             }
+        } else if let guesses = session.guesses {
+            StripHUD.show(guesses, word: wordRect ?? caretRect(client)) { [weak self] index in
+                guard let self, let input: IMKTextInput = self.client() else { return }
+                self.session.pickGuess(index, client: self.textClient(input))
+                self.syncStrip(input)
+            }
+        } else if session.fixedSlip != nil {
+            StripHUD.note("✦ " + L("Typo fixed"), word: wordRect ?? caretRect(client))
         } else if let readings = session.readings {
             let marked = client.markedRange()
             let typing = marked.location != NSNotFound && marked.length > 0

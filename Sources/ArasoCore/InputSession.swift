@@ -107,6 +107,9 @@ public final class InputSession {
         case escape
         /// A switch key other than Esc (⇧Esc, a right ⌥ tap…), sent only where it is chosen.
         case cycle
+        /// A switch key held (a right ⌥ pressed half a second or more): what the word could have been
+        /// meant as, one slip of the fingers undone (`SlipGuesser`), listed to pick from (`guesses`).
+        case guess
         /// Space, digit or punctuation typed by the input method.
         case printable(Character)
         /// ⇧Space: a space of the other width (full-width where Space types a half-width one).
@@ -183,6 +186,15 @@ public final class InputSession {
         public var numbered = false
     }
 
+    /// The long press's guesses for the word just committed (`Key.guess`): each as it goes in, the
+    /// one in the word's place selected, and the word as typed, for the list's foot. No texts: there
+    /// was nothing to guess.
+    public struct Guesses: Equatable {
+        public let texts: [String]
+        public let selected: Int
+        public let typed: String
+    }
+
     /// A correction the dictionary just took: the first one (the engine leans that way from now
     /// on), the second, the word learned for good, or a switch back to Araso's own reading that
     /// forgot it. The input method shows it by the word.
@@ -214,12 +226,18 @@ public final class InputSession {
         var inLine: (index: Int, length: Int)?
         /// What went in before a switch key changed it (nil: as it is): what Esc on its fix puts back.
         var firstText: String?
+        /// The keys of the guess in the word's place (`SlipGuesser`), picked from the long press's list
+        /// or put in at the word's end (`fixedTo`); nil: the keys' own reading. `keys` stay as typed.
+        var guessed: String?
+        /// The guess the word went in as without asking (`slipFix`). Left for another reading, the keys
+        /// are learned as that one when the window closes, so they aren't fixed again.
+        var fixedTo: String?
 
         /// The word as it went in, before any switch key: the fix's Esc puts it back (`Fixing.revert`).
         var beforeSwitching: Committed {
             Committed(keys: keys, decided: decided, committedAs: committedAs, language: committedAs,
                       text: firstText ?? text, boundary: boundary, location: location, previous: previous,
-                      learns: learns, typedBoundary: typedBoundary)
+                      learns: learns, typedBoundary: typedBoundary, guessed: fixedTo, fixedTo: fixedTo)
         }
 
         /// The same word after Delete took back its boundary's last character (all of it but a
@@ -228,7 +246,8 @@ public final class InputSession {
             var word = Committed(keys: keys, decided: decided, committedAs: committedAs, language: language,
                                  text: String(text.dropLast()), boundary: String(boundary.dropLast()), location: location,
                                  previous: previous, learns: learns,
-                                 typedBoundary: boundary.count > 1 ? typedBoundary.map { String($0.dropLast()) } : nil)
+                                 typedBoundary: boundary.count > 1 ? typedBoundary.map { String($0.dropLast()) } : nil,
+                                 guessed: guessed, fixedTo: fixedTo)
             word.firstText = firstText.map { String($0.dropLast()) }
             return word
         }
@@ -237,7 +256,8 @@ public final class InputSession {
         func followed(by ch: Character) -> Committed {
             var word = Committed(keys: keys, decided: decided, committedAs: committedAs, language: language,
                                  text: text + String(ch), boundary: boundary + String(ch), location: location,
-                                 previous: previous, learns: learns, typedBoundary: typedBoundary.map { $0 + String(ch) })
+                                 previous: previous, learns: learns, typedBoundary: typedBoundary.map { $0 + String(ch) },
+                                 guessed: guessed, fixedTo: fixedTo)
             word.firstText = firstText.map { $0 + String(ch) }
             return word
         }
@@ -251,7 +271,7 @@ public final class InputSession {
         func moved(by delta: Int) -> Committed {
             Committed(keys: keys, decided: decided, committedAs: committedAs, language: language, text: text,
                       boundary: boundary, location: location + delta, previous: previous, learns: learns,
-                      typedBoundary: typedBoundary)
+                      typedBoundary: typedBoundary, guessed: guessed, fixedTo: fixedTo)
         }
     }
 
@@ -284,6 +304,19 @@ public final class InputSession {
     public private(set) var readings: Readings?
     /// Set by the key that made a correction stick (`Learned`), cleared by the next one.
     public private(set) var learned: Learned?
+    /// Set by a long press of the switch key (`Key.guess`) while its guesses are listed, cleared by the
+    /// key that picks one or goes on.
+    public private(set) var guesses: Guesses?
+    /// The guesses listed, the one in the word's place, and the word as it was before the list: what
+    /// Esc puts back.
+    private var guessing: (list: [SlipGuesser.Guess], selected: Int, before: Committed)?
+    /// Set by the word end that put a guess in without asking (`slipFix`): the word, for the input
+    /// method to show by it; cleared by the next key.
+    public private(set) var fixedSlip: String?
+    /// A word that can't be Korean as typed, one slip from a word (`SlipGuesser.autoFix`), goes in as
+    /// that word at its end (`Settings.fixSlips`).
+    public let fixSlips: Bool
+    private static let slipGuesser = SlipGuesser(korean: koreanModel)
     private let policies: AppPolicies
     private var forced: Language?
     /// Whether `forced` is the user's choice (Esc) rather than "back to kana" after converting
@@ -391,7 +424,7 @@ public final class InputSession {
 
     public init(engine: DictionaryEngine, policies: AppPolicies = AppPolicies(),
                 converter: JapaneseConverter? = nil, japaneseEnabled: Bool = false, liveConversion: Bool = false,
-                returnConfirmsOnly: Bool = true) {
+                returnConfirmsOnly: Bool = true, fixSlips: Bool = false) {
         self.engine = engine
         self.policies = policies
         policy = policies.defaultPolicy
@@ -399,6 +432,7 @@ public final class InputSession {
         japaneseDefault = japaneseEnabled
         self.liveConversion = liveConversion
         self.returnConfirmsOnly = returnConfirmsOnly
+        self.fixSlips = fixSlips
         if japaneseEnabled || policies.turnsJapaneseOn, let model = JapaneseModel.shared {
             japaneseSegmenter = JapaneseSegmenter(english: EnglishModel.shared, japanese: model)
         }
@@ -490,6 +524,8 @@ public final class InputSession {
         if let deferred = fixAfterArrow { fixAfterArrow = nil; learnUnmarked(deferred.commit) }
         readings = nil
         learned = nil
+        guesses = nil
+        fixedSlip = nil
         let inKoreanSymbols = afterKoreanSymbol
         afterKoreanSymbol = false
         guard policy.enabled, !paused else { return false }
@@ -501,7 +537,10 @@ public final class InputSession {
             resetRun()
             return false
         }
+        if fixing != nil, key == .guess { return true } // guesses are for the word just committed, not a fix
         if fixing != nil { return handleFixing(key, client: client) } // ⇧Space confirms it first, as any key
+        if guessing != nil, let handled = handleGuessing(key, client: client) { return handled }
+        if key == .guess { return openGuesses(client) }
         if key == .shiftSpace {
             // With nothing being typed, the other width: full-width unless Space already types that.
             guard keys.isEmpty, conversion == nil, japaneseEnabled, policy.fullWidth else {
@@ -562,6 +601,14 @@ public final class InputSession {
                 return true
             }
         }
+        // Delete right after a word was fixed at its end (`slipFix`): the fix is undone, the boundary
+        // stays, and the word reads as the engine had it. Left so, it is learned when the window
+        // closes; deleted further, it isn't.
+        if key == .delete, keys.isEmpty, let pending, let fixed = pending.fixedTo, pending.guessed == fixed,
+           !pending.boundary.isEmpty, let undone = undoFix(pending, client: client) {
+            lastCommit = undone
+            return true
+        }
         // Delete right after the commit: the app takes back the space or punctuation, and the
         // word itself can still be changed (Space before looking, then Delete and Esc).
         if key == .delete, keys.isEmpty, let pending, !pending.boundary.isEmpty {
@@ -593,7 +640,11 @@ public final class InputSession {
             noteRun(String(ch))
             return false // the app types it
         }
-        if let pending { finalize(pending) }
+        if var pending {
+            // Deleted into, a word whose fix was undone is being typed again, not left as it is.
+            if key == .delete, pending.fixedTo != nil { pending.learns = false }
+            finalize(pending)
+        }
         if switchesLanguage, keys.isEmpty, let run = passedRunBeforeCaret(client) {
             passedRun = nil
             startSymbol(run.text, client, replacing: run.range)
@@ -782,16 +833,23 @@ public final class InputSession {
             let location = marked.location != NSNotFound ? marked.location : client.selectedRange().location
             let previous = previousLanguage
             passedRun = nil
+            let fix = slipFix(previous: previous)
             let word = finishWord()
+            let language = fix == nil ? word.language : .korean, text = fix?.text ?? word.text
             // Only the word goes in; the app types the space or punctuation itself, as with the
             // system's Korean input. Handing over "word + space" for the space key made terminals
             // (Ghostty, which sends the key with its text) add a stray character.
-            client.insertText(word.text, replacing: nil)
-            lastCommit = Committed(keys: word.keys, decided: word.decided, committedAs: word.language,
-                                   language: word.language, text: word.text + String(ch), boundary: String(ch),
-                                   location: location, previous: previous, learns: !inURLRun)
-            noteRun(word.text + String(ch))
-            afterKoreanSymbol = KoreanLayout.current.isSebeolsik && word.language.sentenceLanguage == .korean
+            client.insertText(text, replacing: nil)
+            lastCommit = Committed(keys: word.keys, decided: word.decided, committedAs: language,
+                                   language: language, text: text + String(ch), boundary: String(ch),
+                                   location: location, previous: previous, learns: !inURLRun,
+                                   guessed: fix?.keys, fixedTo: fix?.keys)
+            if fix != nil {
+                previousLanguage = .korean
+                fixedSlip = text
+            }
+            noteRun(text + String(ch))
+            afterKoreanSymbol = KoreanLayout.current.isSebeolsik && language.sentenceLanguage == .korean
                 && ch != " " && !inURLRun
             return false
 
@@ -828,6 +886,9 @@ public final class InputSession {
 
         case .shiftSpace: // handled above
             return false
+
+        case .guess: // handled above
+            return true
         }
     }
 
@@ -851,6 +912,8 @@ public final class InputSession {
         guard !keys.isEmpty || conversion != nil || fixing != nil else { return false }
         readings = nil // as on any key: the strip is synced right after this
         learned = nil
+        guesses = nil
+        fixedSlip = nil
         commit(client: client)
         previousLanguage = nil
         resetRun()
@@ -956,6 +1019,156 @@ public final class InputSession {
         commitCandidate(client: client)
     }
 
+    // MARK: - Slips of the fingers
+
+    /// The guess the word being typed goes in as at its end, without asking (`SlipGuesser.autoFix`):
+    /// with `fixSlips` on, for a word the user didn't switch, outside URLs and Strict apps, in
+    /// neither Japanese nor Caps Lock, that the dictionary doesn't know, and only where the engine
+    /// reads the guess as Korean. A word with nothing before it is taken as after Korean (two
+    /// syllables do). Asked before `finishWord`, which forgets what the word was.
+    private func slipFix(previous: Language?) -> SlipGuesser.Guess? {
+        // Keys after text already in, with no boundary (the rest of a word split mid-word, 토마수 +
+        // mgksxp), are a piece of a word: one slip from a word they aren't.
+        guard fixSlips, forced == nil, pinned == nil, !inURLRun, !capsWord,
+              !(runKnown && runText.last.map { $0.isLetter || $0.isNumber } == true),
+              policy.conversionThreshold < AppPolicy.strictThreshold, currentLanguage() != .japanese,
+              shortcutReading(partial: false) == nil,
+              engine.rememberedLanguage(keys, app: app) == nil, engine.correctedOnce(keys, app: app) == nil,
+              let guess = Self.slipGuesser.autoFix(keys, afterKorean: previous == .korean || previous == nil),
+              engine.decide(guess.keys, context: DecisionContext(previousLanguage: previous, app: app,
+                                                                 japanese: japaneseEnabled)).language == .korean
+        else { return nil }
+        return guess
+    }
+
+    /// The word just committed in place of the guess it went in as: what the engine had for the keys,
+    /// its boundary kept. Nil where the caret isn't right after it or the field no longer has it.
+    private func undoFix(_ commit: Committed, client: TextClient) -> Committed? {
+        let range = NSRange(location: commit.location, length: utf16(commit.text))
+        let caret = client.selectedRange()
+        guard caret.location == NSMaxRange(range), caret.length == 0, client.text(in: range) == commit.text else { return nil }
+        let language = commit.decided
+        let text = committedReading(commit.keys, as: language) + commit.boundary(in: language)
+        client.insertText(text, replacing: range)
+        if runText.hasSuffix(commit.text) { runText = String(runText.dropLast(commit.text.count)) + text }
+        if commit.inLine == nil { previousLanguage = language.sentenceLanguage }
+        var undone = Committed(keys: commit.keys, decided: commit.decided, committedAs: commit.committedAs,
+                               language: language, text: text, boundary: commit.boundary, location: commit.location,
+                               previous: commit.previous, learns: commit.learns, typedBoundary: commit.typedBoundary,
+                               fixedTo: commit.fixedTo)
+        undone.inLine = commit.inLine
+        undone.firstText = commit.firstText ?? commit.text
+        return undone
+    }
+
+    /// The long press: the word being typed goes in as shown (as Return confirms it), then the word
+    /// just committed shows its first guess in its place, the rest listed (`guesses`). With nothing to
+    /// guess the list is empty, for the input method to say so, and the key goes nowhere.
+    private func openGuesses(_ client: TextClient) -> Bool {
+        if conversion != nil { return true }
+        if !keys.isEmpty, heldBoundary != nil || !confirmTyped(client) { commit(client: client) }
+        guard keys.isEmpty, let pending = lastCommit else { return true }
+        let list = Self.slipGuesser.guesses(for: pending.keys)
+        guard !list.isEmpty else {
+            guesses = Guesses(texts: [], selected: 0, typed: String(pending.text.dropLast(pending.boundary.count)))
+            return true
+        }
+        guessing = (list, 0, pending)
+        showGuess(0, client)
+        return true
+    }
+
+    /// The keys while guesses are listed, as in the candidate window: the long press again or ↓ the
+    /// next, ↑ the one before, a digit picks one, Return keeps the one shown, Esc and Delete put the
+    /// word back as it was. The switch key and any other key keep the one shown and go on as after
+    /// any word (nil: `handle` goes on with the key).
+    private func handleGuessing(_ key: Key, client: TextClient) -> Bool? {
+        guard let state = guessing, lastCommit != nil else { guessing = nil; return nil }
+        let count = state.list.count
+        switch key {
+        case .guess, .down:
+            showGuess((state.selected + 1) % count, client)
+            return true
+        case .up:
+            showGuess((state.selected + count - 1) % count, client)
+            return true
+        case .printable(let ch) where ch.wholeNumberValue.map({ (1...count).contains($0) }) == true:
+            showGuess(ch.wholeNumberValue! - 1, client)
+            keepGuess()
+            return true
+        case .enter:
+            keepGuess()
+            return true
+        case .escape, .delete:
+            guessing = nil
+            putBack(state.before, client)
+            return true
+        default:
+            guessing = nil
+            return nil
+        }
+    }
+
+    /// A guess clicked in the list: picked as its digit would.
+    public func pickGuess(_ index: Int, client: TextClient) {
+        guard let state = guessing, state.list.indices.contains(index) else { return }
+        guesses = nil
+        showGuess(index, client)
+        keepGuess()
+    }
+
+    /// Guess `index` in the word's place, listed as selected.
+    private func showGuess(_ index: Int, _ client: TextClient) {
+        guard var state = guessing, let current = lastCommit else { return }
+        let range = NSRange(location: current.location, length: utf16(current.text))
+        let caret = client.selectedRange()
+        guard caret.location == NSMaxRange(range), caret.length == 0, client.text(in: range) == current.text else {
+            guessing = nil
+            return
+        }
+        let base = state.before, guess = state.list[index]
+        let text = guess.text + base.boundary(in: .korean)
+        client.insertText(text, replacing: range)
+        if runText.hasSuffix(current.text) { runText = String(runText.dropLast(current.text.count)) + text }
+        if base.inLine == nil { previousLanguage = .korean }
+        var shown = Committed(keys: base.keys, decided: base.decided, committedAs: base.committedAs, language: .korean,
+                              text: text, boundary: base.boundary, location: base.location, previous: base.previous,
+                              learns: base.learns, typedBoundary: base.typedBoundary, guessed: guess.keys, fixedTo: base.fixedTo)
+        shown.inLine = base.inLine
+        shown.firstText = base.firstText ?? base.text
+        lastCommit = shown
+        state.selected = index
+        guessing = state
+        guesses = Guesses(texts: state.list.map(\.text), selected: index,
+                          typed: String(base.text.dropLast(base.boundary.count)))
+    }
+
+    /// The guess shown stays, and the list closes. Picked by hand, it teaches nothing, except that keys
+    /// the dictionary remembers (a fix undone before, or a switch) are forgotten: the user meant a word.
+    /// A fix picked again after Delete undid it (a Delete meant for the text) is no fix any more: the
+    /// next Delete is the app's.
+    private func keepGuess() {
+        guard let state = guessing, let shown = lastCommit else { return }
+        guessing = nil
+        guesses = nil
+        lastCommit?.fixedTo = nil
+        if engine.rememberedLanguage(state.before.keys, app: app) != nil || engine.correctedOnce(state.before.keys, app: app) != nil {
+            engine.forget(state.before.keys)
+            learned = Learned(text: String(shown.text.dropLast(shown.boundary.count)), language: .korean, learning: .forgot)
+        }
+    }
+
+    /// The word just committed back as `before`, where a guess was shown.
+    private func putBack(_ before: Committed, _ client: TextClient) {
+        guard let current = lastCommit else { return }
+        let range = NSRange(location: current.location, length: utf16(current.text))
+        guard client.text(in: range) == current.text else { lastCommit = before; return }
+        client.insertText(before.text, replacing: range)
+        if runText.hasSuffix(current.text) { runText = String(runText.dropLast(current.text.count)) + before.text }
+        if before.inLine == nil { previousLanguage = before.language.sentenceLanguage }
+        lastCommit = before
+    }
+
     // MARK: - URLs and paths
 
     /// Whether a run of text without spaces is a URL or path from here on: `://`, `www.`, `~/`,
@@ -1038,6 +1251,15 @@ public final class InputSession {
             /// The word that was being typed (`startFixingTyped`): learned as a word finished with Space
             /// is, by whether a reading was chosen (`Fixing.chosen`), not by how it went in.
             var typed = false
+            /// As the word's `Committed.guessed` and `fixedTo`: in its own language it reads as the guess
+            /// (`text`), and a fix switched away from here is learned so it isn't made again.
+            var guessed: String?
+            var fixedTo: String?
+
+            /// The piece in `language`: the guess it went in as in its own, else its keys' reading.
+            func reading(as language: Language, _ keysReading: (String, Language) -> String) -> String {
+                guessed != nil && language == self.language ? text : keysReading(keys, language)
+            }
 
             func boundary(in language: Language) -> String {
                 language == .korean ? boundary : typedBoundary ?? boundary
@@ -1109,7 +1331,8 @@ public final class InputSession {
         func piece(_ entry: Committed) -> Fixing.Piece {
             Fixing.Piece(keys: entry.keys, decided: entry.decided, language: entry.language,
                          text: String(entry.text.dropLast(entry.boundary.count)), boundary: entry.boundary,
-                         typedBoundary: entry.typedBoundary, learns: entry.learns)
+                         typedBoundary: entry.typedBoundary, learns: entry.learns,
+                         guessed: entry.guessed, fixedTo: entry.fixedTo)
         }
         func intact(_ entry: Committed) -> Bool {
             client.text(in: NSRange(location: entry.location, length: utf16(entry.text))) == entry.text
@@ -1316,7 +1539,8 @@ public final class InputSession {
         else { return false }
         let piece = Fixing.Piece(keys: commit.keys, decided: commit.decided, language: commit.language,
                                  text: String(commit.text.dropLast(commit.boundary.count)), boundary: commit.boundary,
-                                 typedBoundary: commit.typedBoundary, learns: commit.learns, typed: true)
+                                 typedBoundary: commit.typedBoundary, learns: commit.learns, typed: true,
+                                 guessed: commit.guessed, fixedTo: commit.fixedTo)
         forgetRecent(from: commit.location)
         // The boundary is marked only where a switch changes it (3-set's symbol) or where what is taken
         // away has to end at the caret (`marksFromCaret`).
@@ -1435,7 +1659,18 @@ public final class InputSession {
     /// A word `deferFixing` left for `caretMoved` that wasn't marked after all (another key came
     /// first, or the caret wasn't at its end): learned as the window closing would have.
     private func learnUnmarked(_ commit: Committed) {
-        if commit.learns, commit.language != commit.committedAs {
+        learnLeft(commit)
+    }
+
+    /// What the window closing on `commit` teaches: a switch away from the reading it went in as, or
+    /// away from a guess put in at its end (`fixedTo`), which is then learned as left even where that
+    /// is the engine's own choice, so the keys aren't fixed again (a correction to Korean shown as
+    /// one away from English, whichever the engine had). A guess left in place teaches nothing.
+    private func learnLeft(_ commit: Committed) {
+        guard commit.learns, commit.guessed == nil else { return }
+        if commit.fixedTo != nil {
+            record(commit.keys, as: commit.language, engineChoice: commit.language == .korean ? .english : .korean)
+        } else if commit.language != commit.committedAs {
             record(commit.keys, as: commit.language, engineChoice: commit.decided)
         }
     }
@@ -1793,7 +2028,7 @@ public final class InputSession {
                 language = restLanguage
             } else if i < fixing.count {
                 language = fixing.language
-                text += (i == 0 ? fixing.kanji : nil) ?? committedReading(piece.keys, as: language)
+                text += (i == 0 ? fixing.kanji : nil) ?? piece.reading(as: language, committedReading)
                 clause.length = utf16(text) - clause.location
                 if i == 0, fixing.kanji != nil, let conversion {
                     // The clause being converted is drawn thick, as in kanji conversion.
@@ -1905,7 +2140,10 @@ public final class InputSession {
             var location = fixing.start - (fixing.placeholder ? 1 : 0)
             for (i, piece) in fixing.pieces.enumerated() {
                 let language = i < fixing.count ? fixing.language : piece.language
-                if i < fixing.count, piece.learns, piece.typed {
+                if i < fixing.count, piece.learns, piece.fixedTo != nil, piece.guessed != nil, language != piece.language {
+                    // A word fixed at its end, switched away from here: as when its fix is undone (`learnLeft`).
+                    record(piece.keys, as: language, engineChoice: language == .korean ? .english : .korean)
+                } else if i < fixing.count, piece.learns, piece.typed {
                     // As `wordEnds` does for a word finished with Space: a chosen reading is a
                     // correction even when it is Araso's own (that forgets one made before).
                     if fixing.chosen { record(piece.keys, as: language, engineChoice: piece.decided) }
@@ -1913,7 +2151,7 @@ public final class InputSession {
                 } else if i < fixing.count, piece.learns, language != piece.language {
                     record(piece.keys, as: language, engineChoice: piece.decided)
                 }
-                let word = i < fixing.count ? (i == 0 ? fixing.kanji : nil) ?? committedReading(piece.keys, as: language)
+                let word = i < fixing.count ? (i == 0 ? fixing.kanji : nil) ?? piece.reading(as: language, committedReading)
                                             : piece.text
                 // A boundary left out of the marked text stays as it was in the field (3-set's `?` of a
                 // word fixed to English).
@@ -1923,7 +2161,8 @@ public final class InputSession {
                 let entry = Committed(keys: piece.keys, decided: piece.decided, committedAs: language, language: language,
                                       text: word + boundary, boundary: piece.boundary,
                                       location: location, previous: nil, learns: piece.learns,
-                                      typedBoundary: piece.typedBoundary)
+                                      typedBoundary: piece.typedBoundary,
+                                      guessed: language == piece.language ? piece.guessed : nil, fixedTo: piece.fixedTo)
                 updated.append(entry)
                 location += utf16(entry.text)
             }
@@ -2529,6 +2768,9 @@ public final class InputSession {
         case .other:
             commit(client: client)
             return false
+
+        case .guess: // kana and kanji aren't guessed: nothing to do, and nothing for the app
+            return true
         }
     }
 
@@ -3058,13 +3300,16 @@ public final class InputSession {
         if commit.inLine == nil { previousLanguage = language.sentenceLanguage }
         var changed = Committed(keys: commit.keys, decided: commit.decided, committedAs: commit.committedAs,
                                 language: language, text: text, boundary: commit.boundary, location: commit.location,
-                                previous: commit.previous, learns: commit.learns, typedBoundary: commit.typedBoundary)
+                                previous: commit.previous, learns: commit.learns, typedBoundary: commit.typedBoundary,
+                                guessed: language == commit.committedAs ? commit.fixedTo : nil, fixedTo: commit.fixedTo)
         changed.inLine = commit.inLine
         changed.firstText = commit.firstText ?? commit.text
         return changed
     }
 
     private func closeFlipWindow() {
+        guessing = nil // a guess listed stays as it is shown
+        guesses = nil
         if let pending = lastCommit { finalize(pending) }
         lastCommit = nil
     }
@@ -3073,9 +3318,7 @@ public final class InputSession {
     /// passed through on the way). Retains the word for later fixes, updating its entry and shifting
     /// later entries when it was switched in place; otherwise retains at most `recentLimit` words.
     private func finalize(_ commit: Committed) {
-        if commit.learns, commit.language != commit.committedAs {
-            record(commit.keys, as: commit.language, engineChoice: commit.decided)
-        }
+        learnLeft(commit)
         if let line = commit.inLine {
             // Switched where it is: the entry takes the new word, with its own space, and the words
             // after it move by the difference.
@@ -3084,7 +3327,8 @@ public final class InputSession {
             recent[line.index] = Committed(keys: old.keys, decided: old.decided, committedAs: commit.language,
                                            language: commit.language, text: commit.text + old.boundary,
                                            boundary: old.boundary, location: old.location, previous: old.previous,
-                                           learns: old.learns, typedBoundary: old.typedBoundary)
+                                           learns: old.learns, typedBoundary: old.typedBoundary,
+                                           guessed: commit.guessed, fixedTo: old.fixedTo)
             for i in recent.indices where i > line.index { recent[i] = recent[i].moved(by: delta) }
             return
         }

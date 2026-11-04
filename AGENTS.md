@@ -197,6 +197,21 @@ tests use `FakeTextField`). It owns the preview and hysteresis, commits, Esc rea
   caret (up to 4096 units), for the caret anywhere in the word and back at the line's end (`FakeDocument`'s
   `fcitx` and `sendsLine`, linux/tests). Not where a composition is only at the caret and can't be
   moved there (`TextClient.marksAnywhere`, `TextContext.marksAtCaret`: Windows floating).
+- One slip of the fingers in a Korean word (#85, `SlipGuesser`, 2-set only): the keys with one
+  slip undone (two neighbours swapped, a key extra or missing, Shift on a ㅃㅉㄸㄲㅆㅒㅖ key, the
+  key next to it on QWERTY's seats) that compose to a word of the lists, by list, then how common.
+  A switch key held half a second (`Key.guess`, `InputController.switchTapChanged`) lists them for
+  the word just committed (the word being typed is confirmed first): `guesses`, kept in `guessing`
+  while the keys of the candidate window pick one (`pickGuess` for clicks), Esc and Delete put the
+  word back; a guess picked teaches nothing but forgets keys the dictionary remembers. With
+  `fixSlips` (off by default) the first goes in at a Space or symbol where the keys can't be Korean
+  as typed (stray jamo, an odd syllable `isOdd`, or Shift off on a final only: 햇어요, never 예요 → 에요)
+  and nothing comes close, not mid-word after text already in (`slipFix`, `SlipGuesser.autoFix`;
+  `fixedSlip` for the note; `tools/eval_slips.py`, zzunkie's, with `ARASO_FIX_SLIPS=1`).
+  `Committed.keys` stay as typed, the guess in `guessed`, the fix in `fixedTo`: Delete right after
+  undoes it (`undoFix`, the boundary kept), and a fix switched or deleted away from and left is
+  learned when the window closes (`learnLeft`, as a correction from the other language), so it isn't
+  made again; deleted into, nothing is learned. A fix left in place teaches nothing.
 - Return on an underlined word only confirms it (`returnConfirmsOnly`, on by default); off, the
   app gets the Return too, except after Japanese. A word only confirmed is the word just committed,
   with no boundary (the macOS ← after a switch then leaves the caret before its last character, where

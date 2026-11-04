@@ -101,6 +101,10 @@ public struct KoreanModel: Sendable {
     /// stays out of the splits and of `knowsSyllable`, which `EU정책` and `RJ이` rely on.
     public func isRareVocabularyWord(_ hangul: String) -> Bool { Self.rareVocabulary.contains(hangul) }
 
+    /// How often the subtitles have the word (`korean_vocabulary.txt`), 0 for a word they lack.
+    public func vocabularyCount(_ hangul: String) -> Int { Self.counts[hangul] ?? 0 }
+    private static let counts = Dictionary(vocabularyCounts.map { ($0.word, $0.count) }, uniquingKeysWith: max)
+
     /// A noun the lists only have with a case particle (혜택 from 혜택을, 혜택으로): they
     /// count words with their particles, so a bare noun can be missing from both.
     public func isKnownStem(_ hangul: String) -> Bool { Self.stems.contains(hangul) }
