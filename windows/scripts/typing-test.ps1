@@ -296,8 +296,10 @@ function Forget-Learned {
 }
 
 # CI's ARM64 runner, fresh from its first sign-in, still opens windows of its own over the field now
-# and then (WSL's first run, again after it was closed) and its x64 host may answer a key late: there a
-# case that comes out wrong is typed once more, in a new field, and has to come out right then.
+# and then (WSL's first run, again after it was closed), and on both runners the host may answer the
+# first key of Try Typing late, which loses it ('kssud hello ', "host didn't answer (995)": ARM since
+# 2026-11-03, x64 on 2026-11-04): a case that comes out wrong is typed once more, in a new field, and
+# has to come out right then. Every try starts with nothing learned, so a retry teaches nothing.
 # A field that never came to the front gets no keys: they would go to whatever is in front (the
 # runner's agent console, 2026-11-03) and the case read as Araso typing nothing. Such a try is
 # typed again, up to twice, on either runner, and a case that never got the front is the runner's.
@@ -306,7 +308,7 @@ function Forget-Learned {
 $script:unfocused = @()
 function Log-Length { if (Test-Path $log) { @(Get-Content $log).Count } else { 0 } }
 function Case([string]$keys, [string]$expected, [scriptblock]$after, [string]$kind = "notepad") {
-    $attempts = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { 2 } else { 1 }
+    $attempts = 2
     $unready = 0
     for ($attempt = 1; ; $attempt++) {
         Forget-Learned
