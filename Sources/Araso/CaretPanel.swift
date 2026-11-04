@@ -49,6 +49,77 @@ import Cocoa
     }
 }
 
+/// The switch key being held, by the caret: nothing for a tap's moment, then a ring that fills
+/// until the half second a long press takes (`InputController.switchTapChanged`), then ✦: letting
+/// go now lists the guesses.
+@MainActor enum LongPressRing {
+    private static let side: CGFloat = 18
+    private static let appears = 0.12
+    private static let ready = 0.5
+    private static var panel: NSPanel?
+    private static var generation = 0
+
+    static func start(caret: NSRect) {
+        generation += 1
+        let current = generation
+        guard caret != .zero else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + appears) {
+            guard current == generation else { return }
+            show(caret: caret, current: current)
+        }
+    }
+
+    static func hide() {
+        generation += 1
+        panel?.orderOut(nil)
+    }
+
+    private static func show(caret: NSRect, current: Int) {
+        let size = NSSize(width: side, height: side)
+        let panel = panel ?? CaretPanel.make(size: size)
+        self.panel = panel
+        let view = NSView(frame: NSRect(origin: .zero, size: size))
+        view.wantsLayer = true
+        let circle = CGPath(ellipseIn: NSRect(origin: .zero, size: size).insetBy(dx: 2, dy: 2), transform: nil)
+        func stroke(_ color: NSColor) -> CAShapeLayer {
+            let shape = CAShapeLayer()
+            shape.path = circle
+            shape.fillColor = nil
+            shape.lineWidth = 2
+            view.effectiveAppearance.performAsCurrentDrawingAppearance { shape.strokeColor = color.cgColor }
+            view.layer?.addSublayer(shape)
+            return shape
+        }
+        _ = stroke(Paper.line)
+        let arc = stroke(Paper.spark)
+        arc.strokeEnd = 0
+        panel.contentView = view
+        panel.setFrame(NSRect(origin: CaretPanel.origin(for: size, caret: caret, gap: 3, centered: true), size: size), display: true)
+        panel.alphaValue = 1
+        panel.orderFrontRegardless()
+        if !reduceMotion {
+            let fill = CABasicAnimation(keyPath: "strokeEnd")
+            fill.fromValue = 0
+            fill.toValue = 1
+            fill.duration = ready - appears
+            arc.add(fill, forKey: "fill")
+        }
+        arc.strokeEnd = 1
+        DispatchQueue.main.asyncAfter(deadline: .now() + ready - appears) {
+            guard current == generation else { return }
+            let dot = CAShapeLayer()
+            dot.path = CGPath(ellipseIn: NSRect(origin: .zero, size: size).insetBy(dx: 1, dy: 1), transform: nil)
+            view.effectiveAppearance.performAsCurrentDrawingAppearance { dot.fillColor = Paper.spark.cgColor }
+            view.layer?.addSublayer(dot)
+            let star = Paper.label("✦", size: 10)
+            star.textColor = .white
+            star.sizeToFit()
+            star.setFrameOrigin(NSPoint(x: (side - star.frame.width) / 2, y: (side - star.frame.height) / 2))
+            view.addSubview(star)
+        }
+    }
+}
+
 /// Lays its subviews out top-down.
 private final class FlippedView: NSView {
     override var isFlipped: Bool { true }
@@ -79,6 +150,8 @@ private let ease = CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1)
     static let line = dynamic(0xe6e1d8, 0xf3f1ec, darkAlpha: 0.16)
     /// The capsule of a word that went back to Araso's own reading: nothing remembered any more.
     static let reset = dynamic(0x6e6e73, 0x636366)
+    /// What marks a guess: what it changed, in this color with a wave under it, the long press's ring.
+    static let spark = dynamic(0xb4690e, 0xf0b35a)
 
     static func label(_ text: String, size: CGFloat, weight: NSFont.Weight = .regular) -> NSTextField {
         let label = NSTextField(labelWithString: text)
@@ -284,13 +357,17 @@ private final class StripCell: NSView {
     private let number: NSTextField?
     private let mark: Mark?
     private var markView: MarkView?
+    /// What a guess changed, as a range of the text, and the wave under it.
+    private var changed: NSRange?
+    private var wave: CAShapeLayer?
     private var outcome: NSTextField?
     /// How far the text and the mark move left when the number goes (`dropNumber`).
     private var numberRoom: CGFloat = 0
 
     override var isFlipped: Bool { true }
 
-    init(_ string: String, number: Int? = nil, mark: Mark? = nil) {
+    /// `changed`: a guess, with which of its characters differ from the keys' own reading.
+    init(_ string: String, number: Int? = nil, mark: Mark? = nil, changed: Range<Int>? = nil) {
         let height = CaretPanel.indicatorHeight
         text = Paper.label(string, size: 13, weight: .medium)
         self.number = number.map(Self.number)
@@ -304,6 +381,7 @@ private final class StripCell: NSView {
         }
         Self.place(text, x: x, width: min(ceil(text.fittingSize.width) + 1, Self.maxText))
         addSubview(text)
+        if let changed { underline(changed, of: string, x: x) }
         x = text.frame.maxX
         if let mark {
             let view = MarkView()
@@ -326,9 +404,45 @@ private final class StripCell: NSView {
 
     required init?(coder: NSCoder) { nil }
 
+    /// The wave under `range` of the characters: AppKit's underlines have no wavy style.
+    private func underline(_ range: Range<Int>, of string: String, x: CGFloat) {
+        guard !range.isEmpty else { return }
+        let characters = Array(string)
+        let before = String(characters.prefix(range.lowerBound)).utf16.count
+        changed = NSRange(location: before, length: String(characters[range]).utf16.count)
+        let attributes: [NSAttributedString.Key: Any] = [.font: Self.font]
+        func width(_ count: Int) -> CGFloat { (String(characters.prefix(count)) as NSString).size(withAttributes: attributes).width }
+        let start = x + 2 + width(range.lowerBound), end = min(x + 2 + width(range.upperBound), x + Self.maxText)
+        let y = Self.baseline + 3
+        let path = CGMutablePath()
+        path.move(to: CGPoint(x: start, y: y))
+        var at = start, up = true
+        while at < end {
+            let next = min(at + 2, end)
+            path.addQuadCurve(to: CGPoint(x: next, y: y), control: CGPoint(x: (at + next) / 2, y: y + (up ? -1.5 : 1.5)))
+            at = next
+            up.toggle()
+        }
+        let shape = CAShapeLayer()
+        shape.path = path
+        shape.fillColor = nil
+        shape.lineWidth = 1
+        wantsLayer = true
+        layer?.addSublayer(shape)
+        wave = shape
+    }
+
     func color(on: Bool) {
         let ink = on ? NSColor.white : Paper.ink2
         text.textColor = ink
+        if let changed {
+            let styled = NSMutableAttributedString(string: text.stringValue, attributes: [.font: Self.font, .foregroundColor: ink])
+            if !on { styled.addAttribute(.foregroundColor, value: Paper.spark, range: changed) }
+            text.attributedStringValue = styled
+        }
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            wave?.strokeColor = on ? NSColor.white.withAlphaComponent(0.85).cgColor : Paper.spark.cgColor
+        }
         number?.textColor = ink.withAlphaComponent(0.72)
         markView?.tint(on ? .white : mark == .remembered ? CaretPanel.indicatorFill : Paper.ink2)
     }
@@ -501,7 +615,8 @@ private final class StripCell: NSView {
     }
 
     /// The long press's guesses for the word (`InputSession.guesses`): a card as the candidates' (five
-    /// at most, numbered for the digits), the word as typed under them; `choose` picks guess `index`.
+    /// at most, numbered for the digits), what each changed colored with a wave under it, opening
+    /// from the guess in the word's place; `choose` picks guess `index`.
     /// With no guesses, a moment's note that there are none.
     static func show(_ guesses: InputSession.Guesses, word: NSRect, choose: @escaping (Int) -> Void) {
         guard !guesses.texts.isEmpty else { return note(L("No guesses"), word: word) }
@@ -514,10 +629,10 @@ private final class StripCell: NSView {
         } else {
             settling = false
             pageStart = 0
-            let cells = guesses.texts.enumerated().map { StripCell($1, number: $0 + 1) }
-            build(cells, layout: .card(width: cardWidth(guesses.texts, footer: guesses.typed), rows: guesses.texts.count,
-                                       footer: guesses.typed),
-                  selected: guesses.selected, word: word)
+            let cells = guesses.texts.enumerated().map { StripCell($1, number: $0 + 1, changed: guesses.changed[$0]) }
+            let width = ceil(cells.map(\.frame.width).max() ?? 0) + inset * 2
+            build(cells, layout: .card(width: width, rows: cells.count, footer: nil),
+                  selected: guesses.selected, word: word, unfolds: true)
         }
         shown = next
         let text = guesses.texts[guesses.selected]
@@ -735,7 +850,8 @@ private final class StripCell: NSView {
     /// under the word's first letter (the clause's, for candidates). A page turned (`turn`, +1
     /// forward) keeps the card where it is and brings the next page up into it (the one before,
     /// down); a new strip or card comes down 2 pt as it shows (up, when it is above the word).
-    private static func build(_ cells: [StripCell], layout: Layout, selected: Int, word: NSRect, turn: CGFloat? = nil) {
+    private static func build(_ cells: [StripCell], layout: Layout, selected: Int, word: NSRect, turn: CGFloat? = nil,
+                              unfolds: Bool = false) {
         let wasUp = isUp
         let oldStrip = wasUp ? panel.map { NSPoint(x: $0.frame.minX + margin, y: $0.frame.minY + margin) } : nil
         hiding = false
@@ -835,6 +951,30 @@ private final class StripCell: NSView {
                 page.animator().alphaValue = 1
                 page.animator().setFrameOrigin(rest)
             })
+        } else if !wasUp, unfolds, !reduceMotion, let clip {
+            // The card opens from the chosen row, the others coming a little later the further they are.
+            let full = track.frame
+            track.frame = cells[selected].frame.offsetBy(dx: clip.frame.minX, dy: clip.frame.minY).insetBy(dx: -inset, dy: -inset)
+            root.alphaValue = 0
+            animate(0.06, nil, { root.animator().alphaValue = 1 })
+            animate(0.2, ease, { track.animator().frame = full })
+            for (i, cell) in cells.enumerated() where i != selected {
+                cell.wantsLayer = true
+                let distance = abs(i - selected)
+                let rise = CABasicAnimation(keyPath: "transform.translation.y")
+                rise.fromValue = i < selected ? 6 : -6
+                rise.toValue = 0
+                let fade = CABasicAnimation(keyPath: "opacity")
+                fade.fromValue = 0
+                fade.toValue = 1
+                for animation in [rise, fade] {
+                    animation.duration = 0.18
+                    animation.beginTime = CACurrentMediaTime() + 0.025 * Double(distance)
+                    animation.fillMode = .backwards
+                    animation.timingFunction = ease
+                    cell.layer?.add(animation, forKey: animation.keyPath)
+                }
+            }
         } else if !wasUp {
             root.alphaValue = 0
             strip.setFrameOrigin(NSPoint(x: margin, y: margin + (above ? 2 : -2)))
