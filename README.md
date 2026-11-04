@@ -109,7 +109,7 @@ curl -fsSL https://raw.githubusercontent.com/nyttastudio/araso/main/scripts/get.
 Windows 10(1809) 이상에서 도는 같은 입력기입니다. 단어 판단, 사전, 학습은 macOS와 같은 코드이고, 한자 변환은
 AzooKey로 합니다.
 
-1. [Windows 베타](https://github.com/nyttastudio/araso/releases/tag/windows-beta-3)의 `Araso-Setup.exe`를 받아 설치하세요.
+1. [Windows 베타](https://github.com/nyttastudio/araso/releases/tag/windows-beta-4)의 `Araso-Setup.exe`를 받아 설치하세요.
    Araso를 등록하고 한국어 입력 방법에 추가합니다. x64와 ARM64 PC 모두 됩니다. 아직 코드 서명이 없어서
    "Windows의 PC 보호" 창이 뜨면 **추가 정보 → 실행**을 누르세요.
 2. 작업 표시줄의 입력 표시기에서 **Araso**를 고르세요. 그 메뉴가 macOS의 입력 메뉴와 같습니다.
@@ -138,7 +138,7 @@ fcitx5 입력기로 도는 같은 입력기입니다. 단어 판단, 사전, 학
    24.04부터는 `fcitx5-frontend-qt6`도. 그다음 `im-config -n fcitx5`와 로그아웃. 22.04에는 `fcitx5-frontend-qt6`가 없어 Qt 6 앱에는 입력되지 않습니다).
    설정 창은 Qt 5로 돕니다. 묶음에 Qt가 들어 있지 않으니 Arch는 `qt5-base`, Fedora는 `qt5-qtbase-gui`를 설치하세요.
    빠져 있으면 `install.sh`가 설치 명령을 알려 줍니다.
-2. [Linux 베타](https://github.com/nyttastudio/araso/releases/tag/linux-beta-4)에서 아키텍처(`uname -m`)에 맞는
+2. [Linux 베타](https://github.com/nyttastudio/araso/releases/tag/linux-beta-5)에서 아키텍처(`uname -m`)에 맞는
    `Araso-linux-<아키텍처>.tar.gz`를 받아 풀고 그 안의 `./install.sh`를 실행하세요. 관리자 암호를 묻습니다.
    소스에서 설치하려면(Swift 6.2, CMake, fcitx5 개발 파일, Qt 6가 필요합니다. 목록은
    [docs/linux-port.md](docs/linux-port.md)):
@@ -313,7 +313,7 @@ Esc, ⇧Esc 중 여러 개를 고를 수 있고, 기본값은 **오른쪽 ⌥ �
 옆 키를 누르면) 한글로 조합할 때 낱자모가 남거나(`clekkr` → `치다ㅏㄱ`) 다른 글자가 됩니다(`djddj` → `엉어`).
 
 - **언어 바꾸기 키를 0.5초 넘게 눌렀다 떼면** 방금 확정한(또는 치던) 단어의 실수 하나를 되돌린 단어들이 한자
-  후보 창 모양으로 뜨고, 첫 번째가 그 자리에 들어갑니다(`엉어` → `영어`). 누르는 동안 커서 옆 링이 차서 언제 떼면 되는지 보이고(macOS), 추측에서 바뀐 글자는 색과 물결 밑줄로 보입니다(Linux는 밑줄만). 다시 길게 누르거나 ↓·↑로 다른 추측,
+  후보 창 모양으로 뜨고, 첫 번째가 그 자리에 들어갑니다(`엉어` → `영어`). 누르는 동안 커서 옆 링이 차서 언제 떼면 되는지 보이고(macOS), 추측에서 바뀐 글자는 색과 물결 밑줄로 보입니다(Linux 제외). 다시 길게 누르거나 ↓·↑로 다른 추측,
   숫자·클릭·Return으로 고르고, Esc와 Delete는 원래대로 돌립니다. 다른 키를 누르면 보이는 대로 두고 이어집니다.
   추측이 없으면 "추측 없음"이 잠깐 뜹니다. 두벌식에서만 동작하고, 실수는 하나까지만 봅니다. 눌릴 때 바로 바뀌는 한/영 키는 길게 누를 수 없습니다(Windows, Linux).
 - **오타 고치기**(설정의 키 → 오타 고치기, `fixSlips`, 기본 꺼짐)를 켜면 확실한 경우에는 단어를 끝낼 때(Space,
