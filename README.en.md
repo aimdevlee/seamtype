@@ -315,7 +315,7 @@ Choose the keys that switch readings in the settings window's **Keys** pane, key
 right ⌥ tapped alone, ⌥Space, right ⇧ tapped alone, Esc and ⇧Esc, as many as you like. By default
 they are **right ⌥ tapped alone** and **⇧Esc**. A key not chosen goes to the app.
 
-Pressing one shows the word's readings in a one-line strip under it (`dkssud · 안녕`). The reading on
+Pressing one shows the word's readings in a vertical strip under it (`dkssud`, then `안녕`, a row each); ↓ and ↑ move to the next and the one before. The reading on
 screen sits in a blue capsule like the one macOS shows under the caret when you switch input sources,
 and the others sit beside it as they would go in, so you see what more presses bring; any other key puts
 the strip away at once. The readings are numbered: a digit or a click picks one, as in the candidate
@@ -408,8 +408,8 @@ particle after them (remember `ghostty` and you get `ghostty에`);
 switching a word back to Araso's own guess forgets it, and switching a remembered word to yet another
 reading moves the memory there the second time. In the switch
 key's strip, a check (✓) after a reading marks the one the dictionary remembers (corrected twice, or a
-word you added yourself), a pencil (✎) one corrected once. The key after a correction folds the strip to
-the chosen reading, whose capsule moves under the word's first letter and says what happened for a
+word you added yourself), a pencil (✎) one corrected once. The key after a correction shrinks the strip
+itself into the chosen reading's capsule, under the word's first letter, which says what happened for a
 moment: a pencil and **Noted** after the first correction, the check drawing itself and **Learned**
 when the word is learned, an arrow back (↺) and **Reset** on gray when switching back to Araso's pick
 forgot it. When nothing changed, the strip just closes.

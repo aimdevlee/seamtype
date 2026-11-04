@@ -292,7 +292,7 @@ void StripWindow::ShowReadings(const std::vector<std::wstring> &texts, const std
     pick_ = std::move(pick);
     choose_ = nullptr;
     selected = std::max(0, std::min(selected, static_cast<int>(texts.size()) - 1));
-    if (Up() && !settling_ && mode_ == Mode::row && texts == texts_ && marks == marks_) {
+    if (Up() && !settling_ && mode_ == Mode::list && texts == texts_ && marks == marks_) {
         Select(selected);
         return;
     }
@@ -304,7 +304,12 @@ void StripWindow::ShowReadings(const std::vector<std::wstring> &texts, const std
     for (size_t i = 0; i < texts.size(); i++) {
         cells.push_back(MakeCell(texts[i], 0, i < marks.size() ? marks[i] : Mark::none, false));
     }
-    Build(std::move(cells), Mode::row, 0, 0, selected, word, 0);
+    float width = 0;
+    for (const auto &cell : cells) width = std::max(width, cell.frame.right - cell.frame.left);
+    int rows = static_cast<int>(cells.size());
+    footer_.clear();
+    footerLayout_ = Com<IDWriteTextLayout>();
+    Build(std::move(cells), Mode::list, std::ceil(width) + kInset * 2, rows, selected, word, 0);
 }
 
 void StripWindow::ShowCandidates(const std::vector<std::wstring> &texts, int selected, const std::wstring &reading,
@@ -389,7 +394,7 @@ void StripWindow::Build(std::vector<Cell> cells, Mode mode, float cardWidth, int
             float top = static_cast<float>(i) * kHeight;
             cells[i].frame = D2D1::RectF(0, top, inside_.right - inside_.left, top + kHeight);
         }
-        size = D2D1::SizeF(cardWidth, inside_.bottom + kFooterHeight + kInset);
+        size = D2D1::SizeF(cardWidth, inside_.bottom + (mode == Mode::card ? kFooterHeight : 0) + kInset);
     }
     cells_ = std::move(cells);
     mode_ = mode;
@@ -474,7 +479,7 @@ void StripWindow::Settle(const std::wstring &text, const std::string &learning, 
     bool hasWord = word.bottom > word.top;
     int index;
     RECT under = word;
-    if (Up() && !settling_ && mode_ == Mode::row && selected_ < static_cast<int>(cells_.size())) {
+    if (Up() && !settling_ && mode_ == Mode::list && selected_ < static_cast<int>(cells_.size())) {
         index = selected_;
         under = word_;
         hasWord = true;
@@ -508,6 +513,55 @@ void StripWindow::Settle(const std::wstring &text, const std::string &learning, 
     // grows to cover it at once, nothing moving on screen, so the strip can travel there.
     float stripLeft = origin_.x + strip_.left * scale, stripTop = origin_.y + strip_.top * scale;
     float from = stripLeft + start.left * scale;
+    if (mode_ == Mode::list) {
+        // The card itself becomes the capsule, in one move: its paper and the thumb land on the
+        // same frame, the other readings gone early, and the capsule takes over the shadow as the
+        // paper goes.
+        float cardWidth = strip_.right - strip_.left, cardHeight = strip_.bottom - strip_.top;
+        RECT work = ui::WorkAreaAt(under);
+        float to = std::max(static_cast<float>(work.left),
+                            std::min(under.left - kPad * scale, static_cast<float>(work.right) - width * scale));
+        float left = std::min(stripLeft, to) - kMargin * scale;
+        float right = std::max(stripLeft + cardWidth * scale, to + width * scale) + kMargin * scale;
+        POINT origin = {static_cast<LONG>(std::floor(left)), origin_.y};
+        strip_.left = (stripLeft - origin.x) / scale;
+        strip_.right = strip_.left + std::max(cardWidth, (to - stripLeft) / scale + width);
+        origin_ = origin;
+        size_ = {static_cast<LONG>(std::ceil(right - origin.x)), size_.cy};
+        const float capsuleLeft = (to - stripLeft) / scale, capsuleTop = above_ ? cardHeight - kHeight : 0;
+        const double move = 0.26;
+        trackLeft_.Set(0);
+        trackLeft_.Go(capsuleLeft, now, move);
+        trackRight_.Set(cardWidth);
+        trackRight_.Go(capsuleLeft + width, now, move);
+        trackTop_.Set(0);
+        trackTop_.Go(capsuleTop, now, move);
+        trackBottom_.Set(cardHeight);
+        trackBottom_.Go(capsuleTop + kHeight, now, move);
+        trackRadius_.Set(kInset + kHeight / 2);
+        trackRadius_.Go(kHeight / 2, now, move);
+        trackAlpha_.Set(1);
+        trackAlpha_.Go(0, now, 0.08, 0.24);
+        othersAlpha_.Set(1);
+        othersAlpha_.Go(0, now, 0.1);
+        travel_.Set(0);
+        thumbX_.Set(start.left);
+        thumbY_.Set(start.top);
+        thumbWidth_.Set(start.right - start.left);
+        thumbX_.Go(capsuleLeft - inside_.left, now, move);
+        thumbY_.Go(capsuleTop - inside_.top, now, move);
+        thumbWidth_.Go(width, now, move);
+        gray_.Set(0);
+        if (learning == "forgot") gray_.Go(1, now, move);
+        settleSay_ = 0.08;
+        outcomeAlpha_.Set(0);
+        outcomeAlpha_.Go(1, now, 0.2, 0.08);
+        alpha_.Set(1);
+        alpha_.Go(0, now, 0.25, 1.9, false);
+        Render(now);
+        Start();
+        return;
+    }
     float to = from;
     if (hasWord) {
         RECT work = ui::WorkAreaAt(under);
@@ -535,10 +589,14 @@ void StripWindow::Settle(const std::wstring &text, const std::string &learning, 
     trackLeft_.Go(start.left, now, 0.15);
     trackRight_.Set(trackWidth);
     trackRight_.Go(start.right, now, 0.15);
+    trackTop_.Set(0);
+    trackBottom_.Set(kHeight);
+    trackRadius_.Set(kHeight / 2);
     trackAlpha_.Set(1);
     trackAlpha_.Go(0, now, 0.15);
     othersAlpha_.Set(1);
     othersAlpha_.Go(0, now, 0.15);
+    settleSay_ = 0.24;
     travel_.Set(0);
     travel_.Go((to - from) / scale, now, 0.22, 0.16);
     thumbWidth_.Go(width, now, 0.22, 0.16);
@@ -623,11 +681,12 @@ void StripWindow::Render(double now) {
         target->SetTransform(base);
 
         // The paper: the track, rounded about the thumb (the card's further out by its inset).
-        float radius = mode_ == Mode::card ? kInset + kHeight / 2 : kHeight / 2;
+        float radius = mode_ != Mode::row ? kInset + kHeight / 2 : kHeight / 2;
         D2D1_RECT_F track = D2D1::RectF(0, 0, width, height);
         float trackAlpha = 1;
         if (settling_) {
-            track = D2D1::RectF(trackLeft_.At(now), 0, trackRight_.At(now), kHeight);
+            track = D2D1::RectF(trackLeft_.At(now), trackTop_.At(now), trackRight_.At(now), trackBottom_.At(now));
+            radius = trackRadius_.At(now);
             trackAlpha = trackAlpha_.At(now);
         }
         if (trackAlpha > 0) {
@@ -642,7 +701,9 @@ void StripWindow::Render(double now) {
 
         // The page: the thumb and the cells, cut at the card's inside so a page turned slides in.
         float pageAlpha = pageAlpha_.At(now);
-        if (mode_ == Mode::card) target->PushAxisAlignedClip(inside_, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+        // A card folding into its capsule leaves its inside on the way.
+        bool clipped = mode_ != Mode::row && !settling_;
+        if (clipped) target->PushAxisAlignedClip(inside_, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
         target->SetTransform(D2D1::Matrix3x2F::Translation(inside_.left, inside_.top + pageSlide_.At(now)) * base);
         D2D1_RECT_F thumb = D2D1::RectF(thumbX_.At(now), thumbY_.At(now), thumbX_.At(now) + thumbWidth_.At(now),
                                         thumbY_.At(now) + kHeight);
@@ -653,11 +714,19 @@ void StripWindow::Render(double now) {
         for (size_t i = 0; i < cells_.size(); i++) {
             bool settled = settling_ && static_cast<int>(i) == settleCell_;
             float alpha = pageAlpha * (settling_ && !settled ? othersAlpha_.At(now) : 1);
+            D2D1_MATRIX_3X2_F page;
+            target->GetTransform(&page);
+            if (settled && mode_ == Mode::list) {
+                // The chosen reading rides on the thumb.
+                target->SetTransform(D2D1::Matrix3x2F::Translation(thumb.left - cells_[i].frame.left, thumb.top - cells_[i].frame.top) *
+                                     *D2D1::Matrix3x2F::ReinterpretBaseType(&page));
+            }
             DrawCell(target, brush.get(), cells_[i], static_cast<int>(i) == selected_, alpha, settled, now);
+            target->SetTransform(page);
         }
+        target->SetTransform(base);
+        if (clipped) target->PopAxisAlignedClip();
         if (mode_ == Mode::card) {
-            target->SetTransform(base);
-            target->PopAxisAlignedClip();
             // The reading and the page under the rows.
             if (footerLayout_) {
                 D2D1_COLOR_F ink = Faded(paper.ink2, 0.85f);
@@ -707,7 +776,7 @@ void StripWindow::DrawCell(ID2D1RenderTarget *target, ID2D1SolidColorBrush *brus
     Glyph glyph = cell.mark == Mark::remembered ? Glyph::check : cell.mark == Mark::once ? Glyph::pencil : Glyph::none;
     float scale = 1, turn = 0, opacity = 1, drawn = 1;
     if (settled) {
-        double t = now - (settleStart_ + 0.24);
+        double t = now - (settleStart_ + settleSay_);
         if (ReduceMotion() && t >= 0) t = 10;
         if (t >= 0) {
             Glyph before = glyph;
@@ -803,7 +872,7 @@ void StripWindow::Click(int x, int y) {
         if (mode_ == Mode::card && choose_) {
             auto choose = choose_;
             choose(pageStart_ + static_cast<int>(i));
-        } else if (mode_ == Mode::row && pick_) {
+        } else if (mode_ == Mode::list && pick_) {
             auto pick = pick_;
             pick(static_cast<int>(i));
         }

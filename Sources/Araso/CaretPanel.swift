@@ -402,17 +402,22 @@ private final class StripCell: NSView {
         case candidates([String], page: Int)
     }
 
-    /// The readings on one line; the candidates in a card `width` wide and `rows` tall on every
-    /// page, so turning one doesn't move anything, the reading and the page (`footer`) under them.
+    /// A capsule on its own on one line; the readings and candidates in a card `width` wide and
+    /// `rows` tall on every page, so turning one doesn't move anything, the candidates' reading and
+    /// page (`footer`) under them.
     private enum Layout {
         case row
-        case card(width: CGFloat, rows: Int, footer: String)
+        case card(width: CGFloat, rows: Int, footer: String?)
     }
 
     private static var panel: NSPanel?
     private static var root: NSView?
     private static var strip: NSView?
     private static var track: NSView?
+    /// The card's rows, nil for a capsule on its own.
+    private static var clip: NSView?
+    /// The card is above the word, the screen's bottom being near.
+    private static var above = false
     private static var thumb: NSView?
     private static var cells: [StripCell] = []
     private static var shown: Shown?
@@ -453,9 +458,11 @@ private final class StripCell: NSView {
         } else {
             settling = false
             pageStart = 0
-            build(readings.texts.indices.map {
+            let cells = readings.texts.indices.map {
                 StripCell(readings.texts[$0], number: readings.numbered && $0 < 9 ? $0 + 1 : nil, mark: marks[$0])
-            }, layout: .row,
+            }
+            let width = ceil(cells.map(\.frame.width).max() ?? 0) + inset * 2
+            build(cells, layout: .card(width: width, rows: cells.count, footer: nil),
                   selected: readings.selected, word: word)
         }
         shown = next
@@ -570,8 +577,8 @@ private final class StripCell: NSView {
         }
     }
 
-    /// The correction the dictionary just took: the paper closes onto the chosen reading, whose
-    /// capsule moves under the word's first letter and says what happened, a pencil and "Noted"
+    /// The correction the dictionary just took: the card itself becomes the chosen reading's
+    /// capsule, under the word's first letter, and says what happened, a pencil and "Noted"
     /// after the first correction, the check drawing itself and "Learned" once learned for good,
     /// the arrow back and "Reset" on gray when a switch back to Araso's own reading forgot the
     /// word. Without a strip up (`word`, the word's line, places it) the capsule shows on its own.
@@ -601,6 +608,10 @@ private final class StripCell: NSView {
         // Where the capsule goes: under the word's first letter, as wide as what it says. The panel
         // grows to cover it at once, nothing moving on screen, so the views can travel there.
         let cell = cells[index]
+        if clip != nil {
+            foldCard(onto: cell, said: said, learned, word: word, current: current)
+            return fadeSettled(panel, current)
+        }
         let start = cell.frame
         let stripOnScreen = NSRect(x: panel.frame.minX + strip.frame.minX, y: panel.frame.minY + margin,
                                    width: strip.frame.width, height: height)
@@ -644,6 +655,72 @@ private final class StripCell: NSView {
                 cell.say(learned.learning)
             }
         }
+        fadeSettled(panel, current)
+    }
+
+    /// The card shrinks into the capsule of `cell` under the word, in one move: its paper and the
+    /// thumb land on the same frame, the other readings gone early, and the capsule takes over the
+    /// shadow as the paper goes.
+    private static func foldCard(onto cell: StripCell, said: String, _ learned: InputSession.Learned, word: NSRect, current: Int) {
+        guard let panel, let strip, let track, let thumb else { return }
+        let card = NSRect(x: panel.frame.minX + strip.frame.minX, y: panel.frame.maxY - strip.frame.minY - track.frame.height,
+                          width: track.frame.width, height: track.frame.height)
+        let start = cell.convert(cell.bounds, to: strip)
+        let width = cell.makeRoom(for: said)
+        let to = word == .zero ? card.minX : CaretPanel.origin(for: NSSize(width: width, height: height),
+                                                               caret: word.offsetBy(dx: -StripCell.pad, dy: 0),
+                                                               gap: CaretPanel.indicatorGap, centered: false).x
+        let top = above ? card.height - height : 0
+        let covered = card.union(NSRect(x: to, y: card.maxY - top - height, width: width, height: height))
+            .insetBy(dx: -margin, dy: -margin)
+        panel.ignoresMouseEvents = true
+        panel.setFrame(covered, display: false)
+        strip.frame = NSRect(x: card.minX - covered.minX, y: margin,
+                             width: max(card.width, to - card.minX + width), height: card.height)
+        // Out of the rows' clip, which would cut them on the way.
+        for view in [thumb, cell] {
+            view.removeFromSuperview()
+            strip.addSubview(view)
+        }
+        thumb.frame = start
+        cell.setFrameOrigin(start.origin)
+        let capsule = NSRect(x: to - card.minX, y: top, width: width, height: height)
+        animate(0.1, ease, { for other in cells where other !== cell { other.animator().alphaValue = 0 } })
+        if !reduceMotion {
+            let round = CABasicAnimation(keyPath: "cornerRadius")
+            round.fromValue = track.layer?.cornerRadius
+            round.toValue = height / 2
+            round.duration = 0.26
+            round.timingFunction = ease
+            track.layer?.add(round, forKey: "round")
+        }
+        track.layer?.cornerRadius = height / 2
+        animate(0.26, ease, {
+            track.animator().frame = capsule
+            thumb.animator().frame = capsule
+            cell.animator().setFrameOrigin(capsule.origin)
+            cell.dropNumber()
+            if learned.learning == .forgot {
+                var gray = Paper.reset.cgColor
+                thumb.effectiveAppearance.performAsCurrentDrawingAppearance { gray = Paper.reset.cgColor }
+                thumb.layer?.backgroundColor = gray
+            }
+        })
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+            guard current == generation else { return }
+            cell.say(learned.learning)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
+            guard current == generation else { return }
+            animate(0.08, nil, {
+                track.animator().alphaValue = 0
+                thumb.layer?.shadowOpacity = shadowOpacity(for: thumb)
+            })
+        }
+    }
+
+    /// What a correction said goes after its moment.
+    private static func fadeSettled(_ panel: NSPanel, _ current: Int) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.9) {
             guard current == generation else { return }
             animate(0.25, nil, { panel.animator().alphaValue = 0 }) {
@@ -688,14 +765,16 @@ private final class StripCell: NSView {
             for (i, cell) in cells.enumerated() {
                 cell.frame = NSRect(x: 0, y: CGFloat(i) * height, width: inside.frame.width, height: height)
             }
-            let label = StripCell.footer(text)
-            StripCell.place(label, x: inset + StripCell.pad)
-            label.setFrameOrigin(NSPoint(x: label.frame.minX, y: label.frame.minY + inside.frame.maxY - 4))
-            size = NSSize(width: width, height: inside.frame.maxY + footerHeight + inset)
+            size = NSSize(width: width, height: inside.frame.maxY + (text == nil ? 0 : footerHeight) + inset)
             // The corners round about the thumb's, the inset further out.
             radius = inset + height / 2
             clip = inside
-            footer = label
+            footer = text.map { text in
+                let label = StripCell.footer(text)
+                StripCell.place(label, x: inset + StripCell.pad)
+                label.setFrameOrigin(NSPoint(x: label.frame.minX, y: label.frame.minY + inside.frame.maxY - 4))
+                return label
+            }
         }
         // Measured now: once it is the panel's content, the root takes the panel's old size.
         let full = NSSize(width: size.width + margin * 2, height: size.height + margin * 2)
@@ -733,6 +812,7 @@ private final class StripCell: NSView {
         self.root = root
         self.strip = strip
         self.track = track
+        self.clip = clip
         self.thumb = thumb
         self.cells = cells
         self.selected = selected
@@ -743,6 +823,7 @@ private final class StripCell: NSView {
                                        gap: CaretPanel.indicatorGap, centered: false)
         if turn != nil, let oldStrip { origin = oldStrip }
         let above = word != .zero && origin.y > word.minY
+        self.above = above
         panel.setFrame(NSRect(origin: NSPoint(x: origin.x - margin, y: origin.y - margin), size: full), display: true)
         panel.alphaValue = 1
         panel.orderFrontRegardless()
