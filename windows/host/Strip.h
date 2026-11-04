@@ -1,4 +1,4 @@
-// The switch key's readings on one strip under the word, the kana→kanji candidates in a card under
+// The switch key's readings in a card under the word, the kana→kanji candidates in a card under
 // the clause, and what a correction did (StripHUD on macOS, Sources/Araso/CaretPanel.swift): the
 // blue capsule of the input source indicator as the thumb on what's on screen, the others on
 // Araso's paper beside it or below it, each as it would go in. Drawn with Direct2D and DirectWrite
@@ -48,7 +48,7 @@ public:
     /// What the dictionary knows about a reading, after it in the strip.
     enum class Mark { none, remembered, once };
 
-    /// The readings on one line under `word` (screen pixels), `selected` on the thumb, the first
+    /// The readings in a card under `word` (screen pixels), `selected` on the thumb, the first
     /// under the word's first letter; a click on another reading calls `pick` with its index.
     void ShowReadings(const std::vector<std::wstring> &texts, const std::vector<Mark> &marks, int selected,
                       const RECT &word, std::function<void(int)> pick);
@@ -59,14 +59,15 @@ public:
     void ShowCandidates(const std::vector<std::wstring> &texts, int selected, const std::wstring &reading,
                         const RECT &clause, std::function<void(int)> choose);
     /// The correction the dictionary just took (`learning`: "once", "forGood" or "forgot"): the
-    /// paper closes onto the chosen reading, whose capsule moves under the word's first letter and
-    /// says what happened. Without a strip up, the capsule shows `text` on its own.
+    /// readings' card becomes the chosen reading's capsule, under the word's first letter, and says
+    /// what happened. Without a card up, the capsule shows `text` on its own.
     void Settle(const std::wstring &text, const std::string &learning, const RECT &word);
     /// Puts the strip away; one saying what a correction did stays its moment unless `force`d.
     void Hide(bool force = false);
 
 private:
-    enum class Mode { none, row, card };
+    /// `row`: a capsule on its own; `card`: the candidates; `list`: the readings.
+    enum class Mode { none, row, card, list };
     enum class Glyph { none, check, pencil, back };
 
     struct Cell {
@@ -126,7 +127,9 @@ private:
     std::string learning_;
     double settleStart_ = 0;
     int settleCell_ = 0;
-    Motion trackLeft_, trackRight_, trackAlpha_, othersAlpha_, travel_, gray_, outcomeAlpha_;
+    Motion trackLeft_, trackRight_, trackTop_, trackBottom_, trackRadius_, trackAlpha_, othersAlpha_, travel_, gray_, outcomeAlpha_;
+    /// How long after the correction the mark moves.
+    double settleSay_ = 0.24;
     Com<IDWriteTextLayout> outcome_;
     float markX_ = 0, outcomeX_ = 0;
 

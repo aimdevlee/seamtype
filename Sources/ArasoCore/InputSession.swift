@@ -537,6 +537,7 @@ public final class InputSession {
             resetRun()
             return false
         }
+        if key == .up || key == .down, let listed, conversion == nil { return stepReadings(listed, down: key == .down, client) }
         if fixing != nil, key == .guess { return true } // guesses are for the word just committed, not a fix
         if fixing != nil { return handleFixing(key, client: client) } // ⇧Space confirms it first, as any key
         if guessing != nil, let handled = handleGuessing(key, client: client) { return handled }
@@ -1567,7 +1568,8 @@ public final class InputSession {
     /// ←/→ right after a switch key changed the word just committed, which make it the fix: a text
     /// service that asks whether it wants a key before sending it (Windows' `test`) keeps them then.
     public func takesArrow(_ key: Key) -> Bool {
-        (key == .left || key == .right) && keys.isEmpty && conversion == nil && fixing == nil
+        if key == .up || key == .down { return readings != nil && conversion == nil }
+        return (key == .left || key == .right) && keys.isEmpty && conversion == nil && fixing == nil
             && lastCommit != nil && readings != nil
     }
 
@@ -1610,6 +1612,23 @@ public final class InputSession {
             lastCommit = nil
             if !pickCommitted(language, pending, client: cased) { lastCommit = pending }
         }
+    }
+
+    /// ↓ or ↑ in the readings a switch key listed: the next or the one before, as presses of the
+    /// switch key leave it. At the list's end nothing changes and it stays up.
+    private func stepReadings(_ listed: Readings, down: Bool, _ client: TextClient) -> Bool {
+        let target = listed.selected + (down ? 1 : -1)
+        guard listed.texts.indices.contains(target) else {
+            readings = listed
+            return true
+        }
+        // Until it is there, not a count of presses: with live conversion one goes to taking the kanji back
+        // to the kana, which isn't a reading of the list.
+        for _ in 0...listed.texts.count {
+            _ = handle(.cycle, client: client)
+            if readings?.selected == target { break }
+        }
+        return true
     }
 
     /// The word just committed switched to `language` as the switch key would, a press at a time;

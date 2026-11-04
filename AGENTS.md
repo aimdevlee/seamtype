@@ -182,7 +182,7 @@ tests use `FakeTextField`). It owns the preview and hysteresis, commits, Esc rea
   (`test`) before it sends a key, and an arrow with nothing typed went to the app untried: there
   `InputSession.takesArrow` keeps ←/→ right after the switch (Windows ARM VM, real keys, 2026-10-30). Making the switch key itself
   start a fix broke the learned capsule, Caps Lock and 3-set boundaries. Only through the field itself
-  (`uncased`: Caps Lock's client would change the rest of the line). The strip lists the clause's readings
+  (`uncased`: Caps Lock's client would change the rest of the line). The strip, a vertical card since the readings list one under another (↓/↑ step through it without going round, `stepReadings`, as that many switch-key presses; `takesArrow`; fcitx5's list is `Vertical` too), lists the clause's readings
   (`clauseReadings`), numbered (`Readings.numbered`): a digit or a click picks one and goes on as Return does, as in the
   candidate window (a cut's front settles, else the fix is in). Digits and clicks share `pickReading`
   everywhere the strip shows: the word being typed is confirmed reading that way (`pickTyped`, as Return
