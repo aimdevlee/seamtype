@@ -522,6 +522,21 @@ if ($env:ARASO_SCREENSHOTS -and $env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
     Shot "13-readings-remembered" $f.window 80 40
     Stop-Process -Id $f.process.Id -Force
 
+    # The long press's guesses: right Alt held past the tap's half second, what each changed marked.
+    function Hold([int]$scan) {
+        [Keys]::Key($scan, $false, $true); Start-Sleep -Milliseconds 650
+        [Keys]::Key($scan, $true, $true); Start-Sleep -Milliseconds 400
+    }
+    $f = Kept "wpf"
+    Send-Keys "dlrj "; Hold 0x38
+    Shot "13a-guess-card" $f.window 240 40
+    Tap 0x50; Start-Sleep -Milliseconds 300 # the next guess
+    Shot "13b-guess-card-next" $f.window 240 40
+    [Keys]::Key(0x01, $false, $false); Start-Sleep -Milliseconds 60; [Keys]::Key(0x01, $true, $false); Start-Sleep -Milliseconds 300
+    Send-Keys "xqzv "; Hold 0x38
+    Shot "13c-no-guesses" $f.window 80 40
+    Stop-Process -Id $f.process.Id -Force
+
     # The same in dark mode: the strip and the card on navy paper.
     $personalize = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
     $light = (Get-ItemProperty $personalize -ErrorAction SilentlyContinue).AppsUseLightTheme
@@ -534,6 +549,10 @@ if ($env:ARASO_SCREENSHOTS -and $env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
     $f = Kept "wpf"
     Send-Keys "dkssud "; Tap 0x38; Start-Sleep -Milliseconds 300
     Shot "15-dark-readings-strip" $f.window 80 40
+    Stop-Process -Id $f.process.Id -Force
+    $f = Kept "wpf"
+    Send-Keys "dlrj "; Hold 0x38
+    Shot "15a-dark-guess-card" $f.window 240 40
     Stop-Process -Id $f.process.Id -Force
     if ($null -eq $light) { Remove-ItemProperty $personalize AppsUseLightTheme -ErrorAction SilentlyContinue }
     else { Set-ItemProperty $personalize AppsUseLightTheme $light }
