@@ -1614,16 +1614,20 @@ public final class InputSession {
         }
     }
 
-    /// ↓ or ↑ in the readings a switch key listed: the next or the one before, as that many presses
-    /// of the switch key leave it. At the list's end nothing changes and it stays up.
+    /// ↓ or ↑ in the readings a switch key listed: the next or the one before, as presses of the
+    /// switch key leave it. At the list's end nothing changes and it stays up.
     private func stepReadings(_ listed: Readings, down: Bool, _ client: TextClient) -> Bool {
         let target = listed.selected + (down ? 1 : -1)
         guard listed.texts.indices.contains(target) else {
             readings = listed
             return true
         }
-        let presses = (target - listed.selected + listed.texts.count) % listed.texts.count
-        for _ in 0..<presses { _ = handle(.cycle, client: client) }
+        // Until it is there, not a count of presses: with live conversion one goes to taking the kanji back
+        // to the kana, which isn't a reading of the list.
+        for _ in 0...listed.texts.count {
+            _ = handle(.cycle, client: client)
+            if readings?.selected == target { break }
+        }
         return true
     }
 
