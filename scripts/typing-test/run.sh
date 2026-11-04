@@ -7,7 +7,7 @@
 # Each suite runs with its own settings.json: cases.tsv with Japanese on, live.tsv with live
 # conversion too, fullwidth.tsv with full-width numbers and spaces, colemak.tsv on Colemak (its
 # keys written as the QWERTY keys pressed), sebeolsik.tsv with Korean on 3-set final, romaji.tsv
-# with English on Colemak and romaji on QWERTY. Esc and ⇧Esc are the switch keys throughout
+# with English on Colemak and romaji on QWERTY, slips.tsv with typos fixed (`fixSlips`). Esc, ⇧Esc and right ⌥ are the switch keys throughout
 # (apps.json), as the cases switch with Esc. The user's settings, apps and learning files (the
 # cases' Esc corrections would be learned like any other; so would its kanji choices) are backed
 # up first and restored afterwards. Araso keeps running: it reads changed files when told, as from
@@ -62,11 +62,12 @@ suite() {
   "$work/typer" "$here/$1" "$app" ${3:+"$3"} || failed=1
 }
 failed=0
-print -r -- '{ "*": { "switchKeys": ["escape", "shiftEscape"] } }' > "$support/apps.json"
+print -r -- '{ "*": { "switchKeys": ["escape", "shiftEscape", "rightOption"] } }' > "$support/apps.json"
 suite cases.tsv '{ "japanese": true }'
 suite live.tsv '{ "japanese": true, "liveConversion": true }'
 suite fullwidth.tsv '{ "japanese": true, "fullWidthDigits": true, "fullWidthSpace": true }'
 suite colemak.tsv '{ "japanese": true, "latinLayout": "colemak" }'
 suite sebeolsik.tsv '{ "japanese": true, "koreanLayout": "sebeolsikFinal" }' 'jfshea '
 suite romaji.tsv '{ "japanese": true, "latinLayout": "colemak", "japaneseLayout": "qwerty" }'
+suite slips.tsv '{ "japanese": true, "fixSlips": true }'
 exit $failed

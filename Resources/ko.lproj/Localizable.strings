@@ -273,3 +273,8 @@
 "Reset" = "원래대로";
 "%@, %ld of %ld" = "%1$@, %3$ld개 중 %2$ld번째";
 "Candidates, %@ selected" = "후보, %@ 선택됨";
+"Guesses, %@ selected" = "추측, %@ 선택됨";
+"No guesses" = "추측 없음";
+"Typo fixed" = "오타 고침";
+"Fix typos" = "오타 고치기";
+"A Korean word with one key slipped (치다ㅏㄱ) goes in as the word meant (치다가); Delete right after undoes it. Hold the switch key for guesses either way." = "키 하나가 꼬인 한국어 단어(치다ㅏㄱ)를 원래 단어(치다가)로 넣습니다. 바로 Delete를 누르면 되돌립니다. 켜든 끄든 바꾸기 키를 길게 누르면 추측이 나옵니다.";

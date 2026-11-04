@@ -5,6 +5,7 @@
 // usage: typer <cases.tsv> <Araso.app> [probe]    each line: script<TAB>expected
 // probe: the keys of 안녕 + Space on the suite's layout (dkssud on 2-set, the default).
 // script: characters as typed; ⏎ Return, ⎋ Esc, ⇧ Shift+Esc, ⌫ Delete, ← → arrows;
+// ◆ right ⌥ held past the long press (lists guesses, `SlipGuesser`);
 // 🔒 a terminal starts waiting for a password, 🅡 a full-screen program (vim), 🔓 neither (a shell);
 // 🔏 a pty nobody's terminal is in a password's mode (WebDriverAgent's output, #83), until 🔓.
 import AppKit
@@ -64,10 +65,21 @@ let keyCodes: [Character: (CGKeyCode, Bool)] = {
 
 func press(_ ch: Character) {
     if "🔒🅡🔓🔏".contains(ch) { return setTerminal(ch) }
+    if ch == "◆" { return holdRightOption() }
     guard let (code, shift) = keyCodes[ch] else { fatalError("no key for \(ch)") }
     key(code, shift ? .maskShift : [])
     // Conversion (Space/Return in Japanese) and word commits take a moment.
     usleep(ch == " " || ch == "⏎" ? 250_000 : 45_000)
+}
+
+func holdRightOption() {
+    let source = CGEventSource(stateID: .hidSystemState)
+    for (down, flags, wait) in [(true, CGEventFlags.maskAlternate, useconds_t(600_000)), (false, CGEventFlags(), useconds_t(1_000_000))] {
+        let e = CGEvent(keyboardEventSource: source, virtualKey: 61, keyDown: down)!
+        e.flags = flags
+        e.post(tap: .cghidEventTap)
+        usleep(wait)
+    }
 }
 
 func key(_ code: CGKeyCode, _ flags: CGEventFlags) {

@@ -493,6 +493,56 @@ private final class StripCell: NSView {
         root?.setAccessibilityLabel(L("Candidates, %@ selected", conversion.current.text))
     }
 
+    /// The long press's guesses for the word (`InputSession.guesses`): a card as the candidates' (five
+    /// at most, numbered for the digits), the word as typed under them; `choose` picks guess `index`.
+    /// With no guesses, a moment's note that there are none.
+    static func show(_ guesses: InputSession.Guesses, word: NSRect, choose: @escaping (Int) -> Void) {
+        guard !guesses.texts.isEmpty else { return note(L("No guesses"), word: word) }
+        self.choose = choose
+        pick = nil
+        generation += 1
+        let next = Shown.candidates(guesses.texts, page: 0)
+        if isUp, !settling, shown == next {
+            select(guesses.selected)
+        } else {
+            settling = false
+            pageStart = 0
+            let cells = guesses.texts.enumerated().map { StripCell($1, number: $0 + 1) }
+            build(cells, layout: .card(width: cardWidth(guesses.texts, footer: guesses.typed), rows: guesses.texts.count,
+                                       footer: guesses.typed),
+                  selected: guesses.selected, word: word)
+        }
+        shown = next
+        let text = guesses.texts[guesses.selected]
+        root?.setAccessibilityLabel(L("Guesses, %@ selected", text))
+        announce(L("%@, %ld of %ld", text, guesses.selected + 1, guesses.texts.count))
+    }
+
+    /// `text` in a capsule under the word for a moment (a word fixed at its end), as a correction's is;
+    /// the keys typed meanwhile don't put it away.
+    static func note(_ text: String, word: NSRect) {
+        guard word != .zero else { return }
+        choose = nil
+        pick = nil
+        pageStart = 0
+        build([StripCell(text)], layout: .row, selected: 0, word: word)
+        generation += 1
+        let current = generation
+        shown = nil
+        settling = true
+        panel?.ignoresMouseEvents = true
+        root?.setAccessibilityLabel(text)
+        announce(text)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.9) {
+            guard current == generation, let panel else { return }
+            animate(0.25, nil, { panel.animator().alphaValue = 0 }) {
+                guard current == generation else { return }
+                panel.orderOut(nil)
+                settling = false
+            }
+        }
+    }
+
     /// Wide enough for every candidate in `texts`, whichever page it is on, and for `footer`, the
     /// widest the footer gets (the last page's count, its digits as wide as any).
     private static func cardWidth(_ texts: [String], footer: String) -> CGFloat {
