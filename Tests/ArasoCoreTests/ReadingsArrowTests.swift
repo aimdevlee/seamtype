@@ -52,9 +52,34 @@ import Testing
         #expect(session.takesArrow(.up))
     }
 
+    /// With live conversion a press can go to taking the kanji back to the kana (`liveSuppressed`), which
+    /// isn't a reading of the list: ↑ still lands on the reading before.
+    @Test func upFromALiveConversionLandsOnTheReadingBefore() throws {
+        let live = InputSession(engine: session.engine, converter: KanjiForAll(), japaneseEnabled: true, liveConversion: true)
+        for ch in "hello" { _ = live.handle(.letter(ch), client: field) }
+        #expect(field.text == "hello")
+        _ = live.handle(.cycle, client: field)
+        #expect(field.text == "漢字")
+        let list = try #require(live.readings)
+        #expect(list.languages[list.selected] == .japanese)
+        #expect(live.handle(.up, client: field))
+        #expect(field.text == "hello")
+        #expect(live.readings?.selected == list.selected - 1)
+    }
+
     @Test func withNoListTheyAreTheApps() {
         type("hello ")
         #expect(!session.takesArrow(.down))
         #expect(!session.handle(.down, client: field))
     }
+}
+
+/// Every reading converts to kanji.
+@MainActor private final class KanjiForAll: JapaneseConverter {
+    func candidates(for kana: String) -> [ConversionCandidate] {
+        [.init(text: "漢字", kanaCount: kana.count), .init(text: kana, kanaCount: kana.count)]
+    }
+    func learn(_ candidate: ConversionCandidate, for kana: String) {}
+    func save() {}
+    func moreCandidates(for kana: String) -> [ConversionCandidate] { [] }
 }
