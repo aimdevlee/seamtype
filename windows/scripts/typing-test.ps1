@@ -447,6 +447,8 @@ $results = @(
     (Case "clekkr " "치다가 " { Hold 0x38; Send-Keys "1" } "wpf"),
     (Case "clekkr " "치다가 " { Hold 0x38 1400; Send-Keys "1" } "wpf"),
     (Case "clekkr " "clekkr " { Hold 0x38; [Keys]::Key(0x01, $false, $false); Start-Sleep -Milliseconds 60; [Keys]::Key(0x01, $true, $false); Start-Sleep -Milliseconds 300 } "wpf"),
+    # Held with nothing to guess at: nothing happens, and typing goes on.
+    (Case "" "hello " { Hold 0x38; Send-Keys "hello " } "wpf"),
     # A Korean keyboard's 한/영 (VK_HANGUL) switches; 한자 (VK_HANJA) pauses.
     (Case "hello" "ㅗ디ㅣㅐ " { Press-Virtual 0x15; Send-Keys " " } $classic),
     (Case "" "dkssud " { Press-Virtual 0x19; Send-Keys "dkssud " } $classic)

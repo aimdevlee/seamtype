@@ -433,6 +433,7 @@ public final class ServiceRuntime {
     private func takes(_ key: WindowsKey, client: Client, session: InputSession) -> Bool {
         // Right Alt as 한/영 stays kept as the key of its own is, though it acts as it goes up.
         if key.vk == KeyMapper.vkHangul, KeyMapper.modifier(key) != nil {
+            if settings.pauseKey == .tap(.rightOption) { return true }
             return session.policy.switchKeys.contains(.rightOption) && !session.inVimNormalMode
         }
         if KeyMapper.modifier(key) != nil || KeyMapper.isLock(key) { return false }

@@ -347,6 +347,7 @@ STDMETHODIMP TextService::OnKeyDown(ITfContext *context, WPARAM wParam, LPARAM l
         if (wParam == VK_HANGUL) {
             *eaten = HostTakes(wParam, lParam, false) ? TRUE : FALSE;
             asked_.valid = false;
+            hangulKept_ = *eaten == TRUE;
         }
         return S_OK;
     }
@@ -367,6 +368,7 @@ STDMETHODIMP TextService::OnTestKeyUp(ITfContext *, WPARAM wParam, LPARAM lParam
         return S_OK;
     }
     *eaten = Takes(wParam, lParam, false) && HostTakes(wParam, lParam, true) ? TRUE : FALSE;
+    if (wParam == VK_HANGUL && hangulKept_) *eaten = TRUE; // the app never saw it go down
     return S_OK;
 }
 
@@ -382,6 +384,10 @@ STDMETHODIMP TextService::OnKeyUp(ITfContext *context, WPARAM wParam, LPARAM lPa
     if (!Takes(wParam, lParam, false)) return S_OK;
     bool taken = HostTakes(wParam, lParam, true);
     asked_.valid = false;
+    if (wParam == VK_HANGUL && hangulKept_) {
+        hangulKept_ = false;
+        *eaten = TRUE; // whether or not the tap did anything: the app never saw it go down
+    }
     if (!taken) return S_OK;
     HandleKey(context, wParam, lParam, "keyUp", eaten);
     *eaten = TRUE;

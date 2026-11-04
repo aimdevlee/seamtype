@@ -89,6 +89,8 @@ private:
     };
     /// The host's answer for the key being pressed (`HostTakes`).
     Seen asked_;
+    /// Right Alt as 한/영 went down kept from the app, so its up is kept too, tap or no tap.
+    bool hangulKept_ = false;
     /// The modifier going down that the host was told of (`SeeModifier`).
     Seen seen_;
     /// A key sent again for the app (`Replay`): it passes when it comes back.
