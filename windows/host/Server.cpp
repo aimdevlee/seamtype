@@ -14,6 +14,7 @@ namespace {
 constexpr UINT kRequestMessage = WM_APP + 1;
 constexpr UINT kDisconnectMessage = WM_APP + 2;
 constexpr UINT kReleaseMessage = WM_APP + 3;
+constexpr UINT kDrawMessage = WM_APP + 4;
 constexpr UINT_PTR kUpdateTimer = 1;
 
 Server *g_server = nullptr;
@@ -212,7 +213,11 @@ std::string Server::Handle(const std::string &text, int &connectionClient) {
         const Json &ui = response["ui"];
         if (op == "place") {
             client.preview = Wide(request["preview"].asString());
-            Draw(id);
+            // Drawn once the answer is out: the text service waits for it only briefly (200 ms) and
+            // drops the connection when it doesn't come, which drops the session and the word being
+            // typed with it. The first word drawn at the caret makes its window and took longer than
+            // that on a fresh CI machine (Try Typing's first key lost, 'kssud hello ').
+            PostMessageW(window_, kDrawMessage, static_cast<WPARAM>(id), 0);
         } else if (ui.isObject()) {
             client.ui = ui;
             const Json &tab = ui["openSettings"];
@@ -348,6 +353,9 @@ LRESULT CALLBACK Server::Proc(HWND window, UINT message, WPARAM wParam, LPARAM l
     }
     case kDisconnectMessage:
         self->Disconnected(static_cast<int>(wParam));
+        return 0;
+    case kDrawMessage:
+        self->Draw(static_cast<int>(wParam));
         return 0;
     case kReleaseMessage: {
         auto *body = reinterpret_cast<std::string *>(lParam);
