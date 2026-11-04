@@ -253,12 +253,13 @@ public enum KeyMapper {
 }
 
 /// Right modifier taps: a switch key (right Alt, right Shift, 한/영) or the pause key, pressed and
-/// released on its own within half a second (InputController's `switchTapChanged` and
-/// `pauseTapChanged` on macOS).
+/// released on its own within half a second, or a switch key held longer for the guesses
+/// (InputController's `switchTapChanged` and `pauseTapChanged` on macOS).
 public struct TapTracker: Sendable {
     public enum Tap: Equatable, Sendable {
         case pause
         case cycle
+        case guess
     }
 
     private var pauseDown: Date?
@@ -299,6 +300,6 @@ public struct TapTracker: Sendable {
         }
         guard let down = switchDown, down.key == code else { return nil }
         switchDown = nil
-        return now.timeIntervalSince(down.at) < Self.window ? .cycle : nil
+        return now.timeIntervalSince(down.at) < Self.window ? .cycle : .guess
     }
 }

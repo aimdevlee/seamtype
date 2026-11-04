@@ -255,6 +255,7 @@ void Server::Draw(int id) {
     // correction did, by the word it was about.
     const Json &list = ui["candidates"];
     const Json &readings = ui["readings"];
+    const Json &guesses = ui["guesses"];
     const Json &learned = ui["learned"];
     auto ask = [this, id](const char *op, int index) {
         Json request = Json::object();
@@ -282,6 +283,21 @@ void Server::Draw(int id) {
         }
         strip_.ShowReadings(texts, marks, readings["selected"].asInt(), anchor, [ask](int index) { ask("pick", index); });
         stripFor_ = id;
+    } else if (guesses.isObject() && guesses["texts"].size() > 0 && placed) {
+        std::vector<std::wstring> texts;
+        std::vector<std::pair<int, int>> changed;
+        for (size_t k = 0; k < guesses["texts"].size(); k++) {
+            texts.push_back(Wide(guesses["texts"][k].asString()));
+            changed.emplace_back(guesses["changed"][k]["start"].asInt(), guesses["changed"][k]["end"].asInt());
+        }
+        strip_.ShowGuesses(texts, changed, guesses["selected"].asInt(), anchor, [ask](int index) { ask("pickGuess", index); });
+        stripFor_ = id;
+    } else if (guesses.isObject() && placed) {
+        strip_.Settle(L("No guesses"), "note", anchor);
+        stripFor_ = id;
+    } else if (ui["typoFixed"].isBool() && (client.hasKeyWord || client.hasWord)) {
+        strip_.Settle(L"\u2726 " + L("Typo fixed"), "note", client.hasKeyWord ? client.keyWord : client.word);
+        stripFor_ = id;
     } else if (learned.isObject() && (client.hasKeyWord || client.hasWord)) {
         strip_.Settle(Wide(learned["text"].asString()), learned["learning"].asString(),
                       client.hasKeyWord ? client.keyWord : client.word);
@@ -290,6 +306,8 @@ void Server::Draw(int id) {
         strip_.Hide();
     }
     client.ui.remove("learned");
+    client.ui.remove("typoFixed");
+    if (guesses.isObject() && guesses["texts"].size() == 0) client.ui.remove("guesses");
     if (ui["paused"].isBool()) strip_.Hide(true);
     if (ui["paused"].isBool() && client.hasCaret) pause_.Show(ui["paused"].asBool(), client.caret);
     else if (ui["paused"].isBool() && placed) pause_.Show(ui["paused"].asBool(), anchor);

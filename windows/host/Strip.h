@@ -12,6 +12,7 @@
 
 #include <functional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace araso {
@@ -52,6 +53,10 @@ public:
     /// under the word's first letter; a click on another reading calls `pick` with its index.
     void ShowReadings(const std::vector<std::wstring> &texts, const std::vector<Mark> &marks, int selected,
                       const RECT &word, std::function<void(int)> pick);
+    /// The long press's guesses in a card under `word`, numbered, what each `changed` (UTF-16 units
+    /// of its text) colored with a wave under it; a click calls `pick` with its index.
+    void ShowGuesses(const std::vector<std::wstring> &texts, const std::vector<std::pair<int, int>> &changed, int selected,
+                     const RECT &word, std::function<void(int)> pick);
     /// The candidates in a card of nine rows a page, numbered for the digits, under `clause`;
     /// `reading` and the page under them. As wide as the widest candidate on any page; a page
     /// turned comes up from below (down, going back). A click calls `choose` with the index in
@@ -60,7 +65,8 @@ public:
                         const RECT &clause, std::function<void(int)> choose);
     /// The correction the dictionary just took (`learning`: "once", "forGood" or "forgot"): the
     /// readings' card becomes the chosen reading's capsule, under the word's first letter, and says
-    /// what happened. Without a card up, the capsule shows `text` on its own.
+    /// what happened. Without a card up, the capsule shows `text` on its own. `learning` "note":
+    /// only `text`, for a moment, whatever is up.
     void Settle(const std::wstring &text, const std::string &learning, const RECT &word);
     /// Puts the strip away; one saying what a correction did stays its moment unless `force`d.
     void Hide(bool force = false);
@@ -74,6 +80,8 @@ private:
         std::wstring text;
         int number = 0; // 1–9 on a card's page, 0 on the strip
         Mark mark = Mark::none;
+        /// What a guess changed, in UTF-16 units of `text`.
+        int changedStart = 0, changedEnd = 0;
         Com<IDWriteTextLayout> layout;
         Com<IDWriteTextLayout> numberLayout;
         float textX = 0, textWidth = 0;

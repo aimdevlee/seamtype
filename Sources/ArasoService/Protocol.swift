@@ -38,6 +38,9 @@ public struct ServiceRequest: Codable, Sendable {
         /// A reading was clicked in the switch key's strip (`index`, of `UIState.Readings.texts`):
         /// switched to as the switch key would, a press at a time; sent by the host itself.
         case pick
+        /// A guess was clicked in the long press's list (`index`, of `UIState.Guesses.texts`); sent by
+        /// the host itself.
+        case pickGuess
         /// Vim changed mode (`vim`, with the terminal's exe in `app` when known).
         case vim
         /// The settings window changed the files (`kanjiReset` when it reset the kanji order).
@@ -243,6 +246,20 @@ public struct UIState: Codable, Equatable, Sendable {
         public var once: Int?
     }
 
+    /// The long press's guesses for the word (`InputSession.guesses`). No texts: nothing to guess,
+    /// which the host says for a moment.
+    public struct Guesses: Codable, Equatable, Sendable {
+        /// What a guess changed, in UTF-16 units of its text.
+        public struct Changed: Codable, Equatable, Sendable {
+            public var start: Int
+            public var end: Int
+        }
+
+        public var texts: [String]
+        public var selected: Int
+        public var changed: [Changed]
+    }
+
     public struct Learned: Codable, Equatable, Sendable {
         public var text: String
         public var tag: String
@@ -252,7 +269,10 @@ public struct UIState: Codable, Equatable, Sendable {
 
     public var candidates: Candidates?
     public var readings: Readings?
+    public var guesses: Guesses?
     public var learned: Learned?
+    /// The word just went in fixed (`InputSession.fixedSlip`): the host says so for a moment.
+    public var typoFixed: Bool?
     /// Set when the key paused or resumed the field: the indicator shows it.
     public var paused: Bool?
     /// A word is being typed.
@@ -269,7 +289,7 @@ public struct UIState: Codable, Equatable, Sendable {
 
     /// Nothing to draw or do: the text service then doesn't say where things are.
     public var isEmpty: Bool {
-        candidates == nil && readings == nil && learned == nil && paused == nil && trace == nil
+        candidates == nil && readings == nil && guesses == nil && learned == nil && typoFixed == nil && paused == nil && trace == nil
             && settingsChanged == nil && openSettings == nil
     }
 }

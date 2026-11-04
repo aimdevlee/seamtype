@@ -201,6 +201,10 @@ void BuildKeys() {
           [](bool on) { ChangeSettings([on](Json &s) { s.set("returnConfirmsOnly", on); }); });
     Note(T("Return on an underlined word confirms it; press it again for a new line. Japanese is always only confirmed."), 20);
 
+    Check(T("Fix typos"), settings["fixSlips"].asBool(false), true,
+          [](bool on) { ChangeSettings([on](Json &s) { s.set("fixSlips", on); }); });
+    Note(T("A Korean word with one key slipped (치다ㅏㄱ) goes in as the word meant (치다가); Delete right after undoes it. Hold the switch key for guesses either way."), 20);
+
     Heading(T("Pause"));
     // Off, the right-hand taps (Ctrl plays ⌘'s part, Super ⌃'s), and a recorded shortcut.
     QStringList items = {T("Off"), T("Right Ctrl tap (한자 on Korean keyboards)"), T("Right Alt tap"), T("Right Shift tap"),

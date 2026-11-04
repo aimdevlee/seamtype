@@ -253,6 +253,89 @@ final class Harness {
         #expect(h.document.composition == nil)
     }
 
+    /// Right Alt held past the tap's half second.
+    private func hold(_ h: Harness) -> Bool {
+        h.press(Keys.rightAlt)
+        Thread.sleep(forTimeInterval: 0.55)
+        var test = ServiceRequest(op: .test, client: h.client, key: Keys.rightAltUp)
+        test.up = true
+        guard h.send(test).reply.handled else { return false }
+        return h.release(Keys.rightAltUp)
+    }
+
+    @Test func holdingTheSwitchKeyListsGuessesAndADigitPicksOne() throws {
+        let h = try Harness()
+        h.type("clekkr ")
+        #expect(hold(h))
+        let guesses = try #require(h.ui?.guesses)
+        #expect(guesses.texts.first == "치다가")
+        #expect(guesses.selected == 0)
+        #expect(guesses.changed.count == guesses.texts.count)
+        #expect(h.document.text == "치다가 ")
+        #expect(h.pressTested(Keys.key("1")))
+        #expect(h.ui?.guesses == nil)
+        #expect(h.document.text == "치다가 ")
+    }
+
+    @Test func arrowsStepThroughTheGuesses() throws {
+        let h = try Harness()
+        h.type("dlrj ")
+        #expect(hold(h))
+        let guesses = try #require(h.ui?.guesses)
+        try #require(guesses.texts.count > 1)
+        #expect(h.pressTested(WindowsKey(vk: KeyMapper.vkDown, scan: 0x50, extended: true)))
+        #expect(h.ui?.guesses?.selected == 1)
+        #expect(h.document.text == guesses.texts[1] + " ")
+        #expect(h.pressTested(WindowsKey(vk: KeyMapper.vkUp, scan: 0x48, extended: true)))
+        #expect(h.ui?.guesses?.selected == 0)
+    }
+
+    @Test func aClickedGuessGoesInAndEscPutsTheWordBack() throws {
+        let h = try Harness()
+        h.type("clekkr ")
+        #expect(hold(h))
+        var pick = ServiceRequest(op: .pickGuess, client: h.client)
+        pick.index = 0
+        h.send(pick)
+        #expect(h.ui?.guesses == nil)
+        #expect(h.document.text == "치다가 ")
+
+        let back = try Harness()
+        back.type("clekkr ")
+        let typed = back.document.text
+        #expect(hold(back))
+        #expect(back.pressTested(Keys.escape))
+        #expect(back.ui?.guesses == nil)
+        #expect(back.document.text == typed)
+    }
+
+    /// What changed comes in UTF-16 units of the guess, for the hosts' text layouts.
+    @Test func aGuessSaysWhatItChanged() throws {
+        let h = try Harness()
+        h.type("clekkr ")
+        #expect(hold(h))
+        let guesses = try #require(h.ui?.guesses)
+        for (text, changed) in zip(guesses.texts, guesses.changed) {
+            #expect(changed.start < changed.end, "\(text)")
+            #expect(changed.end <= text.utf16.count, "\(text)")
+        }
+    }
+
+    @Test func noWordToGuessAtLeavesTheHeldKeyToTheApp() throws {
+        let h = try Harness()
+        #expect(!hold(h))
+        #expect(h.ui?.guesses == nil)
+    }
+
+    @Test func aFixedWordIsSaidOnce() throws {
+        let h = try Harness(settings: #"{"fixSlips": true}"#)
+        h.type("clekkr ")
+        #expect(h.document.text == "치다가 ")
+        #expect(h.ui?.typoFixed == true)
+        h.type("d")
+        #expect(h.ui?.typoFixed == nil)
+    }
+
     @Test func rightAltTapSwitchesTheWordJustCommitted() throws {
         let h = try Harness()
         h.type("hello ")
@@ -921,11 +1004,11 @@ final class Harness {
         #expect(KeyMapper.modifier(Keys.hangul) == nil) // a key of its own
     }
 
-    @Test func aSlowTapIsNoTap() {
+    @Test func aHeldSwitchKeyIsAGuessNotATap() {
         var taps = TapTracker()
         let start = Date()
         taps.down(.rightAlt, held: [.option], pauseKey: .standard, switchKeys: [.rightOption], now: start)
-        #expect(taps.up(.rightAlt, pauseKey: .standard, now: start.addingTimeInterval(0.8)) == nil)
+        #expect(taps.up(.rightAlt, pauseKey: .standard, now: start.addingTimeInterval(0.8)) == .guess)
         taps.down(.rightAlt, held: [.option], pauseKey: .standard, switchKeys: [.rightOption], now: start)
         #expect(taps.up(.rightAlt, pauseKey: .standard, now: start.addingTimeInterval(0.1)) == .cycle)
         // Not chosen as a switch key: nothing.
