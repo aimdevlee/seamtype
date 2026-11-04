@@ -354,6 +354,16 @@ function Tap([int]$scan) {
     [Keys]::Key($scan, $true, $true); Start-Sleep -Milliseconds 200
 }
 
+# Held past the tap's half second, as a keyboard does it: the key repeating until it goes up.
+function Hold([int]$scan, [int]$milliseconds = 650) {
+    [Keys]::Key($scan, $false, $true)
+    for ($held = 0; $held -lt $milliseconds; $held += 50) {
+        Start-Sleep -Milliseconds 50
+        if ($held -ge 300) { [Keys]::Key($scan, $false, $true) }
+    }
+    [Keys]::Key($scan, $true, $true); Start-Sleep -Milliseconds 400
+}
+
 # The classic field: Notepad's Edit control (Windows 10, Server), or the same control in a WinForms
 # window where Notepad is Windows 11's own app (CI's ARM64 runner).
 $classic = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "winforms" } else { "notepad" }
@@ -432,10 +442,17 @@ $results = @(
     (Case "hello" "ㅗ디ㅣㅐ " { Tap 0x38; Send-Keys " " } $classic),
     # Right Ctrl tapped alone pauses (0x1D extended): keys then go in as typed.
     (Case "" "dkssud " { Tap 0x1D; Send-Keys "dkssud " } $classic),
-    # A Korean keyboard's 한/영 (VK_HANGUL) switches as it goes down; 한자 (VK_HANJA) pauses.
+    # Right Alt held: the guesses for the word just committed, the first shown, a digit picks it;
+    # Esc puts the word back. Longer than the text service's one second for a repeated press too.
+    (Case "clekkr " "치다가 " { Hold 0x38; Send-Keys "1" } "wpf"),
+    (Case "clekkr " "치다가 " { Hold 0x38 1400; Send-Keys "1" } "wpf"),
+    (Case "clekkr " "치다ㅏㄱ " { Hold 0x38; [Keys]::Key(0x01, $false, $false); Start-Sleep -Milliseconds 60; [Keys]::Key(0x01, $true, $false); Start-Sleep -Milliseconds 300 } "wpf"),
+    # A Korean keyboard's 한/영 (VK_HANGUL) switches; 한자 (VK_HANJA) pauses.
     (Case "hello" "ㅗ디ㅣㅐ " { Press-Virtual 0x15; Send-Keys " " } $classic),
     (Case "" "dkssud " { Press-Virtual 0x19; Send-Keys "dkssud " } $classic)
 )
+# Which key right Alt is here decides how a hold gets to the host (`IsRightAltHangul`).
+Write-Host "right Alt as VK_HANGUL: $(@(Select-String -Path $log -SimpleMatch 'right Alt arrives as VK_HANGUL' -ErrorAction SilentlyContinue).Count) presses"
 # Reported, not required: switching the word just committed in a classic app, whose text Araso
 # edits only through Windows' compatibility layer. With nothing learned the word stays as it went in,
 # by right Alt and 한/영 alike, on both CI runners; 한/영's case passed while it was required only
@@ -523,10 +540,6 @@ if ($env:ARASO_SCREENSHOTS -and $env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
     Stop-Process -Id $f.process.Id -Force
 
     # The long press's guesses: right Alt held past the tap's half second, what each changed marked.
-    function Hold([int]$scan) {
-        [Keys]::Key($scan, $false, $true); Start-Sleep -Milliseconds 650
-        [Keys]::Key($scan, $true, $true); Start-Sleep -Milliseconds 400
-    }
     $f = Kept "wpf"
     Send-Keys "dlrj "; Hold 0x38
     Shot "13a-guess-card" $f.window 240 40

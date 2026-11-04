@@ -111,7 +111,7 @@ private:
     void InsertAtCaret(TfEditCookie cookie, ITfContext *context, const std::wstring &text);
     void ClearFloating();
 
-    bool Takes(WPARAM wParam, bool down) const;
+    bool Takes(WPARAM wParam, LPARAM lParam, bool down) const;
     bool HostTakes(WPARAM wParam, LPARAM lParam, bool up);
     void SeeModifier(ITfContext *context, WPARAM wParam, LPARAM lParam);
     void HandleKey(ITfContext *context, WPARAM wParam, LPARAM lParam, const char *op, BOOL *eaten);

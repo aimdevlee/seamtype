@@ -396,7 +396,7 @@ public final class ServiceRuntime {
         }
         if KeyMapper.isLock(key) { return false }
         client.taps.otherKey()
-        // 한/영 and 한자 (right Alt and right Ctrl on Korean keyboards) act as they go down.
+        // A 한/영 key of its own and 한자 (right Ctrl on Korean keyboards) act as they go down.
         if key.vk == KeyMapper.vkHangul {
             guard session.policy.switchKeys.contains(.rightOption), !session.inVimNormalMode else { return false }
             _ = session.handle(.cycle, client: field)
@@ -431,6 +431,10 @@ public final class ServiceRuntime {
     /// the app untouched (a shortcut's accelerator sees it) and the session only hears of it, as on
     /// macOS. Asked more than once for one key, it answers the same.
     private func takes(_ key: WindowsKey, client: Client, session: InputSession) -> Bool {
+        // Right Alt as 한/영 stays kept as the key of its own is, though it acts as it goes up.
+        if key.vk == KeyMapper.vkHangul, KeyMapper.modifier(key) != nil {
+            return session.policy.switchKeys.contains(.rightOption) && !session.inVimNormalMode
+        }
         if KeyMapper.modifier(key) != nil || KeyMapper.isLock(key) { return false }
         client.taps.otherKey() // a modifier held with it is a shortcut, kept or not
         if key.vk == KeyMapper.vkHangul {

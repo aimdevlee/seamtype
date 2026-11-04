@@ -133,6 +133,7 @@ enum Keys {
     static let rightCtrlUp = WindowsKey(vk: KeyMapper.vkControl, scan: 0x1D, extended: true)
     static let leftCtrl = WindowsKey(vk: KeyMapper.vkControl, scan: 0x1D, ctrl: true)
     static let hangul = WindowsKey(vk: KeyMapper.vkHangul, scan: 0x72)
+    static let rightAltHangul = WindowsKey(vk: KeyMapper.vkHangul, scan: 0x38, extended: true)
     static let escape = WindowsKey(vk: KeyMapper.vkEscape, scan: 0x01)
     static let shiftEscape = WindowsKey(vk: KeyMapper.vkEscape, scan: 0x01, shift: true)
     static let back = WindowsKey(vk: KeyMapper.vkBack, scan: 0x0E)
@@ -498,6 +499,33 @@ final class Harness {
         #expect(h.press(Keys.hangul))
         #expect(h.document.text != "안녕")
         #expect(h.document.composition != nil)
+    }
+
+    /// The Korean keyboard type where right Alt itself is VK_HANGUL: a tap acts as it goes up.
+    @Test func rightAltAsHangulTapSwitchesGoingUp() throws {
+        let h = try Harness()
+        h.type("dkssud")
+        #expect(h.send(ServiceRequest(op: .test, client: h.client, key: Keys.rightAltHangul)).reply.handled)
+        #expect(!h.press(Keys.rightAltHangul))
+        #expect(h.document.text == "안녕")
+        var test = ServiceRequest(op: .test, client: h.client, key: Keys.rightAltHangul)
+        test.up = true
+        #expect(h.send(test).reply.handled)
+        #expect(h.release(Keys.rightAltHangul))
+        #expect(h.document.text != "안녕")
+    }
+
+    @Test func rightAltAsHangulHeldListsGuesses() throws {
+        let h = try Harness()
+        h.type("clekkr ")
+        h.press(Keys.rightAltHangul)
+        Thread.sleep(forTimeInterval: 0.55)
+        var test = ServiceRequest(op: .test, client: h.client, key: Keys.rightAltHangul)
+        test.up = true
+        #expect(h.send(test).reply.handled)
+        #expect(h.release(Keys.rightAltHangul))
+        #expect(h.ui?.guesses?.texts.first == "치다가")
+        #expect(h.document.text == "치다가 ")
     }
 
     @Test func altWithAnotherKeyIsNoTap() throws {
@@ -1002,6 +1030,7 @@ final class Harness {
         #expect(KeyMapper.modifier(WindowsKey(vk: 0x10, scan: 0x2A)) == .leftShift)
         #expect(KeyMapper.modifier(Keys.rightCtrl)?.macKeyCode == PauseKey.Tap.rightCommand.keyCode)
         #expect(KeyMapper.modifier(Keys.hangul) == nil) // a key of its own
+        #expect(KeyMapper.modifier(Keys.rightAltHangul) == .rightAlt)
     }
 
     @Test func aHeldSwitchKeyIsAGuessNotATap() {
