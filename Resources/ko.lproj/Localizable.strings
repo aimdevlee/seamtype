@@ -21,6 +21,7 @@
 "Shows the top kanji candidate as you type." = "입력하면서 가장 앞선 한자 후보를 바로 보여 줍니다.";
 "Full-width numbers" = "전각 숫자";
 "Full-width space" = "전각 공백";
+"Full-width characters" = "전각 문자";
 "Reset the kanji candidate order?" = "한자 후보 순서를 처음으로 되돌릴까요?";
 "Reset" = "되돌리기";
 "Kanji you picked before won't come first anymore. Remembered words stay." = "전에 고른 한자가 더는 앞에 나오지 않습니다. 기억한 단어는 그대로입니다.";

@@ -994,10 +994,14 @@ private struct AppRowView: View {
         if let value = row.entry.enabled { own.append((L("Convert words"), value ? L("On") : L("Off"))) }
         if let value = row.entry.conversionThreshold { own.append((L("Conversion"), Strictness.name(value))) }
         if let value = row.entry.japanese { own.append((L("Japanese"), value ? L("On") : L("Off"))) }
-        if let value = row.entry.switchKeys {
-            own.append((L("Switch keys"), value.isEmpty ? L("None — can't switch") : SwitchKey.names(value)))
+        // What applies, not only what the entry names: 0.1.8's escapeToApp changes the default's keys.
+        let keys = row.entry.applied(to: defaultPolicy).switchKeys
+        if row.entry.switchKeys != nil || keys != defaultPolicy.switchKeys {
+            own.append((L("Switch keys"), keys.isEmpty ? L("None — can't switch") : SwitchKey.names(keys)))
         }
         if let value = row.entry.holdSpace { own.append((L("After Space / punctuation"), holdSpaceName(value))) }
+        // Set in apps.json only: this pane has no menu for it.
+        if let value = row.entry.fullWidth { own.append((L("Full-width characters"), value ? L("On") : L("Off"))) }
         return own
     }
 
