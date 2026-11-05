@@ -327,6 +327,47 @@ import Testing
         field.caretLags = true // another terminal, not known to need marked text
         type("djddj◆")
         #expect(field.text == "엉어")
-        #expect(session.guesses == nil)
+        #expect(session.guesses?.texts.isEmpty == true) // says so, the word left as it went in
+    }
+
+    // MARK: - The long press where the field can't be read
+
+    /// As Ghostty is, real keys: the caret is always at the start, and no text comes back.
+    func likeGhostty() {
+        field.readable = false
+        field.caretStaysAtStart = true
+    }
+
+    @Test func inGhosttyAWordBeingTypedListsGuesses() {
+        likeGhostty()
+        type("djddj◆")
+        #expect(field.text == "영어")
+        #expect(session.guesses?.texts.first == "영어")
+        #expect(field.markedRange().location != NSNotFound)
+        type("⏎")
+        #expect(field.text == "영어")
+        #expect(field.markedRange().location == NSNotFound)
+    }
+
+    @Test func inGhosttyEscPutsBackAWordBeingTyped() {
+        likeGhostty()
+        type("djddj◆⎋")
+        #expect(field.text == "엉어")
+        #expect(field.markedRange().location == NSNotFound)
+    }
+
+    @Test func inGhosttyTheNextWordKeepsTheGuess() {
+        likeGhostty()
+        type("djddj◆ ")
+        #expect(field.text == "영어 ")
+        #expect(field.markedRange().location == NSNotFound)
+    }
+
+    @Test func inGhosttyAWordAlreadyInIsLeftAlone() {
+        likeGhostty()
+        type("djddj ◆")
+        #expect(field.text == "엉어 ")
+        #expect(field.markedRange().location == NSNotFound)
+        #expect(session.guesses?.texts.isEmpty == true)
     }
 }

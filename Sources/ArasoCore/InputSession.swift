@@ -1087,8 +1087,12 @@ public final class InputSession {
         if conversion != nil { return true }
         // Where keys need marked text, the word being typed stays marked: it needn't go in only to be
         // taken away, and the caret wouldn't be after it yet.
+        // So too where the field can't read back what is marked (Ghostty, real keys, 2026-11-05): it could
+        // not be checked or replaced once in.
         let list = keys.isEmpty ? [] : Self.slipGuesser.guesses(for: keys)
-        let stayMarked = client.keysOnlyWhileMarked && !list.isEmpty
+        let shown = client.markedRange()
+        let unreadable = !keys.isEmpty && shown.location != NSNotFound && client.text(in: shown) == nil
+        let stayMarked = (client.keysOnlyWhileMarked || unreadable) && !list.isEmpty
         if !keys.isEmpty, heldBoundary != nil || !confirmTyped(client, insert: !stayMarked) { commit(client: client) }
         guard keys.isEmpty, let pending = lastCommit else { return true }
         let guessed = stayMarked ? list : Self.slipGuesser.guesses(for: pending.keys)
@@ -1096,8 +1100,10 @@ public final class InputSession {
             guesses = Guesses(texts: [], selected: 0, changed: [])
             return true
         }
-        guessing = (guessed, 0, pending, client.keysOnlyWhileMarked)
+        guessing = (guessed, 0, pending, client.keysOnlyWhileMarked || stayMarked)
         showGuess(0, client)
+        // A word already in that the field can't give back (Ghostty, after Space) can't be replaced.
+        if guessing == nil { guesses = Guesses(texts: [], selected: 0, changed: []) }
         return true
     }
 
@@ -1124,7 +1130,7 @@ public final class InputSession {
             return true
         case .escape, .delete:
             guessing = nil
-            putBack(state.before, client)
+            putBack(state.before, marked: state.marked, client)
             return true
         default:
             settleMarkedGuess(client)
@@ -1198,9 +1204,9 @@ public final class InputSession {
     }
 
     /// The word just committed back as `before`, where a guess was shown.
-    private func putBack(_ before: Committed, _ client: TextClient) {
+    private func putBack(_ before: Committed, marked: Bool, _ client: TextClient) {
         guard let current = lastCommit else { return }
-        if client.keysOnlyWhileMarked, client.markedRange().location != NSNotFound {
+        if marked, client.markedRange().location != NSNotFound {
             client.insertText(before.text, replacing: nil)
             if runText.hasSuffix(current.text) { runText = String(runText.dropLast(current.text.count)) + before.text }
             if before.inLine == nil { previousLanguage = before.language.sentenceLanguage }

@@ -205,7 +205,9 @@ tests use `FakeTextField`). It owns the preview and hysteresis, commits, Esc rea
   while the keys of the candidate window pick one (`pickGuess` for clicks), Esc and Delete put the
   word back. Terminal takes those keys itself with nothing marked, and its caret catches up with an insert only
   after the key (`TextClient.keysOnlyWhileMarked`; real keys, 2026-11-05), so there the guess stays marked text
-  while listed (the word being typed never goes in first) and goes in when one is kept. `cat`'s line editing erases
+  while listed (the word being typed never goes in first) and goes in when one is kept. So too for the word being typed where the field can't read back marked text
+  (`client.text(in:)` nil; Ghostty, real keys, 2026-11-05: caret always {0, 0}); a word already in can't be replaced there, so
+  the list comes up empty. `cat`'s line editing erases
   a wide character as one cell, so a word replaced there, by a guess or a switch, looks broken though the line is right; a guess picked teaches nothing but forgets keys the dictionary remembers. With
   `fixSlips` (off by default) the first goes in at a Space or symbol where the keys can't be Korean
   as typed (stray jamo, an odd syllable `isOdd`, or Shift off on a final only: 햇어요, never 예요 → 에요)
