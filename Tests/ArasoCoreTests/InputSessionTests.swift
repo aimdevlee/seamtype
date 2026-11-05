@@ -40,6 +40,8 @@ final class FakeTextField: TextClient {
     /// start of the word, until the key is done (`caretCaughtUp`).
     var caretLags = false
     private var laggingCaret: Int?
+    /// True as in Ghostty: the caret is always reported at the start of the field.
+    var caretStaysAtStart = false
 
     func caretCaughtUp() { laggingCaret = nil }
 
@@ -86,7 +88,7 @@ final class FakeTextField: TextClient {
         cursor = target.location + (s as NSString).length
     }
 
-    func selectedRange() -> NSRange { NSRange(location: laggingCaret ?? cursor, length: 0) }
+    func selectedRange() -> NSRange { NSRange(location: caretStaysAtStart ? 0 : laggingCaret ?? cursor, length: 0) }
     func markedRange() -> NSRange { marked }
     func text(in range: NSRange) -> String? {
         guard readable, NSMaxRange(range) <= (text as NSString).length else { return nil }
