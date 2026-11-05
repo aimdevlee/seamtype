@@ -370,4 +370,14 @@ import Testing
         #expect(field.markedRange().location == NSNotFound)
         #expect(session.guesses?.texts.isEmpty == true)
     }
+
+    @Test func aHeldWordGoesInAndSaysSo() {
+        likeGhostty()
+        let held = InputSession(engine: dictionary, policies: AppPolicies(overrides: ["test.hold": .init(holdSpace: true)]))
+        held.activate(app: "test.hold")
+        type("djddj ◆", into: held)
+        #expect(field.text == "엉어 ")
+        #expect(field.markedRange().location == NSNotFound)
+        #expect(held.guesses?.texts.isEmpty == true)
+    }
 }

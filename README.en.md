@@ -351,7 +351,7 @@ the next key is hit. Composed as Hangul, that leaves loose jamo (`clekkr` → `�
   again or ↓·↑ for another, a digit, a click or Return to pick one; Esc and Delete put the word back. Any other key
   keeps what is shown and goes on. With nothing to guess, "No guesses" shows for a moment. 2-set only, one slip only. A 한/영 key of its own, which acts as it goes down, can't be held for this (Windows, Linux); 한/영 in right Alt's place can (Windows).
   In macOS Terminal the guess stays underlined while the list is open and goes in when you pick it. Outside a shell prompt, as in `cat`, replacing a word after Space can look broken on screen, though the line itself is right.
-  Where an app doesn't let Araso read the text, such as Ghostty, only a word still being typed gets guesses; a word after Space can't be replaced, so "No guesses" shows.
+  Where an app doesn't let Araso read the text, such as Ghostty, only a word still being typed gets guesses; a word after Space (also one `holdSpace` kept underlined) can't be replaced, so "No guesses" shows.
 - **Fix typos** (Settings → Keys, `fixSlips`, off by default): where it is clear, the word is fixed as it ends
   (Space, punctuation) and "✦ Typo fixed" shows for a moment (`clekkr` → `치다가`). Only when the keys as typed
   leave loose jamo or a syllable nobody types (a word of syllables only, only for Shift on a final: `햇어요` → `했어요`), don't

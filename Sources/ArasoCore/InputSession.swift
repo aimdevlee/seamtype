@@ -1093,8 +1093,13 @@ public final class InputSession {
         let shown = client.markedRange()
         let unreadable = !keys.isEmpty && shown.location != NSNotFound && client.text(in: shown) == nil
         let stayMarked = (client.keysOnlyWhileMarked || unreadable) && !list.isEmpty
-        if !keys.isEmpty, heldBoundary != nil || !confirmTyped(client, insert: !stayMarked) { commit(client: client) }
-        guard keys.isEmpty, let pending = lastCommit else { return true }
+        let hadWord = !keys.isEmpty
+        if hadWord, heldBoundary != nil || !confirmTyped(client, insert: !stayMarked) { commit(client: client) }
+        guard keys.isEmpty, let pending = lastCommit else {
+            // A held word went in with its boundary, which leaves no word just committed to replace.
+            if hadWord { guesses = Guesses(texts: [], selected: 0, changed: []) }
+            return true
+        }
         let guessed = stayMarked ? list : Self.slipGuesser.guesses(for: pending.keys)
         guard !guessed.isEmpty else {
             guesses = Guesses(texts: [], selected: 0, changed: [])
