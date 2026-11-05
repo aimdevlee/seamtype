@@ -356,6 +356,17 @@ import Testing
         #expect(field.markedRange().location == NSNotFound)
     }
 
+    @Test func inGhosttyTextBeforeTheWordIsLeftAlone() {
+        likeGhostty()
+        type("dkssud djddj◆")
+        #expect(field.text == "안녕 영어")
+        type("⏎")
+        #expect(field.text == "안녕 영어")
+        type(" djddj◆⎋")
+        #expect(field.text == "안녕 영어 엉어")
+        #expect(field.markedRange().location == NSNotFound)
+    }
+
     @Test func inGhosttyTheNextWordKeepsTheGuess() {
         likeGhostty()
         type("djddj◆ ")
