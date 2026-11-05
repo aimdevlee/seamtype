@@ -99,6 +99,12 @@ public struct AppPolicy: Codable, Equatable, Sendable {
                       japanese: policy.japanese == base.japanese ? nil : policy.japanese)
         }
 
+        /// The app's switch keys follow the default again, 0.1.8's `escapeToApp` gone with them.
+        public mutating func followDefaultKeys() {
+            switchKeys = nil
+            escapeToApp = nil
+        }
+
         public func applied(to base: AppPolicy) -> AppPolicy {
             var keys = switchKeys ?? base.switchKeys
             if switchKeys == nil, let escapeToApp {

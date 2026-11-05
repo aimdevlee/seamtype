@@ -445,6 +445,13 @@ final class InputController: IMKInputController {
                 word.size.width = wordEndReported || font.isFixedPitch ? max(word.width, measured) : measured
             }
         }
+        // `wordRect` is the last word underlined, and the word just committed may not be it (the last
+        // of several fixed, a URL's segment): it has to end by the caret, past no more than a boundary.
+        if !typing, wordFirstLine == nil {
+            let caret = caretRect(client)
+            let gap = caret.minX - word.maxX
+            guard abs(caret.midY - word.midY) < word.height / 2, (-word.height / 2...word.height * 2).contains(gap) else { return }
+        }
         // The line's bottom is the font's descent under the baseline, the app's underline a little
         // under the baseline, up to 2 points thick; the wave goes just under that.
         let underlineY = wordFont.map { word.minY - $0.descender + $0.underlinePosition } ?? word.minY + 1

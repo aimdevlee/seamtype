@@ -314,7 +314,7 @@ void StripWindow::ShowReadings(const std::vector<std::wstring> &texts, const std
     pick_ = std::move(pick);
     choose_ = nullptr;
     selected = std::max(0, std::min(selected, static_cast<int>(texts.size()) - 1));
-    if (Up() && !settling_ && mode_ == Mode::list && texts == texts_ && marks == marks_) {
+    if (Up() && !settling_ && mode_ == Mode::list && texts == texts_ && marks == marks_ && tags == tags_ && numbered == numbered_) {
         Select(selected);
         return;
     }
@@ -322,6 +322,8 @@ void StripWindow::ShowReadings(const std::vector<std::wstring> &texts, const std
     pageStart_ = 0;
     texts_ = texts;
     marks_ = marks;
+    tags_ = tags;
+    numbered_ = numbered;
     std::vector<Cell> cells;
     bool anyMark = false;
     float widestText = 0;

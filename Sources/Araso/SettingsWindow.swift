@@ -1070,11 +1070,13 @@ private struct AppRowView: View {
                             }
                         }
                         .help(L("Off: words here are Korean or English only, as with Japanese off. On: Japanese here even when it is off under Languages."))
-                        Field(title: L("Switch keys"), inherited: row.entry.switchKeys == nil) {
+                        Field(title: L("Switch keys"), inherited: row.entry.switchKeys == nil && row.entry.applied(to: defaultPolicy).switchKeys == defaultPolicy.switchKeys) {
                             SwitchKeysMenu(own: row.entry.switchKeys, taken: model.settings.pauseKey.switchKey,
                                            effective: row.entry.applied(to: defaultPolicy).switchKeys,
                                            inherited: defaultPolicy.switchKeys) { value in
-                                model.setEntry(for: row.id) { $0.switchKeys = value }
+                                model.setEntry(for: row.id) { entry in
+                                    if let value { entry.switchKeys = value } else { entry.followDefaultKeys() }
+                                }
                             }
                         }
                         // Per app only, for terminals: in "*" it would turn off text replacements everywhere.
@@ -1170,11 +1172,14 @@ private struct SwitchKeysMenu: View {
     let inherited: Set<SwitchKey>
     let set: (Set<SwitchKey>?) -> Void
 
+    private var followsDefault: Bool { own == nil && effective == inherited }
+
     var body: some View {
         Menu {
-            // Checked while the app follows the default; choosing it drops the app's own keys.
+            // Checked while the app follows the default; choosing it drops the app's own keys,
+            // and 0.1.8's escapeToApp, which makes `effective` differ with no keys of its own.
             Toggle(L("Default (%@)", SwitchKey.names(inherited)),
-                   isOn: Binding(get: { own == nil }, set: { if $0 { set(nil) } }))
+                   isOn: Binding(get: { followsDefault }, set: { if $0 { set(nil) } }))
             Divider()
             ForEach(SwitchKey.allCases, id: \.self) { key in
                 Toggle(key.displayName, isOn: Binding(
@@ -1188,8 +1193,8 @@ private struct SwitchKeysMenu: View {
             }
         } label: {
             // A menu's label shows only text.
-            Text(own.map { $0.isEmpty ? L("None — can't switch") : SwitchKey.names($0) }
-                 ?? L("Default (%@)", SwitchKey.names(effective)))
+            Text(followsDefault ? L("Default (%@)", SwitchKey.names(inherited))
+                 : effective.isEmpty ? L("None — can't switch") : SwitchKey.names(effective))
         }
         .fixedSize()
     }

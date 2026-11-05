@@ -117,6 +117,8 @@ private:
     std::vector<std::wstring> texts_;
     std::wstring reading_;
     std::vector<Mark> marks_;
+    std::vector<std::string> tags_;
+    bool numbered_ = false;
     int selected_ = 0;
     int page_ = 0;
     int pageStart_ = 0;
