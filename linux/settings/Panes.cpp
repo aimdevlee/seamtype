@@ -93,7 +93,6 @@ void BuildLanguages() {
     bool japaneseUsed = japanese;
     for (const Json &item : g.model["apps"].items()) japaneseUsed = japaneseUsed || item["entry"]["japanese"].asBool(false);
 
-    Heading(T("Languages"));
     // Not a setting of Araso's: fcitx5's, which the input method changes (the window may not write
     // fcitx5's file while it runs). The box keeps what was clicked until fcitx5 has saved it.
     Check(T("On in every text field"), ActiveByDefault(), true, [](bool on) {
@@ -183,10 +182,9 @@ void BuildKeys() {
         });
         Note(taken == id ? T("This key pauses. Choose another pause key first.") : T(info.note), 20);
     }
-    QString names = KeyNames(keys);
-    if (names.isEmpty()) Note(T("Nothing switches a word's language."));
+    if (KeyNames(keys).isEmpty()) Note(T("Nothing switches a word's language."));
     else if (keys.size() == 5) Note(T("All of these switch languages."));
-    else Note(T("Switching: %@. The others go to the app as usual.", {names.toStdString()}));
+    else Note(T("The keys not chosen go to the app as usual."));
     Note(T("A right Alt or Shift tap with other modifiers is left to what it's bound to."));
 
     Heading(T("Apps with their own keys"));
@@ -355,7 +353,6 @@ void AddApp() {
 void BuildApps() {
     const Json &policy = g.model["defaultPolicy"];
     bool strict = policy["conversionThreshold"].asNumber(0.5) >= Strict();
-    Heading(T("Default — every app"));
     if (!policy["enabled"].asBool(true)) Note(T("Convert words is off under Languages, so nothing converts."));
     Combo(T("Conversion"), {T("Normal"), T("Strict")}, strict ? 1 : 0, true, [](int index) {
         ChangeDefault([index](Json &p) { p.set("conversionThreshold", index == 1 ? Strict() : 0.5); });
@@ -363,7 +360,7 @@ void BuildApps() {
     Note(strict ? T("Converts only words that are clearly Korean or Japanese, so short commands stay as typed (gst stays gst). For terminals.")
                 : T("Converts a word when it reads more like Korean or Japanese than English (gst → ㅎㄴㅅ)."));
 
-    Heading(T("Exceptions — only apps that differ"));
+    Heading(T("Apps that differ"));
     const Json &apps = g.model["apps"];
     if (apps.size() == 0) Note(T("None. Add an app that should work differently."));
     QTreeWidget *list = List({T("App"), T("Convert words"), T("Conversion"), T("Japanese"), T("Switch keys"),

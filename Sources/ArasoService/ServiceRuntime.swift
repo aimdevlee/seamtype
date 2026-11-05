@@ -511,7 +511,7 @@ public final class ServiceRuntime {
         if let readings = session.readings {
             ui.readings = UIState.Readings(texts: readings.texts, tags: readings.languages.map(\.tag),
                                            selected: readings.selected, remembered: readings.remembered,
-                                           once: readings.once)
+                                           once: readings.once, numbered: readings.numbered ? true : nil)
         }
         if let guesses = session.guesses {
             let changed = zip(guesses.texts, guesses.changed).map { text, range in

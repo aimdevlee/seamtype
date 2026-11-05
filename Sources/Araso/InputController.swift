@@ -16,7 +16,7 @@ final class InputController: IMKInputController {
     /// Which switch key (right ⌥ or right ⇧, in `AppPolicy.switchKeys`) went down and when,
     /// while no other key has been pressed with it: a tap switches the word's language.
     private var switchTapDown: (key: UInt16, at: Date)? {
-        didSet { if switchTapDown == nil { MainActor.assumeIsolated { LongPressRing.hide() } } }
+        didSet { if switchTapDown == nil { MainActor.assumeIsolated { LongPressWave.hide() } } }
     }
     /// A terminal was waiting for a password at the last key (`PasswordPrompt`): its keys went to
     /// the app as typed, and what was being typed went in before the first of them.
@@ -27,6 +27,10 @@ final class InputController: IMKInputController {
     private var wordRect: NSRect?
     /// The font the app reported for that word, to measure where a word just committed ends.
     private var wordFont: NSFont?
+    /// Whether the app itself said where that word ends, rather than it being estimated.
+    private var wordEndReported = false
+    /// How many UTF-16 units of that word are on its first line, when it wraps.
+    private var wordFirstLine: Int?
 
     /// This client's session, rebuilt (after committing what was being typed) when a setting changed.
     @MainActor private var session: InputSession {
@@ -268,7 +272,7 @@ final class InputController: IMKInputController {
             // and its tap belongs to whatever the user bound it to.
             let others = event.modifierFlags.intersection([.command, .control, .option, .shift]).subtracting(flag)
             switchTapDown = others.isEmpty ? (event.keyCode, Date()) : nil
-            if switchTapDown != nil, session.canGuess { LongPressRing.start(caret: caretRect(client)) }
+            if switchTapDown != nil, session.canGuess { startLongPressWave(client) }
             return
         }
         guard let down = switchTapDown, down.key == event.keyCode else { return }
@@ -331,7 +335,8 @@ final class InputController: IMKInputController {
     /// The start is the marked text's index 0, through `attributes(forCharacterIndex:)`, the call
     /// the readings list is placed by: `firstRect(forCharacterRange:)` came back as garbage
     /// (1.6e-314) through IMK. TextEdit answers a zero rect for the index just past the word, so
-    /// the end is its last letter's place plus one letter's average width.
+    /// the end is its last letter's place plus one letter's average width. A word the line's end
+    /// wraps is measured to where its first line ends, by the last letter still on it.
     @MainActor private func noteWordRect(_ client: IMKTextInput) {
         let marked = client.markedRange()
         guard marked.location != NSNotFound, marked.length > 0 else { return }
@@ -345,7 +350,18 @@ final class InputController: IMKInputController {
         log.debug("word start \(start.debugDescription, privacy: .public) last \(last.debugDescription, privacy: .public) end \(end.debugDescription, privacy: .public)")
         func onLine(_ rect: NSRect) -> Bool { Self.plausible(rect) && rect.minX > start.minX && abs(rect.midY - start.midY) < 1 }
         let endX: CGFloat
-        if onLine(end) {
+        wordEndReported = onLine(end)
+        wordFirstLine = nil
+        if marked.length > 1, Self.plausible(last), abs(last.midY - start.midY) >= 1 {
+            var index = marked.length - 2, letter = NSRect.zero
+            while index >= 1 {
+                _ = client.attributes(forCharacterIndex: index, lineHeightRectangle: &letter)
+                if onLine(letter) { break }
+                index -= 1
+            }
+            wordFirstLine = max(index, 0) + 1
+            endX = index >= 1 ? letter.minX + (letter.minX - start.minX) / CGFloat(index) : start.minX + start.height * 0.55
+        } else if onLine(end) {
             endX = end.minX
         } else if onLine(last) {
             endX = last.minX + (last.minX - start.minX) / CGFloat(marked.length - 1)
@@ -407,6 +423,39 @@ final class InputController: IMKInputController {
         }
         _ = client.attributes(forCharacterIndex: 0, lineHeightRectangle: &rect)
         return rect
+    }
+
+    /// Draws the wave under the word a long press is about: the one being typed, else the one just
+    /// committed, kept from while it was underlined. It should end where the word does, so the width
+    /// is the word's own in the app's font, or what the app's positions give if the app said where
+    /// the word ends or the font is fixed-pitch and that is longer (a terminal's cells are wider than
+    /// the font's Hangul), and only as far as its first line goes when it wraps. Nothing shows without
+    /// a place for the word.
+    @MainActor private func startLongPressWave(_ client: IMKTextInput) {
+        let marked = client.markedRange()
+        let typing = marked.location != NSNotFound && marked.length > 0
+        if typing { noteWordRect(client) }
+        guard var word = wordRect else { return }
+        if typing, word.origin != caretRect(client).origin { return } // measured another word
+        var text = typing ? client.attributedSubstring(from: marked)?.string : session.committedWord
+        if let count = wordFirstLine, let whole = text as NSString?, whole.length > count { text = whole.substring(to: count) }
+        if let font = wordFont, let text {
+            let measured = (text as NSString).size(withAttributes: [.font: font]).width
+            if measured > 0, (word.width * 0.5...word.width * 1.5).contains(measured) {
+                word.size.width = wordEndReported || font.isFixedPitch ? max(word.width, measured) : measured
+            }
+        }
+        // `wordRect` is the last word underlined, and the word just committed may not be it (the last
+        // of several fixed, a URL's segment): it has to end by the caret, past no more than a boundary.
+        if !typing, wordFirstLine == nil {
+            let caret = caretRect(client)
+            let gap = caret.minX - word.maxX
+            guard abs(caret.midY - word.midY) < word.height / 2, (-word.height / 2...word.height * 2).contains(gap) else { return }
+        }
+        // The line's bottom is the font's descent under the baseline, the app's underline a little
+        // under the baseline, up to 2 points thick; the wave goes just under that.
+        let underlineY = wordFont.map { word.minY - $0.descender + $0.underlinePosition } ?? word.minY + 1
+        LongPressWave.start(word: word, y: underlineY - 3.5)
     }
 
     /// Maps a key-down event to a session key, preserving shifted arrows and configured switch
@@ -490,13 +539,17 @@ final class InputController: IMKInputController {
                 item.representedObject = value
                 menu.addItem(item)
             }
-            // A temporary state of this text field first, then the app's saved settings: word
-            // conversion and, under it, what only matters while it is on. The names are the
-            // settings window's, so a choice reads the same in both.
+            // A temporary state of this text field first, then what is switched most, then the app's
+            // saved settings: word conversion and, under it, what only matters while it is on. The
+            // names are the settings window's, so a choice reads the same in both.
             add(runtime.settings.pauseKey == .off ? L("Pause in This Text Field")
                     : L("Pause in This Text Field (%@)", runtime.settings.pauseKey.label),
                 // A session from before a settings change is replaced, unpaused, on the next key.
                 #selector(togglePause(_:)), on: current.map { $0.generation == runtime.generation && $0.session.paused } ?? false)
+            menu.addItem(.separator())
+            add(L("Japanese Input"), #selector(toggleJapanese(_:)), on: runtime.settings.japanese)
+            add(L("Live Conversion"), #selector(toggleLiveConversion(_:)), on: runtime.settings.liveConversion,
+                enabled: runtime.japaneseLoaded, indent: 1) // also where only an app has Japanese on
             menu.addItem(.separator())
             if let app = current?.session.app ?? client()?.bundleIdentifier() {
                 let policies = AppPolicies.load()
@@ -521,10 +574,6 @@ final class InputController: IMKInputController {
                 }
                 menu.addItem(.separator())
             }
-
-            add(L("Japanese Input"), #selector(toggleJapanese(_:)), on: runtime.settings.japanese)
-            add(L("Live Conversion"), #selector(toggleLiveConversion(_:)), on: runtime.settings.liveConversion,
-                enabled: runtime.japaneseLoaded, indent: 1) // also where only an app has Japanese on
 
             menu.addItem(.separator())
             if let keys = runtime.engine.lastLearned {

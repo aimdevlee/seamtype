@@ -49,10 +49,10 @@ struct PaneInfo {
 };
 
 const PaneInfo kPanes[] = {
-    {"general", "Languages", "Which languages each word is decided between, the layouts they are typed on, and how Japanese types.", BuildLanguages},
+    {"general", "Languages", "Which language each word is decided as.", BuildLanguages},
     {"keys", "Keys", "The keys that change a word's language, and a few more.", BuildKeys},
-    {"apps", "Apps", "How sure a word must be to convert, and apps that work differently.", BuildApps},
-    {"learning", "Dictionary", "Keys that always come out one way.", BuildDictionary},
+    {"apps", "Apps", "What every app does, and the apps that differ.", BuildApps},
+    {"learning", "Dictionary", "Keys that always come out one way, also with a particle after them.", BuildDictionary},
     {"typing", "Try Typing", "Type here to see how each word is decided.", BuildTyping},
     {"about", "About", "Version, updates and files.", BuildAbout},
 };

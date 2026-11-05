@@ -50,9 +50,11 @@ public:
     enum class Mark { none, remembered, once };
 
     /// The readings in a card under `word` (screen pixels), `selected` on the thumb, the first
-    /// under the word's first letter; a click on another reading calls `pick` with its index.
-    void ShowReadings(const std::vector<std::wstring> &texts, const std::vector<Mark> &marks, int selected,
-                      const RECT &word, std::function<void(int)> pick);
+    /// under the word's first letter, each with its language in its own script (`tags`: EN, KO, JA,
+    /// MIX), numbered when the digits pick them; a click on another reading calls `pick` with its index.
+    void ShowReadings(const std::vector<std::wstring> &texts, const std::vector<Mark> &marks,
+                      const std::vector<std::string> &tags, bool numbered, int selected, const RECT &word,
+                      std::function<void(int)> pick);
     /// The long press's guesses in a card under `word`, numbered, what each `changed` (UTF-16 units
     /// of its text) colored with a wave under it; a click calls `pick` with its index.
     void ShowGuesses(const std::vector<std::wstring> &texts, const std::vector<std::pair<int, int>> &changed, int selected,
@@ -66,7 +68,7 @@ public:
     /// The correction the dictionary just took (`learning`: "once", "forGood" or "forgot"): the
     /// readings' card becomes the chosen reading's capsule, under the word's first letter, and says
     /// what happened. Without a card up, the capsule shows `text` on its own. `learning` "note":
-    /// only `text`, for a moment, whatever is up.
+    /// only `text`, for a moment, whatever is up; "nothing": the same on gray, as nothing was done.
     void Settle(const std::wstring &text, const std::string &learning, const RECT &word);
     /// Puts the strip away; one saying what a correction did stays its moment unless `force`d.
     void Hide(bool force = false);
@@ -85,6 +87,11 @@ private:
         Com<IDWriteTextLayout> layout;
         Com<IDWriteTextLayout> numberLayout;
         float textX = 0, textWidth = 0;
+        /// Where the list's marks stand, past its widest text, so they line up.
+        float markX = 0;
+        /// The reading's language in its own script, at the row's end.
+        Com<IDWriteTextLayout> languageLayout;
+        float languageWidth = 0;
         D2D1_RECT_F frame = {}; // in the page's coordinates (DIPs)
     };
 
@@ -110,6 +117,8 @@ private:
     std::vector<std::wstring> texts_;
     std::wstring reading_;
     std::vector<Mark> marks_;
+    std::vector<std::string> tags_;
+    bool numbered_ = false;
     int selected_ = 0;
     int page_ = 0;
     int pageStart_ = 0;
@@ -119,6 +128,8 @@ private:
     RECT word_ = {};
     std::wstring footer_;
     Com<IDWriteTextLayout> footerLayout_;
+    /// The page, at the footer's other end.
+    Com<IDWriteTextLayout> pageLayout_;
     std::function<void(int)> pick_, choose_;
     /// The strip's frame in the window (DIPs) and, for a card, its rows' inside.
     D2D1_RECT_F strip_ = {};
@@ -152,7 +163,12 @@ private:
     std::wstring measuredFooter_;
     float measuredWidth_ = 0;
 
-    Cell MakeCell(const std::wstring &text, int number, Mark mark, bool japanese) const;
+    /// `row`: a card's row, larger than a capsule on its own.
+    Cell MakeCell(const std::wstring &text, int number, Mark mark, bool japanese, bool row = true) const;
+    /// A row's height, the line its text sits on and that text's cap height in the current mode.
+    float RowHeight() const;
+    float Baseline() const;
+    float CapHeight() const;
     float CardWidth(const std::vector<std::wstring> &texts, const std::wstring &footer, bool japanese);
     void Build(std::vector<Cell> cells, Mode mode, float cardWidth, int rows, int selected, const RECT &word, int turn);
     void Select(int index);

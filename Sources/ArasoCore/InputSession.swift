@@ -1062,11 +1062,16 @@ public final class InputSession {
         return undone
     }
 
-    /// Whether a long press of the switch key has a word to guess at, for the ring that says it is
-    /// being held.
+    /// Whether a long press of the switch key has a word to guess at, for the wave drawn while it
+    /// is held.
     public var canGuess: Bool {
         KoreanLayout.current == .dubeolsik && fixing == nil && conversion == nil && !inVimNormalMode
             && (!keys.isEmpty || lastCommit != nil)
+    }
+
+    /// The word just committed, without its boundary, for measuring it on screen.
+    public var committedWord: String? {
+        lastCommit.map { String($0.text.dropLast($0.boundary.count)) }
     }
 
     /// The long press: the word being typed goes in as shown (as Return confirms it), then the word

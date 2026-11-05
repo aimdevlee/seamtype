@@ -42,7 +42,6 @@ void BuildLanguages() {
     bool japaneseUsed = japanese;
     for (const Json &item : g.model["apps"].items()) japaneseUsed = japaneseUsed || item["entry"]["japanese"].asBool(false);
 
-    Heading(L("Languages"));
     Check(L("Convert words"), policy["enabled"].asBool(true), true, [](bool on) {
         ChangeDefault([on](Json &p) { p.set("enabled", on); });
     });
@@ -122,10 +121,9 @@ void BuildKeys() {
         });
         Note(taken == id ? L("This key pauses. Choose another pause key first.") : L(info.note), S(20));
     }
-    std::wstring names = KeyNames(keys);
-    if (names.empty()) Note(L("Nothing switches a word's language."));
+    if (KeyNames(keys).empty()) Note(L("Nothing switches a word's language."));
     else if (keys.size() == 5) Note(L("All of these switch languages."));
-    else Note(L("Switching: %@. The others go to the app as usual.", {names}));
+    else Note(L("The keys not chosen go to the app as usual."));
     Note(L("A right Alt or Shift tap with other modifiers is left to what it's bound to."));
 
     Heading(L("Apps with their own keys"));
@@ -287,7 +285,6 @@ void AddApp() {
 void BuildApps() {
     const Json &policy = g.model["defaultPolicy"];
     bool strict = policy["conversionThreshold"].asNumber(0.5) >= Strict();
-    Heading(L("Default — every app"));
     if (!policy["enabled"].asBool(true)) Note(L("Convert words is off under Languages, so nothing converts."));
     Combo(L("Conversion"), {L("Normal"), L("Strict")}, strict ? 1 : 0, true, [](int index) {
         ChangeDefault([index](Json &p) { p.set("conversionThreshold", index == 1 ? Strict() : 0.5); });
@@ -295,7 +292,7 @@ void BuildApps() {
     Note(strict ? L("Converts only words that are clearly Korean or Japanese, so short commands stay as typed (gst stays gst). For terminals.")
                 : L("Converts a word when it reads more like Korean or Japanese than English (gst → ㅎㄴㅅ)."));
 
-    Heading(L("Exceptions — only apps that differ"));
+    Heading(L("Apps that differ"));
     const Json &apps = g.model["apps"];
     if (apps.size() == 0) Note(L("None. Add an app that should work differently."));
     HWND list = List({{L("App"), 150}, {L("Convert words"), 110}, {L("Conversion"), 110}, {L("Japanese"), 90},

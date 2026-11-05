@@ -244,6 +244,8 @@ public struct UIState: Codable, Equatable, Sendable {
         /// corrected once (a pencil), as macOS's strip marks them.
         public var remembered: Int?
         public var once: Int?
+        /// The digits pick a reading (1 for the first), so the rows are numbered.
+        public var numbered: Bool?
     }
 
     /// The long press's guesses for the word (`InputSession.guesses`). No texts: nothing to guess,
