@@ -80,11 +80,13 @@ struct TypingPane: View {
                 }
                 .padding(16)
             }
-            HStack(spacing: 8) {
+            HStack(spacing: 18) {
+                Text(L("Examples")).font(.system(size: 12)).foregroundStyle(Seam.ink2)
                 Example(keys: "dkssud githubdp", output: "안녕 github에")
                 Example(keys: "hello TextEditdptj", output: "hello TextEdit에서")
                 Example(keys: "kyouha ␣", output: "今日は")
             }
+            .padding(.top, -8).padding(.leading, 2)
             SeamCard(title: L("How it was decided")) {
                 VStack(alignment: .leading, spacing: 10) {
                     if let current {

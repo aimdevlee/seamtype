@@ -281,7 +281,10 @@ void Server::Draw(int id) {
                             : index == once     ? StripWindow::Mark::once
                                                 : StripWindow::Mark::none);
         }
-        strip_.ShowReadings(texts, marks, readings["selected"].asInt(), anchor, [ask](int index) { ask("pick", index); });
+        std::vector<std::string> tags;
+        for (size_t k = 0; k < readings["tags"].size(); k++) tags.push_back(readings["tags"][k].asString());
+        strip_.ShowReadings(texts, marks, tags, readings["numbered"].asBool(false), readings["selected"].asInt(), anchor,
+                            [ask](int index) { ask("pick", index); });
         stripFor_ = id;
     } else if (guesses.isObject() && guesses["texts"].size() > 0 && placed) {
         std::vector<std::wstring> texts;
@@ -293,7 +296,7 @@ void Server::Draw(int id) {
         strip_.ShowGuesses(texts, changed, guesses["selected"].asInt(), anchor, [ask](int index) { ask("pickGuess", index); });
         stripFor_ = id;
     } else if (guesses.isObject() && placed) {
-        strip_.Settle(L("No guesses"), "note", anchor);
+        strip_.Settle(L("No guesses"), "nothing", anchor);
         stripFor_ = id;
     } else if (ui["typoFixed"].isBool() && (client.hasKeyWord || client.hasWord)) {
         strip_.Settle(L"\u2726 " + L("Typo fixed"), "note", client.hasKeyWord ? client.keyWord : client.word);

@@ -13,22 +13,27 @@ namespace {
 const wchar_t *kStripClass = L"ArasoStrip";
 constexpr UINT_PTR kFrameTimer = 1;
 
-// macOS's measures, in points there and DIPs here: the input source indicator's capsule height
-// and its gap below the caret, a cell's padding, how wide a text gets, the room around the strip
-// for its shadow, the card's paper around its rows and the room under them for the footer.
-constexpr float kHeight = 23, kGap = 4, kPad = 10, kMaxText = 140, kMargin = 12, kInset = 3, kFooterHeight = 16;
+// macOS's measures, in points there and DIPs here: the input source indicator's capsule height,
+// a card's row, the gap below the caret, a cell's padding, how wide a text gets, the room around
+// the strip for its shadow, the card's paper around its rows and the room under them for the footer.
+constexpr float kHeight = 23, kRowHeight = 26, kGap = 4, kPad = 10, kMaxText = 220, kMargin = 12, kInset = 4, kFooterHeight = 24;
 constexpr float kMarkSide = 11;
-/// The line every text of the strip sits on: the reading's cap height (Segoe UI's, 0.7 em at
-/// 13) centered in the capsule. Marks are centered on the same middle.
-constexpr float kCapHeight = 13 * 0.7f;
-constexpr float kBaseline = (kHeight + kCapHeight) / 2;
 constexpr int kPageSize = 9;
+
+/// The language in its own script.
+std::wstring Script(const std::string &tag) {
+    if (tag == "EN") return L"A";
+    if (tag == "KO") return L"\xC544"; // 아
+    if (tag == "JA") return L"\x3042"; // あ
+    if (tag == "MIX") return L"A\xC544";
+    return L"";
+}
 
 ID2D1Factory *g_d2d = nullptr;
 IDWriteFactory *g_dwrite = nullptr;
 ID2D1DCRenderTarget *g_target = nullptr;
 ID2D1StrokeStyle *g_round = nullptr;
-IDWriteTextFormat *g_cellFormat = nullptr, *g_numberFormat = nullptr, *g_footerFormat = nullptr,
+IDWriteTextFormat *g_cellFormat = nullptr, *g_rowFormat = nullptr, *g_numberFormat = nullptr, *g_footerFormat = nullptr,
                   *g_outcomeFormat = nullptr, *g_iconFormat = nullptr;
 
 bool HasFamily(const wchar_t *name) {
@@ -65,13 +70,14 @@ bool Factories() {
         // to, have no medium, and medium came out as their bold.
         const wchar_t *family = HasFamily(L"Segoe UI Variable Text") ? L"Segoe UI Variable Text" : L"Segoe UI";
         g_cellFormat = MakeFormat(family, 13, DWRITE_FONT_WEIGHT_REGULAR);
-        g_numberFormat = MakeFormat(family, 10, DWRITE_FONT_WEIGHT_REGULAR);
+        g_rowFormat = MakeFormat(family, 15, DWRITE_FONT_WEIGHT_REGULAR);
+        g_numberFormat = MakeFormat(family, 11, DWRITE_FONT_WEIGHT_REGULAR);
         g_footerFormat = MakeFormat(family, 11, DWRITE_FONT_WEIGHT_REGULAR);
         g_outcomeFormat = MakeFormat(family, 12, DWRITE_FONT_WEIGHT_SEMI_BOLD);
         // The pencil and the arrow back: Windows' own icon font (Segoe MDL2 Assets on Windows 10).
         g_iconFormat = MakeFormat(HasFamily(L"Segoe Fluent Icons") ? L"Segoe Fluent Icons" : L"Segoe MDL2 Assets", 10,
                                   DWRITE_FONT_WEIGHT_REGULAR);
-        if (!g_cellFormat || !g_numberFormat || !g_footerFormat || !g_outcomeFormat || !g_iconFormat) return false;
+        if (!g_cellFormat || !g_rowFormat || !g_numberFormat || !g_footerFormat || !g_outcomeFormat || !g_iconFormat) return false;
         g_iconFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
         g_iconFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
         // A text longer than the cell is cut with an ellipsis.
@@ -79,6 +85,10 @@ bool Factories() {
         g_dwrite->CreateEllipsisTrimmingSign(g_cellFormat, &ellipsis);
         DWRITE_TRIMMING trimming = {DWRITE_TRIMMING_GRANULARITY_CHARACTER, 0, 0};
         g_cellFormat->SetTrimming(&trimming, ellipsis);
+        if (ellipsis) ellipsis->Release();
+        ellipsis = nullptr;
+        g_dwrite->CreateEllipsisTrimmingSign(g_rowFormat, &ellipsis);
+        g_rowFormat->SetTrimming(&trimming, ellipsis);
         if (ellipsis) ellipsis->Release();
     }
     if (!g_round) {
@@ -151,7 +161,7 @@ D2D1_COLOR_F Mix(D2D1_COLOR_F a, D2D1_COLOR_F b, float t) {
 /// Araso's paper, as on the website and in the settings window: birch paper and navy ink, navy
 /// paper in the dark.
 struct Paper {
-    D2D1_COLOR_F background, ink2, line, reset, thumb, spark;
+    D2D1_COLOR_F background, ink2, line, reset, thumb, redPen;
     float shadow;
 
     static Paper Current() {
@@ -164,7 +174,7 @@ struct Paper {
         paper.reset = theme.dark ? Rgb(0x636366) : Rgb(0x6e6e73);
         paper.thumb = FromColorRef(theme.accent);
         // What marks a guess: what it changed, in this color with a wave under it.
-        paper.spark = theme.dark ? Rgb(0xf0b35a) : Rgb(0xb4690e);
+        paper.redPen = theme.dark ? Rgb(0xff6b5f) : Rgb(0xc62828);
         // The strip's shadow, deeper on dark paper.
         paper.shadow = theme.dark ? 0.45f : 0.14f;
         return paper;
@@ -255,20 +265,29 @@ void StripWindow::Motion::Go(float value, double now, double seconds, double del
 
 // MARK: - What is shown
 
-StripWindow::Cell StripWindow::MakeCell(const std::wstring &text, int number, Mark mark, bool japanese) const {
+// A capsule on its own is the system indicator's size; a card's rows are for reading, kanji above all.
+float StripWindow::RowHeight() const { return mode_ == Mode::row ? kHeight : kRowHeight; }
+/// The text's cap height (Segoe UI's, 0.7 em).
+float StripWindow::CapHeight() const { return (mode_ == Mode::row ? 13 : 15) * 0.7f; }
+/// The line every text of a row sits on: the cap height centered in the row. Marks are centered on
+/// the same middle.
+float StripWindow::Baseline() const { return (RowHeight() + CapHeight()) / 2; }
+
+StripWindow::Cell StripWindow::MakeCell(const std::wstring &text, int number, Mark mark, bool japanese, bool row) const {
     Cell cell;
     cell.text = text;
     cell.number = number;
     cell.mark = mark;
-    cell.layout = Layout(text, g_cellFormat, kMaxText, japanese);
+    cell.layout = Layout(text, row ? g_rowFormat : g_cellFormat, kMaxText, japanese);
     cell.textWidth = std::min(WidthOf(cell.layout.get()), kMaxText);
     cell.textX = kPad;
     if (number > 0) {
         cell.numberLayout = Layout(std::to_wstring(number), g_numberFormat, 100);
         cell.textX += NumberWidth() + 3;
     }
+    cell.markX = cell.textX + cell.textWidth + 5;
     float width = cell.textX + cell.textWidth + (mark != Mark::none ? 5 + kMarkSide : 0) + kPad;
-    cell.frame = D2D1::RectF(0, 0, width, kHeight);
+    cell.frame = D2D1::RectF(0, 0, width, row ? kRowHeight : kHeight);
     return cell;
 }
 
@@ -278,7 +297,7 @@ float StripWindow::CardWidth(const std::vector<std::wstring> &texts, const std::
     if (texts == measuredTexts_ && footer == measuredFooter_) return measuredWidth_;
     float widest = 0;
     for (const auto &text : texts) {
-        float width = std::min(WidthOf(Layout(text, g_cellFormat, kMaxText, japanese).get()), kMaxText);
+        float width = std::min(WidthOf(Layout(text, g_rowFormat, kMaxText, japanese).get()), kMaxText);
         widest = std::max(widest, kPad + NumberWidth() + 3 + width + kPad);
     }
     float footerWidth = WidthOf(Layout(footer, g_footerFormat, 1000, japanese).get()) + kPad * 2;
@@ -288,8 +307,9 @@ float StripWindow::CardWidth(const std::vector<std::wstring> &texts, const std::
     return measuredWidth_;
 }
 
-void StripWindow::ShowReadings(const std::vector<std::wstring> &texts, const std::vector<Mark> &marks, int selected,
-                               const RECT &word, std::function<void(int)> pick) {
+void StripWindow::ShowReadings(const std::vector<std::wstring> &texts, const std::vector<Mark> &marks,
+                               const std::vector<std::string> &tags, bool numbered, int selected, const RECT &word,
+                               std::function<void(int)> pick) {
     if (texts.empty() || word.bottom <= word.top || !Factories()) return Hide(true);
     pick_ = std::move(pick);
     choose_ = nullptr;
@@ -303,14 +323,31 @@ void StripWindow::ShowReadings(const std::vector<std::wstring> &texts, const std
     texts_ = texts;
     marks_ = marks;
     std::vector<Cell> cells;
+    bool anyMark = false;
+    float widestText = 0;
     for (size_t i = 0; i < texts.size(); i++) {
-        cells.push_back(MakeCell(texts[i], 0, i < marks.size() ? marks[i] : Mark::none, false));
+        Mark mark = i < marks.size() ? marks[i] : Mark::none;
+        anyMark = anyMark || mark != Mark::none;
+        cells.push_back(MakeCell(texts[i], numbered && i < 9 ? static_cast<int>(i) + 1 : 0, mark, false));
+        widestText = std::max(widestText, cells.back().textWidth);
     }
     float width = 0;
-    for (const auto &cell : cells) width = std::max(width, cell.frame.right - cell.frame.left);
+    for (size_t i = 0; i < cells.size(); i++) {
+        Cell &cell = cells[i];
+        float x = cell.textX + widestText;
+        cell.markX = x + 5;
+        if (anyMark) x += 5 + kMarkSide;
+        if (i < tags.size() && !Script(tags[i]).empty()) {
+            cell.languageLayout = Layout(Script(tags[i]), g_outcomeFormat, 100);
+            cell.languageWidth = WidthOf(cell.languageLayout.get());
+            x += 10 + cell.languageWidth;
+        }
+        width = std::max(width, x + kPad);
+    }
     int rows = static_cast<int>(cells.size());
     footer_.clear();
     footerLayout_ = Com<IDWriteTextLayout>();
+    pageLayout_ = Com<IDWriteTextLayout>();
     Build(std::move(cells), Mode::list, std::ceil(width) + kInset * 2, rows, selected, word, 0);
 }
 
@@ -342,6 +379,7 @@ void StripWindow::ShowGuesses(const std::vector<std::wstring> &texts, const std:
     int rows = static_cast<int>(cells.size());
     footer_.clear();
     footerLayout_ = Com<IDWriteTextLayout>();
+    pageLayout_ = Com<IDWriteTextLayout>();
     Build(std::move(cells), Mode::list, std::ceil(width) + kInset * 2, rows, selected, word, 0);
 }
 
@@ -368,16 +406,16 @@ void StripWindow::ShowCandidates(const std::vector<std::wstring> &texts, int sel
     bool japanese = std::wstring(LocaleOf(reading, true)) == L"ja-jp";
     int count = static_cast<int>(texts.size());
     int pages = (count + kPageSize - 1) / kPageSize;
-    auto footer = [&](int p) {
-        return pages > 1 ? reading + L" · " + std::to_wstring(p + 1) + L"/" + std::to_wstring(pages) : reading;
-    };
-    footer_ = footer(page);
+    auto pageText = [&](int p) { return std::to_wstring(p + 1) + L"/" + std::to_wstring(pages); };
+    footer_ = reading;
     footerLayout_ = Layout(footer_, g_footerFormat, 1000, japanese);
+    pageLayout_ = pages > 1 ? Layout(pageText(page), g_footerFormat, 1000) : Com<IDWriteTextLayout>();
     std::vector<Cell> cells;
     for (int i = pageStart_; i < std::min(pageStart_ + kPageSize, count); i++) {
         cells.push_back(MakeCell(texts[i], i - pageStart_ + 1, Mark::none, japanese));
     }
-    Build(std::move(cells), Mode::card, CardWidth(texts, footer(pages - 1), japanese), std::min(kPageSize, count),
+    std::wstring widest = pages > 1 ? reading + L"   " + pageText(pages - 1) : reading;
+    Build(std::move(cells), Mode::card, CardWidth(texts, widest, japanese), std::min(kPageSize, count),
           selected % kPageSize, clause, turn);
 }
 
@@ -422,10 +460,10 @@ void StripWindow::Build(std::vector<Cell> cells, Mode mode, float cardWidth, int
         inside_ = D2D1::RectF(0, 0, size.width, kHeight);
     } else {
         // The rows inside the paper's inset, cut at its edge, so a page turned slides in under it.
-        inside_ = D2D1::RectF(kInset, kInset, cardWidth - kInset, kInset + rows * kHeight);
+        inside_ = D2D1::RectF(kInset, kInset, cardWidth - kInset, kInset + rows * kRowHeight);
         for (size_t i = 0; i < cells.size(); i++) {
-            float top = static_cast<float>(i) * kHeight;
-            cells[i].frame = D2D1::RectF(0, top, inside_.right - inside_.left, top + kHeight);
+            float top = static_cast<float>(i) * kRowHeight;
+            cells[i].frame = D2D1::RectF(0, top, inside_.right - inside_.left, top + kRowHeight);
         }
         size = D2D1::SizeF(cardWidth, inside_.bottom + (mode == Mode::card ? kFooterHeight : 0) + kInset);
     }
@@ -512,7 +550,8 @@ void StripWindow::Settle(const std::wstring &text, const std::string &learning, 
     bool hasWord = word.bottom > word.top;
     int index;
     RECT under = word;
-    bool note = learning == "note";
+    bool nothing = learning == "nothing";
+    bool note = learning == "note" || nothing;
     if (!note && Up() && !settling_ && mode_ == Mode::list && selected_ < static_cast<int>(cells_.size())) {
         index = selected_;
         under = word_;
@@ -521,7 +560,7 @@ void StripWindow::Settle(const std::wstring &text, const std::string &learning, 
         if (!hasWord) return;
         texts_.clear();
         marks_.clear();
-        Build({MakeCell(text, 0, Mark::none, false)}, Mode::row, 0, 0, 0, word, 0);
+        Build({MakeCell(text, 0, Mark::none, false, false)}, Mode::row, 0, 0, 0, word, 0);
         index = 0;
     }
     if (!window_) return;
@@ -539,6 +578,7 @@ void StripWindow::Settle(const std::wstring &text, const std::string &learning, 
     const D2D1_RECT_F start = cell.frame;
     const char *said = learning == "once" ? "Noted" : learning == "forGood" ? "Learned" : "Reset";
     outcome_ = note ? Com<IDWriteTextLayout>() : Layout(L(said), g_outcomeFormat, 1000);
+    // Next to the text, wherever the list's marks stood: this capsule has only this reading.
     markX_ = cell.textX + cell.textWidth + 5;
     outcomeX_ = markX_ + kMarkSide + 6;
     float width = note ? start.right - start.left : outcomeX_ + WidthOf(outcome_.get()) + kPad;
@@ -562,7 +602,8 @@ void StripWindow::Settle(const std::wstring &text, const std::string &learning, 
         strip_.right = strip_.left + std::max(cardWidth, (to - stripLeft) / scale + width);
         origin_ = origin;
         size_ = {static_cast<LONG>(std::ceil(right - origin.x)), size_.cy};
-        const float capsuleLeft = (to - stripLeft) / scale, capsuleTop = above_ ? cardHeight - kHeight : 0;
+        // The capsule is the row's height: its letters don't change size on the way.
+        const float capsuleLeft = (to - stripLeft) / scale, capsuleTop = above_ ? cardHeight - kRowHeight : 0;
         const double move = 0.26;
         trackLeft_.Set(0);
         trackLeft_.Go(capsuleLeft, now, move);
@@ -571,9 +612,9 @@ void StripWindow::Settle(const std::wstring &text, const std::string &learning, 
         trackTop_.Set(0);
         trackTop_.Go(capsuleTop, now, move);
         trackBottom_.Set(cardHeight);
-        trackBottom_.Go(capsuleTop + kHeight, now, move);
-        trackRadius_.Set(kInset + kHeight / 2);
-        trackRadius_.Go(kHeight / 2, now, move);
+        trackBottom_.Go(capsuleTop + kRowHeight, now, move);
+        trackRadius_.Set(kInset + kRowHeight / 2);
+        trackRadius_.Go(kRowHeight / 2, now, move);
         trackAlpha_.Set(1);
         trackAlpha_.Go(0, now, 0.08, 0.24);
         othersAlpha_.Set(1);
@@ -634,7 +675,7 @@ void StripWindow::Settle(const std::wstring &text, const std::string &learning, 
     travel_.Set(0);
     travel_.Go((to - from) / scale, now, 0.22, 0.16);
     thumbWidth_.Go(width, now, 0.22, 0.16);
-    gray_.Set(0);
+    gray_.Set(nothing ? 1.0f : 0.0f);
     if (learning == "forgot") gray_.Go(1, now, 0.22, 0.16);
     outcomeAlpha_.Set(0);
     outcomeAlpha_.Go(1, now, 0.2, 0.24);
@@ -715,7 +756,7 @@ void StripWindow::Render(double now) {
         target->SetTransform(base);
 
         // The paper: the track, rounded about the thumb (the card's further out by its inset).
-        float radius = mode_ != Mode::row ? kInset + kHeight / 2 : kHeight / 2;
+        float radius = mode_ != Mode::row ? kInset + kRowHeight / 2 : kHeight / 2;
         D2D1_RECT_F track = D2D1::RectF(0, 0, width, height);
         float trackAlpha = 1;
         if (settling_) {
@@ -740,11 +781,11 @@ void StripWindow::Render(double now) {
         if (clipped) target->PushAxisAlignedClip(inside_, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
         target->SetTransform(D2D1::Matrix3x2F::Translation(inside_.left, inside_.top + pageSlide_.At(now)) * base);
         D2D1_RECT_F thumb = D2D1::RectF(thumbX_.At(now), thumbY_.At(now), thumbX_.At(now) + thumbWidth_.At(now),
-                                        thumbY_.At(now) + kHeight);
-        if (settling_) Shadow(target, brush.get(), thumb, kHeight / 2, paper.shadow * (1 - trackAlpha));
+                                        thumbY_.At(now) + RowHeight());
+        if (settling_) Shadow(target, brush.get(), thumb, RowHeight() / 2, paper.shadow * (1 - trackAlpha));
         D2D1_COLOR_F thumbColor = Faded(Mix(paper.thumb, paper.reset, gray_.At(now)), pageAlpha);
         brush->SetColor(&thumbColor);
-        target->FillRoundedRectangle(D2D1::RoundedRect(thumb, kHeight / 2, kHeight / 2), brush.get());
+        target->FillRoundedRectangle(D2D1::RoundedRect(thumb, RowHeight() / 2, RowHeight() / 2), brush.get());
         for (size_t i = 0; i < cells_.size(); i++) {
             bool settled = settling_ && static_cast<int>(i) == settleCell_;
             float alpha = pageAlpha * (settling_ && !settled ? othersAlpha_.At(now) : 1);
@@ -761,12 +802,16 @@ void StripWindow::Render(double now) {
         target->SetTransform(base);
         if (clipped) target->PopAxisAlignedClip();
         if (mode_ == Mode::card) {
-            // The reading and the page under the rows.
-            if (footerLayout_) {
-                D2D1_COLOR_F ink = Faded(paper.ink2, 0.85f);
-                brush->SetColor(&ink);
-                float y = kBaseline + inside_.bottom - 4 - BaselineOf(footerLayout_.get());
-                target->DrawTextLayout(D2D1::Point2F(kInset + kPad, y), footerLayout_.get(), brush.get());
+            // The reading and the page under a hairline below the rows.
+            float side = kInset + kPad, line = inside_.bottom + 3.5f;
+            D2D1_COLOR_F hairline = paper.line;
+            brush->SetColor(&hairline);
+            target->DrawLine(D2D1::Point2F(side, line), D2D1::Point2F(width - side, line), brush.get(), 1);
+            D2D1_COLOR_F ink = paper.ink2;
+            brush->SetColor(&ink);
+            if (footerLayout_) target->DrawTextLayout(D2D1::Point2F(side, line + 3), footerLayout_.get(), brush.get());
+            if (pageLayout_) {
+                target->DrawTextLayout(D2D1::Point2F(width - side - WidthOf(pageLayout_.get()), line + 3), pageLayout_.get(), brush.get());
             }
         }
     }
@@ -783,7 +828,7 @@ void StripWindow::Render(double now) {
     ReleaseDC(nullptr, screen);
 }
 
-/// One reading or candidate: its number (candidates), its text, its mark (readings), white on the
+/// One reading or candidate: its number, its text, its mark and language (readings), white on the
 /// thumb and the paper's ink beside it. The settled one says what the correction did.
 void StripWindow::DrawCell(ID2D1RenderTarget *target, ID2D1SolidColorBrush *brush, const Cell &cell, bool on,
                            float alpha, bool settled, double now) {
@@ -794,35 +839,39 @@ void StripWindow::DrawCell(ID2D1RenderTarget *target, ID2D1SolidColorBrush *brus
     D2D1::Matrix3x2F at = D2D1::Matrix3x2F::Translation(cell.frame.left, cell.frame.top) * *D2D1::Matrix3x2F::ReinterpretBaseType(&page);
     target->SetTransform(at);
     on = on || settled;
+    const float baseline = Baseline(), rowHeight = RowHeight();
     D2D1_COLOR_F white = D2D1::ColorF(1, 1, 1, alpha);
     D2D1_COLOR_F ink = on ? white : Faded(paper.ink2, alpha);
     if (cell.numberLayout) {
-        D2D1_COLOR_F number = Faded(ink, 0.72f);
-        brush->SetColor(&number);
-        target->DrawTextLayout(D2D1::Point2F(kPad, kBaseline - BaselineOf(cell.numberLayout.get())), cell.numberLayout.get(), brush);
+        brush->SetColor(&ink);
+        target->DrawTextLayout(D2D1::Point2F(kPad, baseline - BaselineOf(cell.numberLayout.get())), cell.numberLayout.get(), brush);
     }
     brush->SetColor(&ink);
-    target->DrawTextLayout(D2D1::Point2F(cell.textX, kBaseline - BaselineOf(cell.layout.get())), cell.layout.get(), brush,
+    target->DrawTextLayout(D2D1::Point2F(cell.textX, baseline - BaselineOf(cell.layout.get())), cell.layout.get(), brush,
                            D2D1_DRAW_TEXT_OPTIONS_CLIP);
+    if (cell.languageLayout && !settled) {
+        float x = cell.frame.right - cell.frame.left - kPad - cell.languageWidth;
+        target->DrawTextLayout(D2D1::Point2F(x, baseline - BaselineOf(cell.languageLayout.get())), cell.languageLayout.get(), brush);
+    }
 
-    // What a guess changed: in the spark's color (white stays on the thumb), a wave under it.
+    // What a guess changed: in the red pen's color (white stays on the thumb), a wave under it.
     if (cell.changedEnd > cell.changedStart) {
         FLOAT from = 0, to = 0, y = 0;
         DWRITE_HIT_TEST_METRICS metrics = {};
         cell.layout->HitTestTextPosition(cell.changedStart, FALSE, &from, &y, &metrics);
         cell.layout->HitTestTextPosition(cell.changedEnd, FALSE, &to, &y, &metrics);
         float left = cell.textX + from, right = cell.textX + to;
-        D2D1_COLOR_F spark = Faded(paper.spark, alpha);
+        D2D1_COLOR_F redPen = Faded(paper.redPen, alpha);
         if (!on) {
-            target->PushAxisAlignedClip(D2D1::RectF(left, 0, right, kHeight), D2D1_ANTIALIAS_MODE_ALIASED);
-            brush->SetColor(&spark);
-            target->DrawTextLayout(D2D1::Point2F(cell.textX, kBaseline - BaselineOf(cell.layout.get())), cell.layout.get(), brush,
+            target->PushAxisAlignedClip(D2D1::RectF(left, 0, right, rowHeight), D2D1_ANTIALIAS_MODE_ALIASED);
+            brush->SetColor(&redPen);
+            target->DrawTextLayout(D2D1::Point2F(cell.textX, baseline - BaselineOf(cell.layout.get())), cell.layout.get(), brush,
                                    D2D1_DRAW_TEXT_OPTIONS_CLIP);
             target->PopAxisAlignedClip();
         }
-        D2D1_COLOR_F wave = on ? D2D1::ColorF(1, 1, 1, alpha * 0.85f) : spark;
+        D2D1_COLOR_F wave = on ? D2D1::ColorF(1, 1, 1, alpha * 0.85f) : redPen;
         brush->SetColor(&wave);
-        float line = kBaseline + 3, step = 2;
+        float line = baseline + 3, step = 2;
         bool up = true;
         for (float x = left; x < right; x += step, up = !up) {
             float next = std::min(x + step, right);
@@ -834,7 +883,7 @@ void StripWindow::DrawCell(ID2D1RenderTarget *target, ID2D1SolidColorBrush *brus
     // corrected once; on the settled one, what the correction did, moving about its center.
     Glyph glyph = cell.mark == Mark::remembered ? Glyph::check : cell.mark == Mark::once ? Glyph::pencil : Glyph::none;
     float scale = 1, turn = 0, opacity = 1, drawn = 1;
-    if (settled && learning_ != "note") {
+    if (settled && learning_ != "note" && learning_ != "nothing") {
         double t = now - (settleStart_ + settleSay_);
         if (ReduceMotion() && t >= 0) t = 10;
         if (t >= 0) {
@@ -870,12 +919,12 @@ void StripWindow::DrawCell(ID2D1RenderTarget *target, ID2D1SolidColorBrush *brus
         if (outcome_) {
             D2D1_COLOR_F said = D2D1::ColorF(1, 1, 1, alpha * outcomeAlpha_.At(now));
             brush->SetColor(&said);
-            target->DrawTextLayout(D2D1::Point2F(outcomeX_, kBaseline - BaselineOf(outcome_.get())), outcome_.get(), brush);
+            target->DrawTextLayout(D2D1::Point2F(outcomeX_, baseline - BaselineOf(outcome_.get())), outcome_.get(), brush);
         }
     }
     if (glyph != Glyph::none && opacity > 0) {
-        float x = settled ? markX_ : cell.textX + cell.textWidth + 5;
-        float y = kBaseline - kCapHeight / 2 - kMarkSide / 2;
+        float x = settled ? markX_ : cell.markX;
+        float y = baseline - CapHeight() / 2 - kMarkSide / 2;
         D2D1_POINT_2F center = D2D1::Point2F(x + kMarkSide / 2, y + kMarkSide / 2);
         target->SetTransform(D2D1::Matrix3x2F::Scale(scale, scale, center) * D2D1::Matrix3x2F::Rotation(turn, center) * at);
         D2D1_COLOR_F color = on ? white : cell.mark == Mark::remembered ? Faded(paper.thumb, alpha) : ink;

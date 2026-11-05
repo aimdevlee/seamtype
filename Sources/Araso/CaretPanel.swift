@@ -49,23 +49,25 @@ import Cocoa
     }
 }
 
-/// The switch key being held, by the caret: nothing for a tap's moment, then a ring that fills
-/// until the half second a long press takes (`InputController.switchTapChanged`), then ✦: letting
-/// go now lists the guesses.
-@MainActor enum LongPressRing {
-    private static let side: CGFloat = 18
+/// The switch key being held, on the word it is about: nothing for a tap's moment, then a red pen's
+/// wave under the word, from its first letter to its last, for the half second a long press takes
+/// (`InputController.switchTapChanged`), then a heavier stroke: letting go now lists the guesses. Its
+/// own mark under the app's underline, which an input method can't color bit by bit, so it doesn't
+/// have to land exactly on it.
+@MainActor enum LongPressWave {
+    private static let height: CGFloat = 10
     private static let appears = 0.12
     private static let ready = 0.5
     private static var panel: NSPanel?
     private static var generation = 0
 
-    static func start(caret: NSRect) {
+    /// `word`: its place on screen. `y`: the wave's middle.
+    static func start(word: NSRect, y: CGFloat) {
         generation += 1
         let current = generation
-        guard caret != .zero else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + appears) {
             guard current == generation else { return }
-            show(caret: caret, current: current)
+            show(word: word, y: y, current: current)
         }
     }
 
@@ -74,48 +76,54 @@ import Cocoa
         panel?.orderOut(nil)
     }
 
-    private static func show(caret: NSRect, current: Int) {
-        let size = NSSize(width: side, height: side)
+    private static func show(word: NSRect, y: CGFloat, current: Int) {
+        let size = NSSize(width: word.width, height: height)
         let panel = panel ?? CaretPanel.make(size: size)
         self.panel = panel
         let view = NSView(frame: NSRect(origin: .zero, size: size))
         view.wantsLayer = true
-        let circle = CGPath(ellipseIn: NSRect(origin: .zero, size: size).insetBy(dx: 2, dy: 2), transform: nil)
-        func stroke(_ color: NSColor) -> CAShapeLayer {
+        // A window goes on whole points, so the wave's place is made inside the panel.
+        let bottom = (y - height / 2).rounded(.down)
+        let middle = y - bottom
+        let wave = CGMutablePath()
+        wave.move(to: CGPoint(x: 0, y: middle))
+        var at: CGFloat = 0, up = true
+        while at < size.width {
+            let next = min(at + 3, size.width)
+            wave.addQuadCurve(to: CGPoint(x: next, y: middle), control: CGPoint(x: (at + next) / 2, y: middle + (up ? 3 : -3)))
+            at = next
+            up.toggle()
+        }
+        func stroke(_ color: NSColor, width: CGFloat) -> CAShapeLayer {
             let shape = CAShapeLayer()
-            shape.path = circle
+            shape.path = wave
             shape.fillColor = nil
-            shape.lineWidth = 2
+            shape.lineWidth = width
+            shape.lineCap = .round
             view.effectiveAppearance.performAsCurrentDrawingAppearance { shape.strokeColor = color.cgColor }
             view.layer?.addSublayer(shape)
             return shape
         }
-        _ = stroke(Paper.line)
-        let arc = stroke(Paper.spark)
-        arc.strokeEnd = 0
+        _ = stroke(Paper.redPen.withAlphaComponent(0.25), width: 1.5)
+        let fill = stroke(Paper.redPen, width: 1.5)
+        // Before the panel shows, or its first frame has the wave whole.
+        if !reduceMotion {
+            let grow = CABasicAnimation(keyPath: "strokeEnd")
+            grow.fromValue = 0
+            grow.toValue = 1
+            grow.duration = ready - appears
+            fill.add(grow, forKey: "fill")
+        }
         panel.contentView = view
-        panel.setFrame(NSRect(origin: CaretPanel.origin(for: size, caret: caret, gap: 3, centered: true), size: size), display: true)
+        panel.setFrame(NSRect(origin: NSPoint(x: word.minX, y: bottom), size: size), display: true)
         panel.alphaValue = 1
         panel.orderFrontRegardless()
-        if !reduceMotion {
-            let fill = CABasicAnimation(keyPath: "strokeEnd")
-            fill.fromValue = 0
-            fill.toValue = 1
-            fill.duration = ready - appears
-            arc.add(fill, forKey: "fill")
-        }
-        arc.strokeEnd = 1
         DispatchQueue.main.asyncAfter(deadline: .now() + ready - appears) {
             guard current == generation else { return }
-            let dot = CAShapeLayer()
-            dot.path = CGPath(ellipseIn: NSRect(origin: .zero, size: size).insetBy(dx: 1, dy: 1), transform: nil)
-            view.effectiveAppearance.performAsCurrentDrawingAppearance { dot.fillColor = Paper.spark.cgColor }
-            view.layer?.addSublayer(dot)
-            let star = Paper.label("✦", size: 10)
-            star.textColor = .white
-            star.sizeToFit()
-            star.setFrameOrigin(NSPoint(x: (side - star.frame.width) / 2, y: (side - star.frame.height) / 2))
-            view.addSubview(star)
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            fill.lineWidth = 2.25
+            CATransaction.commit()
         }
     }
 }
@@ -150,8 +158,9 @@ private let ease = CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1)
     static let line = dynamic(0xe6e1d8, 0xf3f1ec, darkAlpha: 0.16)
     /// The capsule of a word that went back to Araso's own reading: nothing remembered any more.
     static let reset = dynamic(0x6e6e73, 0x636366)
-    /// What marks a guess: what it changed, in this color with a wave under it, the long press's ring.
-    static let spark = dynamic(0xb4690e, 0xf0b35a)
+    /// A red pen, what marks a guess: the long press's wave under the word, and what a guess
+    /// changed, in this color with a wave under it.
+    static let redPen = dynamic(0xc62828, 0xff6b5f)
 
     static func label(_ text: String, size: CGFloat, weight: NSFont.Weight = .regular) -> NSTextField {
         let label = NSTextField(labelWithString: text)
@@ -306,43 +315,73 @@ private final class MarkView: NSView {
     }
 }
 
+private extension Language {
+    /// The language in its own script, as short as a row's end has room for.
+    var script: String {
+        switch self {
+        case .english: return "A"
+        case .korean: return "아"
+        case .japanese: return "あ"
+        case .mixed: return "A아"
+        }
+    }
+}
+
+/// How large a cell's text sits: a capsule on its own is the system indicator's size, a card's rows
+/// are for reading, kanji above all, and a little taller.
+@MainActor private struct CellLook {
+    let height: CGFloat
+    let font: NSFont
+    /// The line every text of the cell sits on, numbers and outcome words too: the text's cap height
+    /// centered in the row. Marks are centered on the same middle, so a check or a pencil sits level
+    /// with the letters rather than with the label's frame, which hangs lower.
+    var baseline: CGFloat { (height + font.capHeight) / 2 }
+
+    static let capsule = CellLook(height: CaretPanel.indicatorHeight, font: .systemFont(ofSize: 13, weight: .medium))
+    static let row = CellLook(height: 26, font: .systemFont(ofSize: 15, weight: .medium))
+}
+
 /// One reading of the strip or candidate of the card: its number (candidates), its text cut at
-/// 140 pt, its mark (readings). White on the thumb, the paper's ink beside it.
+/// 220 pt, its mark and language (readings). White on the thumb, the paper's ink beside it.
 private final class StripCell: NSView {
     static let pad: CGFloat = 10
-    static let maxText: CGFloat = 140
-    static let font = NSFont.systemFont(ofSize: 13, weight: .medium)
+    static let maxText: CGFloat = 220
     /// The numbers' digits are all as wide, so the candidates start at one x down the card.
-    private static let numberFont = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .medium)
+    private static let numberFont = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
     private static let numberWidth = ceil(number(8).fittingSize.width) + 1
-    private static let measure = Paper.label("", size: 13, weight: .medium)
-    /// The line every text of the strip sits on, numbers and outcome words too: the reading's cap
-    /// height centered in the capsule. Marks are centered on the same middle, so a check or a
-    /// pencil sits level with the letters rather than with the label's frame, which hangs lower.
-    static var baseline: CGFloat { (CaretPanel.indicatorHeight + font.capHeight) / 2 }
+    private static let measure: NSTextField = {
+        let label = Paper.label("", size: 15, weight: .medium)
+        label.font = CellLook.row.font
+        return label
+    }()
 
-    /// Puts `label` at `x`, its baseline on the strip's, kept on a backing pixel.
-    static func place(_ label: NSTextField, x: CGFloat, width: CGFloat? = nil) {
+    /// Puts `label` at `x`, its baseline on `baseline`, kept on a backing pixel.
+    static func place(_ label: NSTextField, x: CGFloat, width: CGFloat? = nil, baseline: CGFloat) {
         let size = label.fittingSize
         label.frame = NSRect(x: x, y: 0, width: width ?? ceil(size.width) + 1, height: size.height)
         label.setFrameOrigin(NSPoint(x: x, y: ((baseline - label.firstBaselineOffsetFromTop) * 2).rounded() / 2))
     }
 
     /// Where a mark's square goes after `x`: centered on the letters' middle.
-    private static func markOrigin(after x: CGFloat) -> NSPoint {
-        NSPoint(x: x + 5, y: baseline - font.capHeight / 2 - MarkView.side / 2)
+    private func markOrigin(after x: CGFloat) -> NSPoint {
+        NSPoint(x: x + 5, y: look.baseline - look.font.capHeight / 2 - MarkView.side / 2)
     }
 
     private static func number(_ n: Int) -> NSTextField {
-        let label = Paper.label("\(n)", size: 10, weight: .medium)
+        let label = Paper.label("\(n)", size: 11, weight: .medium)
         label.font = numberFont
         return label
     }
 
     /// How wide a numbered cell for `string` is, without making one.
     static func width(numbered string: String) -> CGFloat {
+        pad + numberWidth + 3 + textWidth(string) + pad
+    }
+
+    /// How wide `string` is in a card's row, cut as a cell cuts it.
+    static func textWidth(_ string: String) -> CGFloat {
         measure.stringValue = string
-        return pad + numberWidth + 3 + min(ceil(measure.fittingSize.width) + 1, maxText) + pad
+        return min(ceil(measure.fittingSize.width) + 1, maxText)
     }
 
     /// The card's footer, the reading and the page: its digits as wide as each other too, so the
@@ -350,10 +389,13 @@ private final class StripCell: NSView {
     static func footer(_ text: String) -> NSTextField {
         let label = Paper.label(text, size: 11)
         label.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
-        label.textColor = Paper.ink2.withAlphaComponent(0.85)
+        label.textColor = Paper.ink2
         return label
     }
     let text: NSTextField
+    private let look: CellLook
+    /// Which language the reading is, in its own script, at the row's end.
+    private let languageLabel: NSTextField?
     private let number: NSTextField?
     private let mark: Mark?
     private var markView: MarkView?
@@ -367,39 +409,57 @@ private final class StripCell: NSView {
     override var isFlipped: Bool { true }
 
     /// `changed`: a guess, with which of its characters differ from the keys' own reading.
-    init(_ string: String, number: Int? = nil, mark: Mark? = nil, changed: Range<Int>? = nil) {
-        let height = CaretPanel.indicatorHeight
+    /// `markColumn`: where the list's marks stand, past the widest text, so they line up; nil
+    /// when nothing in the list has one.
+    init(_ string: String, number: Int? = nil, mark: Mark? = nil, changed: Range<Int>? = nil,
+         look: CellLook? = nil, markColumn: CGFloat? = nil, language: Language? = nil) {
+        let look = look ?? .capsule
+        self.look = look
         text = Paper.label(string, size: 13, weight: .medium)
+        text.font = look.font
         self.number = number.map(Self.number)
         self.mark = mark
+        languageLabel = language.map { Paper.label($0.script, size: 12, weight: .semibold) }
         super.init(frame: .zero)
         var x = Self.pad
         if let number = self.number {
-            Self.place(number, x: x)
+            Self.place(number, x: x, baseline: look.baseline)
             addSubview(number)
             x = number.frame.maxX + 3
         }
-        Self.place(text, x: x, width: min(ceil(text.fittingSize.width) + 1, Self.maxText))
+        Self.place(text, x: x, width: min(ceil(text.fittingSize.width) + 1, Self.maxText), baseline: look.baseline)
         addSubview(text)
         if let changed { underline(changed, of: string, x: x) }
-        x = text.frame.maxX
+        x = max(text.frame.maxX, x + (markColumn ?? 0))
         if let mark {
             let view = MarkView()
-            view.setFrameOrigin(Self.markOrigin(after: x))
+            view.setFrameOrigin(markOrigin(after: x))
             addSubview(view)
             view.show(mark == .remembered ? .check : .pencil, color: Paper.ink2)
             markView = view
-            x += 5 + MarkView.side
         }
-        frame = NSRect(x: 0, y: 0, width: x + Self.pad, height: height)
+        if markColumn != nil { x += 5 + MarkView.side }
+        if let languageLabel {
+            Self.place(languageLabel, x: x + 10, baseline: look.baseline)
+            addSubview(languageLabel)
+            x = languageLabel.frame.maxX
+        }
+        frame = NSRect(x: 0, y: 0, width: x + Self.pad, height: look.height)
         setAccessibilityElement(true)
         setAccessibilityRole(.staticText)
-        let spoken = switch mark {
+        var spoken = switch mark {
         case .remembered: "\(string), \(L("Remembered"))"
         case .once: "\(string), \(L("Corrected once"))"
         case nil: string
         }
+        if let language { spoken += ", \(language.displayName)" }
         setAccessibilityLabel(spoken)
+    }
+
+    /// The language stays at the row's end, however wide the card made the row.
+    func alignLanguage() {
+        guard let languageLabel else { return }
+        languageLabel.setFrameOrigin(NSPoint(x: frame.width - Self.pad - languageLabel.frame.width, y: languageLabel.frame.minY))
     }
 
     required init?(coder: NSCoder) { nil }
@@ -410,10 +470,10 @@ private final class StripCell: NSView {
         let characters = Array(string)
         let before = String(characters.prefix(range.lowerBound)).utf16.count
         changed = NSRange(location: before, length: String(characters[range]).utf16.count)
-        let attributes: [NSAttributedString.Key: Any] = [.font: Self.font]
+        let attributes: [NSAttributedString.Key: Any] = [.font: look.font]
         func width(_ count: Int) -> CGFloat { (String(characters.prefix(count)) as NSString).size(withAttributes: attributes).width }
         let start = x + 2 + width(range.lowerBound), end = min(x + 2 + width(range.upperBound), x + Self.maxText)
-        let y = Self.baseline + 3
+        let y = look.baseline + 3
         let path = CGMutablePath()
         path.move(to: CGPoint(x: start, y: y))
         var at = start, up = true
@@ -436,14 +496,15 @@ private final class StripCell: NSView {
         let ink = on ? NSColor.white : Paper.ink2
         text.textColor = ink
         if let changed {
-            let styled = NSMutableAttributedString(string: text.stringValue, attributes: [.font: Self.font, .foregroundColor: ink])
-            if !on { styled.addAttribute(.foregroundColor, value: Paper.spark, range: changed) }
+            let styled = NSMutableAttributedString(string: text.stringValue, attributes: [.font: look.font, .foregroundColor: ink])
+            if !on { styled.addAttribute(.foregroundColor, value: Paper.redPen, range: changed) }
             text.attributedStringValue = styled
         }
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            wave?.strokeColor = on ? NSColor.white.withAlphaComponent(0.85).cgColor : Paper.spark.cgColor
+            wave?.strokeColor = on ? NSColor.white.withAlphaComponent(0.85).cgColor : Paper.redPen.cgColor
         }
-        number?.textColor = ink.withAlphaComponent(0.72)
+        number?.textColor = ink
+        languageLabel?.textColor = ink
         markView?.tint(on ? .white : mark == .remembered ? CaretPanel.indicatorFill : Paper.ink2)
     }
 
@@ -451,22 +512,23 @@ private final class StripCell: NSView {
     /// returns the width it now takes, without the number: the reading is chosen, and its text is
     /// to land on the word's first letter, as an unnumbered cell's does.
     func makeRoom(for word: String) -> CGFloat {
-        let height = CaretPanel.indicatorHeight
         numberRoom = number == nil ? 0 : text.frame.minX - Self.pad
+        languageLabel?.isHidden = true
         let view = markView ?? {
             let view = MarkView()
-            view.setFrameOrigin(Self.markOrigin(after: text.frame.maxX))
             addSubview(view)
             markView = view
             return view
         }()
+        // Next to the text, wherever the list's marks stood: this capsule has only this reading.
+        view.setFrameOrigin(markOrigin(after: text.frame.maxX))
         let label = Paper.label(word, size: 12, weight: .semibold)
         label.textColor = .white
-        Self.place(label, x: view.frame.maxX - numberRoom + 6)
+        Self.place(label, x: view.frame.maxX - numberRoom + 6, baseline: look.baseline)
         label.alphaValue = 0
         addSubview(label)
         outcome = label
-        setFrameSize(NSSize(width: label.frame.maxX + Self.pad, height: height))
+        setFrameSize(NSSize(width: label.frame.maxX + Self.pad, height: frame.height))
         return frame.width
     }
 
@@ -518,10 +580,10 @@ private final class StripCell: NSView {
 
     /// A capsule on its own on one line; the readings and candidates in a card `width` wide and
     /// `rows` tall on every page, so turning one doesn't move anything, the candidates' reading and
-    /// page (`footer`) under them.
+    /// page (`footer`) under a hairline below them.
     private enum Layout {
         case row
-        case card(width: CGFloat, rows: Int, footer: String?)
+        case card(width: CGFloat, rows: Int, footer: (reading: String, page: String?)?)
     }
 
     private static var panel: NSPanel?
@@ -551,8 +613,8 @@ private final class StripCell: NSView {
     /// Room around the strip for its shadow.
     private static let margin: CGFloat = 12
     /// The card's paper around its rows, and the room under them for the footer.
-    private static let inset: CGFloat = 3
-    private static let footerHeight: CGFloat = 16
+    private static let inset: CGFloat = 4
+    private static let footerHeight: CGFloat = 24
     /// The card's width for the candidates it was last measured for.
     private static var measured: (texts: [String], footer: String, width: CGFloat)?
 
@@ -572,8 +634,10 @@ private final class StripCell: NSView {
         } else {
             settling = false
             pageStart = 0
+            let markColumn = marks.contains { $0 != nil } ? readings.texts.map(StripCell.textWidth).max() : nil
             let cells = readings.texts.indices.map {
-                StripCell(readings.texts[$0], number: readings.numbered && $0 < 9 ? $0 + 1 : nil, mark: marks[$0])
+                StripCell(readings.texts[$0], number: readings.numbered && $0 < 9 ? $0 + 1 : nil, mark: marks[$0], look: .row,
+                          markColumn: markColumn, language: readings.languages.indices.contains($0) ? readings.languages[$0] : nil)
             }
             let width = ceil(cells.map(\.frame.width).max() ?? 0) + inset * 2
             build(cells, layout: .card(width: width, rows: cells.count, footer: nil),
@@ -604,10 +668,13 @@ private final class StripCell: NSView {
             settling = false
             pageStart = page * pageSize
             let pages = (texts.count + pageSize - 1) / pageSize
-            let footer = { (page: Int) in pages > 1 ? "\(conversion.kana) · \(page + 1)/\(pages)" : conversion.kana }
-            let cells = texts[pageStart..<min(pageStart + pageSize, texts.count)].enumerated().map { StripCell($1, number: $0 + 1) }
-            build(cells, layout: .card(width: cardWidth(texts, footer: footer(pages - 1)), rows: min(pageSize, texts.count),
-                                       footer: footer(page)),
+            let pageText = { (page: Int) in pages > 1 ? "\(page + 1)/\(pages)" : nil }
+            let cells = texts[pageStart..<min(pageStart + pageSize, texts.count)].enumerated().map {
+                StripCell($1, number: $0 + 1, look: .row)
+            }
+            let widest = conversion.kana + (pageText(pages - 1).map { "   " + $0 } ?? "")
+            build(cells, layout: .card(width: cardWidth(texts, footer: widest), rows: min(pageSize, texts.count),
+                                       footer: (conversion.kana, pageText(page))),
                   selected: conversion.selected % pageSize, word: clause, turn: turn)
         }
         shown = next
@@ -619,7 +686,7 @@ private final class StripCell: NSView {
     /// from the guess in the word's place; `choose` picks guess `index`.
     /// With no guesses, a moment's note that there are none.
     static func show(_ guesses: InputSession.Guesses, word: NSRect, choose: @escaping (Int) -> Void) {
-        guard !guesses.texts.isEmpty else { return note(L("No guesses"), word: word) }
+        guard !guesses.texts.isEmpty else { return note(L("No guesses"), word: word, neutral: true) }
         self.choose = choose
         pick = nil
         generation += 1
@@ -629,7 +696,7 @@ private final class StripCell: NSView {
         } else {
             settling = false
             pageStart = 0
-            let cells = guesses.texts.enumerated().map { StripCell($1, number: $0 + 1, changed: guesses.changed[$0]) }
+            let cells = guesses.texts.enumerated().map { StripCell($1, number: $0 + 1, changed: guesses.changed[$0], look: .row) }
             let width = ceil(cells.map(\.frame.width).max() ?? 0) + inset * 2
             build(cells, layout: .card(width: width, rows: cells.count, footer: nil),
                   selected: guesses.selected, word: word, unfolds: true)
@@ -641,13 +708,19 @@ private final class StripCell: NSView {
     }
 
     /// `text` in a capsule under the word for a moment (a word fixed at its end), as a correction's is;
-    /// the keys typed meanwhile don't put it away.
-    static func note(_ text: String, word: NSRect) {
+    /// the keys typed meanwhile don't put it away. `neutral`: gray, as blue says something was chosen
+    /// or done, and here nothing was.
+    static func note(_ text: String, word: NSRect, neutral: Bool = false) {
         guard word != .zero else { return }
         choose = nil
         pick = nil
         pageStart = 0
         build([StripCell(text)], layout: .row, selected: 0, word: word)
+        if neutral, let thumb {
+            var gray = Paper.reset.cgColor
+            thumb.effectiveAppearance.performAsCurrentDrawingAppearance { gray = Paper.reset.cgColor }
+            thumb.layer?.backgroundColor = gray
+        }
         generation += 1
         let current = generation
         shown = nil
@@ -781,6 +854,8 @@ private final class StripCell: NSView {
         let card = NSRect(x: panel.frame.minX + strip.frame.minX, y: panel.frame.maxY - strip.frame.minY - track.frame.height,
                           width: track.frame.width, height: track.frame.height)
         let start = cell.convert(cell.bounds, to: strip)
+        // The capsule is the row's height: its letters don't change size on the way.
+        let height = cell.frame.height
         let width = cell.makeRoom(for: said)
         let to = word == .zero ? card.minX : CaretPanel.origin(for: NSSize(width: width, height: height),
                                                                caret: word.offsetBy(dx: -StripCell.pad, dy: 0),
@@ -860,9 +935,10 @@ private final class StripCell: NSView {
         panel.ignoresMouseEvents = false
 
         let size: NSSize
-        var radius = height / 2
+        let rowHeight = cells.first?.frame.height ?? height
+        var radius = rowHeight / 2
         var clip: NSView?
-        var footer: NSTextField?
+        var footers: [NSView] = []
         switch layout {
         case .row:
             var x: CGFloat = 0
@@ -873,23 +949,35 @@ private final class StripCell: NSView {
             size = NSSize(width: ceil(x), height: height)
         case .card(let width, let rows, let text):
             // The rows inside the paper's inset, cut at its edge, so a page turned slides in under it.
-            let inside = FlippedView(frame: NSRect(x: inset, y: inset, width: width - inset * 2, height: CGFloat(rows) * height))
+            let inside = FlippedView(frame: NSRect(x: inset, y: inset, width: width - inset * 2, height: CGFloat(rows) * rowHeight))
             inside.wantsLayer = true
             inside.layer?.masksToBounds = true
-            inside.layer?.cornerRadius = height / 2
+            inside.layer?.cornerRadius = rowHeight / 2
             inside.layer?.cornerCurve = .continuous
             for (i, cell) in cells.enumerated() {
-                cell.frame = NSRect(x: 0, y: CGFloat(i) * height, width: inside.frame.width, height: height)
+                cell.frame = NSRect(x: 0, y: CGFloat(i) * rowHeight, width: inside.frame.width, height: rowHeight)
+                cell.alignLanguage()
             }
             size = NSSize(width: width, height: inside.frame.maxY + (text == nil ? 0 : footerHeight) + inset)
             // The corners round about the thumb's, the inset further out.
-            radius = inset + height / 2
+            radius = inset + rowHeight / 2
             clip = inside
-            footer = text.map { text in
-                let label = StripCell.footer(text)
-                StripCell.place(label, x: inset + StripCell.pad)
-                label.setFrameOrigin(NSPoint(x: label.frame.minX, y: label.frame.minY + inside.frame.maxY - 4))
-                return label
+            if let text {
+                let side = inset + StripCell.pad
+                let line = NSView(frame: NSRect(x: side, y: inside.frame.maxY + 3, width: width - side * 2, height: 1))
+                line.wantsLayer = true
+                line.effectiveAppearance.performAsCurrentDrawingAppearance { line.layer?.backgroundColor = Paper.line.cgColor }
+                footers.append(line)
+                let label = StripCell.footer(text.reading)
+                label.sizeToFit()
+                label.setFrameOrigin(NSPoint(x: side, y: line.frame.maxY + 4))
+                footers.append(label)
+                if let page = text.page {
+                    let pageLabel = StripCell.footer(page)
+                    pageLabel.sizeToFit()
+                    pageLabel.setFrameOrigin(NSPoint(x: width - side - pageLabel.frame.width, y: line.frame.maxY + 4))
+                    footers.append(pageLabel)
+                }
             }
         }
         // Measured now: once it is the panel's content, the root takes the panel's old size.
@@ -921,7 +1009,7 @@ private final class StripCell: NSView {
         page.addSubview(thumb)
         cells.forEach(page.addSubview)
         page.addSubview(ClickView(frame: page.bounds) { clicked(at: $0) })
-        footer.map(strip.addSubview)
+        footers.forEach(strip.addSubview)
         root.addSubview(strip)
         root.setAccessibilityRole(.list)
         panel.contentView = root
@@ -990,7 +1078,7 @@ private final class StripCell: NSView {
     private static func capsule(_ frame: NSRect, radius: CGFloat? = nil) -> NSView {
         let view = NSView(frame: frame)
         view.wantsLayer = true
-        view.layer?.cornerRadius = radius ?? height / 2
+        view.layer?.cornerRadius = radius ?? frame.height / 2
         view.layer?.cornerCurve = .continuous
         view.layer?.shadowColor = NSColor.black.cgColor
         view.layer?.shadowRadius = 5

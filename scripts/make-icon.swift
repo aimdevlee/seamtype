@@ -2,13 +2,11 @@
 // into rows, one per language: the top of A, the middle of 아, the bottom of あ. One icon
 // whatever is switched on: the bundle is signed, so it can't change at runtime.
 // Black on transparent, so macOS can tint it (TISIconIsTemplate), at 1x and 2x in one TIFF.
-// --slash strikes it through, for the pause indicator under the caret.
-// usage: swift scripts/make-icon.swift [--slash] <out.tiff>
+// usage: swift scripts/make-icon.swift <out.tiff>
 import AppKit
 import CoreText
 
 let out = URL(fileURLWithPath: CommandLine.arguments.last!)
-let slashed = CommandLine.arguments.contains("--slash")
 let W: CGFloat = 20, H: CGFloat = 16
 
 func roundedFont(_ size: CGFloat, _ weight: NSFont.Weight) -> CTFont {
@@ -71,19 +69,6 @@ func representation(_ mark: Mark, scale: CGFloat) -> NSBitmapImageRep {
         c.addPath(glyphPath(text, size: size, cx: W / 2, cy: H / 2)); c.fillPath()
         c.restoreGState()
     }
-    if slashed {
-        // Top left to bottom right, with a clear gap cut around it so it stands apart from the letters.
-        let from = CGPoint(x: 2, y: H - 1), to = CGPoint(x: W - 2, y: 1)
-        c.setLineCap(.round)
-        c.setBlendMode(.clear)
-        c.setLineWidth(3.2)
-        c.move(to: from); c.addLine(to: to); c.strokePath()
-        c.setBlendMode(.normal)
-        c.setStrokeColor(NSColor.black.cgColor)
-        c.setLineWidth(1.4)
-        c.move(to: from); c.addLine(to: to); c.strokePath()
-    }
-
     NSGraphicsContext.restoreGraphicsState()
     return rep
 }

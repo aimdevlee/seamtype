@@ -36,7 +36,7 @@ struct DictionaryPane: View {
         /// What the entries under this filter are, under the filter.
         var explanation: String {
             switch self {
-            case .all: return L("These keys come out as written here, also with a particle after them.")
+            case .all: return ""
             case .added: return L("Words you added here. They always come out this way.")
             case .remembered: return L("Words you switched the same way twice. They always come out this way.")
             case .once: return L("Words you switched once. They only lean that way, and are forgotten after 30 days unless you switch or type them again.")
@@ -52,38 +52,17 @@ struct DictionaryPane: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            PaneHeader(tab: .learning)
-            HStack(spacing: 12) {
-                Picker(L("List"), selection: $filter) {
-                    ForEach(Filter.allCases, id: \.self) { filter in
-                        Text(String(format: filter.title, model.entries.filter(filter.includes).count)).tag(filter)
-                    }
-                }
-                .pickerStyle(.segmented).labelsHidden().fixedSize()
-                Spacer()
-                // Narrow, and + alone: the filter's English titles take most of the row.
-                ComposingSearchField(placeholder: L("Search"), text: $search).frame(width: 140)
-                Button { editing = .new(keys: "") } label: { Image(systemName: "plus") }
-                    .help(L("Add…"))
-                    .accessibilityLabel(L("Add…"))
-            }
-            Text(filter.explanation)
-                .font(.system(size: 12)).foregroundStyle(Seam.ink2)
-            if shown.isEmpty {
-                EmptyList(symbol: search.isEmpty ? "text.book.closed" : "magnifyingglass",
-                          title: search.isEmpty ? L("No words yet") : L("No matches"),
-                          detail: search.isEmpty ? L("Add a word with +, or switch a word that came out wrong with the language switch key: corrected the same way twice, it's remembered here.") : nil)
+        VStack(alignment: .leading, spacing: 12) {
+            PaneHeader(tab: .learning).padding(.bottom, 6)
+            if model.entries.isEmpty {
+                EmptyList(symbol: nil, title: L("No words yet"),
+                          detail: L("Switch a word that came out wrong with the language switch key: corrected the same way twice, it's remembered here."),
+                          action: (L("Add Word"), { editing = .new(keys: "") }))
             } else {
-                table
-            }
-            HStack {
-                Spacer()
-                Button(L("Forget Learned Words…"), role: .destructive) { confirmForgetAll = true }
-                    .disabled(!model.entries.contains { $0.source == .learned })
+                list
             }
         }
-        .padding(.horizontal, 28).padding(.top, 26).padding(.bottom, 20)
+        .padding(.horizontal, 28).padding(.top, 30).padding(.bottom, 20)
         .background(Seam.bg)
         .sheet(item: $editing) { EntrySheet(model: model, target: $0) }
         .confirmationDialog(L("Forget every learned word?"), isPresented: $confirmForgetAll) {
@@ -93,14 +72,45 @@ struct DictionaryPane: View {
         }
     }
 
+    @ViewBuilder private var list: some View {
+            HStack(spacing: 12) {
+                Picker(L("List"), selection: $filter) {
+                    ForEach(Filter.allCases, id: \.self) { filter in
+                        Text(String(format: filter.title, model.entries.filter(filter.includes).count)).tag(filter)
+                    }
+                }
+                .pickerStyle(.segmented).labelsHidden().fixedSize()
+                Spacer()
+                // Narrow: the filter's English titles take most of the row.
+                ComposingSearchField(placeholder: L("Search"), text: $search).frame(width: 130)
+                Button(L("Add Word")) { editing = .new(keys: "") }.buttonStyle(.borderedProminent)
+            }
+            if filter != .all {
+                Text(filter.explanation)
+                    .font(.system(size: 12)).foregroundStyle(Seam.ink2)
+            }
+            if shown.isEmpty {
+                EmptyList(symbol: search.isEmpty ? nil : "magnifyingglass",
+                          title: search.isEmpty ? L("No words yet") : L("No matches"), detail: nil)
+            } else {
+                table
+            }
+            HStack {
+                Spacer()
+                Button(L("Forget Learned Words…")) { confirmForgetAll = true }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 12)).foregroundStyle(Seam.ink2)
+                    .disabled(!model.entries.contains { $0.source == .learned })
+            }
+    }
+
     private var table: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 Text(L("Keys")).frame(width: Column.keys, alignment: .leading)
                 Text(L("Result")).frame(maxWidth: .infinity, alignment: .leading)
                 Text(L("Status")).frame(width: Column.source, alignment: .leading)
-                Text(L("Apps")).frame(width: Column.apps, alignment: .leading)
-                Text(L("Expires")).frame(width: Column.expires, alignment: .leading)
+                Text(L("App")).frame(width: Column.apps, alignment: .leading)
                 Color.clear.frame(width: Column.actions, height: 1)
             }
             .font(.system(size: 11, weight: .medium)).foregroundStyle(Seam.ink3)
@@ -134,9 +144,8 @@ struct DictionaryPane: View {
 
 private enum Column {
     static let keys: CGFloat = 100
-    static let source: CGFloat = 112
+    static let source: CGFloat = 170
     static let apps: CGFloat = 110
-    static let expires: CGFloat = 70
     static let actions: CGFloat = 28
 }
 
@@ -150,28 +159,28 @@ private struct EntryRow: View {
             Text(verbatim: entry.keys).font(.system(size: 13, design: .monospaced)).foregroundStyle(Seam.ink2)
                 .lineLimit(1).truncationMode(.middle).help(entry.keys)
                 .frame(width: Column.keys, alignment: .leading)
-            HStack(spacing: 6) {
-                Text(verbatim: EntryText.of(entry)).font(.system(size: 14, weight: .semibold)).foregroundStyle(Seam.ink)
-                    .lineLimit(1).truncationMode(.middle)
-                Text(EntryText.kind(entry)).font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(entry.language?.ink ?? Seam.ink3)
+            HStack(spacing: 7) {
+                if let language = entry.language {
+                    Underlined(text: EntryText.of(entry), color: language.tint, size: 14).lineLimit(1).truncationMode(.middle)
+                } else {
+                    Text(verbatim: EntryText.of(entry)).font(.system(size: 14, weight: .bold)).foregroundStyle(Seam.ink)
+                        .lineLimit(1).truncationMode(.middle)
+                }
+                Text(EntryText.kind(entry)).font(.system(size: 11)).foregroundStyle(Seam.ink3)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            SourceBadge(entry: entry).frame(width: Column.source, alignment: .leading)
+            EntryStatus(entry: entry).frame(width: Column.source, alignment: .leading)
             Text(EntryText.apps(entry)).font(.system(size: 12)).foregroundStyle(Seam.ink2).lineLimit(1)
                 .frame(width: Column.apps, alignment: .leading)
-            Text(EntryText.expires(entry)).font(.system(size: 12).monospacedDigit())
-                .foregroundStyle(entry.strength == .weak ? Seam.ink2 : Seam.ink3).lineLimit(1)
-                .frame(width: Column.expires, alignment: .leading)
             Menu {
                 if entry.language != nil { Button(L("Edit…"), action: edit) }
                 if entry.source == .learned { Button(L("Keep for Good")) { model.pin(entry.id) } }
                 Button(L("Remove"), role: .destructive) { model.remove(entry.id) }
             } label: {
-                Image(systemName: "ellipsis.circle")
+                Image(systemName: "ellipsis")
             }
             .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-            .foregroundStyle(Seam.ink3)
+            .foregroundStyle(Seam.ink2)
             .help(L("Edit, keep for good or remove"))
             .accessibilityLabel(L("Actions for %@", entry.keys))
             .frame(width: Column.actions, alignment: .trailing)
@@ -193,27 +202,40 @@ enum EntryText {
         return entry.text ?? ""
     }
 
-    /// When a word corrected once is forgotten; a dash for the rest, which stay.
-    static func expires(_ entry: UserDictionary.Entry) -> String {
-        guard let days = UserDictionary.daysLeft(entry, today: Date()) else { return "—" }
-        return L("%ld days", days)
-    }
-
     static func apps(_ entry: UserDictionary.Entry) -> String {
         guard let apps = entry.apps else { return L("Every app") }
         return apps.map { $0.hasSuffix(".") ? $0 + "*" : AppName.of($0) }.joined(separator: ", ")
     }
 }
 
-/// Added and remembered words stay (blue and ink); a word corrected once is on its way (yellow).
-private struct SourceBadge: View {
+/// Whose word it is and whether it stays: added, remembered, or corrected once with the days left.
+/// The glyphs have a column of their own, so the words start at one x.
+private struct EntryStatus: View {
     let entry: UserDictionary.Entry
 
     var body: some View {
+        HStack(spacing: 4) {
+            Group {
+                switch (entry.source, entry.strength) {
+                case (.user, _): Color.clear
+                case (_, .weak?): Image(systemName: "pencil").foregroundStyle(Seam.warning)
+                default: Image(systemName: "checkmark").foregroundStyle(Seam.korean)
+                }
+            }
+            .font(.system(size: 10, weight: .bold))
+            .frame(width: 13, height: 13)
+            .accessibilityHidden(true)
+            Text(title).font(.system(size: 12)).foregroundStyle(Seam.ink2).lineLimit(1)
+        }
+    }
+
+    private var title: String {
         switch (entry.source, entry.strength) {
-        case (.user, _): Badge(title: L("Added"), fill: Seam.bg2, ink: Seam.ink)
-        case (_, .weak?): Badge(title: L("Corrected once"), fill: Seam.japanese.opacity(0.22), ink: Seam.japaneseInk)
-        default: Badge(title: L("Remembered"), fill: Seam.korean.opacity(0.14), ink: Seam.korean)
+        case (.user, _): return L("Added")
+        case (_, .weak?):
+            guard let days = UserDictionary.daysLeft(entry, today: Date()) else { return L("Corrected once") }
+            return L("Corrected once · %ld days left", days)
+        default: return L("Remembered")
         }
     }
 }
@@ -290,33 +312,29 @@ struct EntrySheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(original == nil ? L("Add to Dictionary") : L("Change Word")).font(.headline)
+            Text(original == nil ? L("Add to Dictionary") : L("Change Word"))
+                .font(.system(size: 15, weight: .semibold)).foregroundStyle(Seam.ink)
             VStack(alignment: .leading, spacing: 4) {
                 KeyField(keys: $keys).frame(height: 30)
                 Text(L("Type the keys as you would on the English layout. They go in as typed, not through an input method."))
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    .font(.system(size: 11.5)).foregroundStyle(Seam.ink2).fixedSize(horizontal: false, vertical: true)
             }
-            Picker(L("Comes out as"), selection: $language) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(L("Comes out as")).font(.system(size: 12, weight: .semibold)).foregroundStyle(Seam.ink2)
                 ForEach(choices, id: \.self) { choice in
-                    HStack(spacing: 8) {
-                        Text(choice.displayName).foregroundStyle(.secondary).frame(width: 64, alignment: .leading)
-                        Text(verbatim: keys.isEmpty ? "–" : UserDictionary.reading(keys, as: choice))
-                        if choice == language, app == nil, !keys.isEmpty {
-                            Text(L("— also with a particle: %@", Self.withParticle(keys, as: choice)))
-                                .font(.caption).foregroundStyle(.tertiary)
-                        }
-                    }
-                    .tag(choice)
+                    ReadingOption(language: choice, reading: keys.isEmpty ? "–" : UserDictionary.reading(keys, as: choice),
+                                  particle: choice == language && app == nil && !keys.isEmpty ? Self.withParticle(keys, as: choice) : nil,
+                                  chosen: choice == language) { language = choice }
                 }
             }
-            .pickerStyle(.radioGroup)
-            Picker(L("App"), selection: $app) {
-                Text(L("Every app")).tag(String?.none)
-                Divider()
-                ForEach(apps, id: \.id) { app in Text(app.name).tag(String?.some(app.id)) }
-            }
-            .fixedSize()
             HStack {
+                Picker(L("App"), selection: $app) {
+                    Text(L("Every app")).tag(String?.none)
+                    Divider()
+                    ForEach(apps, id: \.id) { app in Text(app.name).tag(String?.some(app.id)) }
+                }
+                .labelsHidden()
+                .fixedSize()
                 if let original {
                     Button(L("Remove"), role: .destructive) {
                         model.remove(original.id)
@@ -353,6 +371,39 @@ struct EntrySheet: View {
     static func withParticle(_ keys: String, as language: Language) -> String {
         let word = UserDictionary.reading(keys, as: language)
         return word + (language == .japanese ? "で" : "에")
+    }
+}
+
+/// One reading the keys can come out as: the word as it will look, underlined in its language's
+/// color, its language, and with a particle after it.
+private struct ReadingOption: View {
+    let language: Language
+    let reading: String
+    let particle: String?
+    let chosen: Bool
+    let choose: () -> Void
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
+        Button(action: choose) {
+            HStack(spacing: 10) {
+                Image(systemName: chosen ? "largecircle.fill.circle" : "circle")
+                    .font(.system(size: 13)).foregroundStyle(chosen ? Seam.blue : Seam.ink3)
+                Underlined(text: reading, color: language.tint, size: 15).lineLimit(1).truncationMode(.middle)
+                Text(language.displayName).font(.system(size: 12)).foregroundStyle(Seam.ink2)
+                Spacer(minLength: 8)
+                if let particle {
+                    Text(L("With a particle: %@", particle)).font(.system(size: 11.5)).foregroundStyle(Seam.ink3).lineLimit(1)
+                }
+            }
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .background(chosen ? Seam.card : .clear, in: shape)
+            .overlay(shape.strokeBorder(Seam.line))
+            .contentShape(shape)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(reading), \(language.displayName)")
+        .accessibilityAddTraits(chosen ? [.isSelected] : [])
     }
 }
 

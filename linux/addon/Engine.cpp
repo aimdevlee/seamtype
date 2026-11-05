@@ -65,12 +65,12 @@ private:
     Kind kind_;
 };
 
-/// The tag a reading shows, in the user's language (the strip's EN, KO, JA, MIX).
-std::string Tag(const std::string &tag) {
-    if (tag == "EN") return L("EN");
-    if (tag == "KO") return L("KO");
-    if (tag == "JA") return L("JA");
-    if (tag == "MIX") return L("MIX");
+/// A reading's language in its own script: the Mac's and Windows' lists show the same.
+std::string Script(const std::string &tag) {
+    if (tag == "EN") return "A";
+    if (tag == "KO") return "아";
+    if (tag == "JA") return "あ";
+    if (tag == "MIX") return "A아";
     return tag;
 }
 
@@ -277,19 +277,23 @@ void Engine::drawPanel(fcitx::InputContext *ic, State *st, const Json &ui) {
         if (pages > 1) footer += "  " + std::to_string(selected / 9 + 1) + "/" + std::to_string(pages);
         panel.setAuxDown(fcitx::Text(footer));
     } else if (readings.isObject()) {
-        // The switch key's list: each reading on its own row, a check after the one the dictionary
-        // remembers and a pencil after the one corrected once.
+        // The switch key's list: each reading on its own row, numbered where the digits pick one, a
+        // check after the one the dictionary remembers and a pencil after the one corrected once.
         auto list = std::make_unique<fcitx::CommonCandidateList>();
         const auto &texts = readings["texts"].items();
         list->setPageSize(std::max<int>(1, static_cast<int>(texts.size())));
-        list->setLabels(std::vector<std::string>(texts.size(), ""));
+        if (readings["numbered"].asBool(false)) {
+            list->setLabels({"1. ", "2. ", "3. ", "4. ", "5. ", "6. ", "7. ", "8. ", "9. "});
+        } else {
+            list->setLabels(std::vector<std::string>(texts.size(), ""));
+        }
         list->setLayoutHint(fcitx::CandidateLayoutHint::Vertical);
         int remembered = readings.has("remembered") ? readings["remembered"].asInt(-1) : -1;
         int once = readings.has("once") ? readings["once"].asInt(-1) : -1;
         for (size_t i = 0; i < texts.size(); ++i) {
             fcitx::Text text;
             text.append(texts[i].asString());
-            std::string tag = " " + Tag(readings["tags"][i].asString());
+            std::string tag = "  " + Script(readings["tags"][i].asString());
             if (static_cast<int>(i) == remembered) tag += " ✓";
             if (static_cast<int>(i) == once) tag += " ✎";
             text.append(tag, fcitx::TextFormatFlag::DontCommit);

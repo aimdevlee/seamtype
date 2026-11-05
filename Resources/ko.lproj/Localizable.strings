@@ -278,3 +278,17 @@
 "Typo fixed" = "오타 고침";
 "Fix typos" = "오타 고치기";
 "A Korean word with one key slipped (치다ㅏㄱ) goes in as the word meant (치다가); Delete right after undoes it. Hold the switch key for guesses either way." = "키 하나가 꼬인 한국어 단어(치다ㅏㄱ)를 원래 단어(치다가)로 넣습니다. 바로 Delete를 누르면 되돌립니다. 켜든 끄든 바꾸기 키를 길게 누르면 추측이 나옵니다.";
+
+/* 설정 창 정리 */
+"Which language each word is decided as." = "단어마다 어느 언어로 판단할지 정합니다.";
+"What every app does, and the apps that differ." = "모든 앱의 기준과, 다르게 쓸 앱을 정합니다.";
+"Keys that always come out one way, also with a particle after them." = "늘 같은 글자로 나오는 키입니다. 뒤에 조사가 붙어도 그대로 나옵니다.";
+"The keys not chosen go to the app as usual." = "고르지 않은 키는 평소처럼 앱에 갑니다.";
+"Apps that differ" = "다르게 쓸 앱";
+"Same as the default" = "기본값과 같음";
+"Follow the Default" = "기본 설정으로 돌리기";
+"Add Word" = "단어 추가";
+"Switch a word that came out wrong with the language switch key: corrected the same way twice, it's remembered here." = "잘못 바뀐 단어를 언어 바꾸기 키로 바꾸세요. 같은 쪽으로 두 번 고치면 여기에 기억됩니다.";
+"Corrected once · %ld days left" = "한 번 고침 · %ld일 남음";
+"With a particle: %@" = "조사가 붙어도: %@";
+"Examples" = "예시";

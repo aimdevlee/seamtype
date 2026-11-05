@@ -347,7 +347,7 @@ the next key is hit. Composed as Hangul, that leaves loose jamo (`clekkr` → `�
 (`djddj` → `엉어`).
 
 - **Hold a language switch key for half a second, then let go**: the words one slip away from the word just
-  committed (or being typed) are listed like kanji candidates, the first put in its place (`엉어` → `영어`). While you hold, a ring by the caret fills to show when to let go (macOS); what each guess changed is colored with a wavy underline (on Linux, just underlined). Hold
+  committed (or being typed) are listed like kanji candidates, the first put in its place (`엉어` → `영어`). While you hold, a red wave draws under the word to show when to let go (macOS); what each guess changed is colored with a wavy underline (on Linux, just underlined). Hold
   again or ↓·↑ for another, a digit, a click or Return to pick one; Esc and Delete put the word back. Any other key
   keeps what is shown and goes on. With nothing to guess, "No guesses" shows for a moment. 2-set only, one slip only. The 한/영 key, which acts as it goes down, can't be held for this (Windows, Linux).
 - **Fix typos** (Settings → Keys, `fixSlips`, off by default): where it is clear, the word is fixed as it ends
@@ -465,8 +465,8 @@ Where every key is a command, like lazygit or htop in a terminal, tap **right �
 word in progress goes in, and in that text field keys go through as typed. Tap again, move to
 another app or text field, or change a setting, to resume.
 
-Each tap shows Araso's icon under the caret for a moment, like the input source indicator,
-struck through when paused. The menu bar icon doesn't change, so to check later, look for the tick
+Each tap shows an A under the caret for a moment, like the input source indicator,
+struck through on gray when paused. The menu bar icon doesn't change, so to check later, look for the tick
 in the input menu.
 
 Change the pause key under **Keys** in the settings window: right ⌘, ⌥, ⇧ or ⌃ tapped on its own, a

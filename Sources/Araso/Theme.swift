@@ -51,88 +51,57 @@ extension Language {
 
 // MARK: - Pane pieces
 
-/// A settings pane: a scrolling column on the paper color, its header first.
+/// A settings pane: a scrolling column on the paper color, its title line first. About opens with
+/// the mark itself instead.
 struct Pane<Content: View>: View {
     let tab: SettingsTab
+    var showsHeader = true
     @ViewBuilder let content: Content
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                PaneHeader(tab: tab)
+            VStack(alignment: .leading, spacing: 20) {
+                if showsHeader { PaneHeader(tab: tab) }
                 content
             }
-            .padding(.horizontal, 28).padding(.top, 26).padding(.bottom, 28)
+            .padding(.horizontal, 28).padding(.top, 30).padding(.bottom, 28)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(Seam.bg)
     }
 }
 
-/// The pane's title and what it's for, on a band with a small picture of it at the right.
+/// The pane's title and, after it on the line, what it's for.
 struct PaneHeader: View {
     let tab: SettingsTab
 
     var body: some View {
-        HStack(alignment: .center, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(tab.title)
-                    .font(.system(size: 22, weight: .bold)).tracking(-0.4)
-                    .foregroundStyle(Seam.ink)
-                Text(tab.subtitle)
-                    .font(.system(size: 13)).foregroundStyle(Seam.ink2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 12)
-            HeaderArt(tab: tab)
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(tab.title)
+                .font(.system(size: 20, weight: .bold)).tracking(-0.3)
+                .foregroundStyle(Seam.ink)
+                .accessibilityAddTraits(.isHeader)
+            Text(tab.subtitle)
+                .font(.system(size: 12.5)).foregroundStyle(Seam.ink2)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.horizontal, 20).padding(.vertical, 16)
-        .background(Seam.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 
-/// What each pane's band shows: the thing the pane changes, as it looks while typing.
-private struct HeaderArt: View {
-    let tab: SettingsTab
+/// The mark where it is small: its rows don't read under about 40 pt, so the plate holds the A.
+struct SmallMark: View {
+    var height: CGFloat = 20
 
     var body: some View {
-        Group {
-            switch tab {
-            case .general:
-                HStack(spacing: 10) {
-                    Underlined(text: "A", color: Seam.english)
-                    Underlined(text: "아", color: Seam.korean)
-                    Underlined(text: "あ", color: Seam.japanese)
-                }
-            case .keys:
-                HStack(spacing: 6) {
-                    Keycap(key: .rightShift, on: true)
-                    Keycap(key: .shiftEscape, on: true)
-                }
-            case .apps:
-                HStack(spacing: 8) {
-                    Text(verbatim: "gst").font(.system(size: 15, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(Seam.ink2)
-                    Image(systemName: "arrow.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(Seam.ink3)
-                    Underlined(text: "gst", color: Seam.english, size: 18)
-                }
-            case .learning:
-                HStack(spacing: 8) {
-                    Text(verbatim: "so").font(.system(size: 15, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(Seam.ink2)
-                    Image(systemName: "arrow.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(Seam.ink3)
-                    Underlined(text: "내", color: Seam.korean, size: 18)
-                }
-            case .typing:
-                HStack(spacing: 4) {
-                    Underlined(text: "안녕", color: Seam.korean, size: 18)
-                    Underlined(text: "hello", color: Seam.english, size: 18)
-                }
-            case .about:
-                EmptyView() // the pane opens with the mark itself
+        RoundedRectangle(cornerRadius: height * 0.28, style: .continuous)
+            .fill(Seam.ink)
+            .overlay {
+                Text(verbatim: "A")
+                    .font(.system(size: height * 0.66, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Seam.bg)
             }
-        }
-        .accessibilityHidden(true)
+            .frame(width: height * 1.25, height: height)
+            .accessibilityHidden(true)
     }
 }
 
@@ -160,8 +129,8 @@ struct SeamCard<Content: View>: View {
         VStack(alignment: .leading, spacing: 8) {
             if let title {
                 Text(title)
-                    .font(.system(size: 12, weight: .bold)).foregroundStyle(Seam.korean)
-                    .padding(.leading, 4)
+                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(Seam.ink2)
+                    .padding(.leading, 2)
                     .accessibilityAddTraits(.isHeader)
             }
             VStack(alignment: .leading, spacing: 0) {

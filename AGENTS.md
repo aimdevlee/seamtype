@@ -187,7 +187,7 @@ tests use `FakeTextField`). It owns the preview and hysteresis, commits, Esc rea
   candidate window (a cut's front settles, else the fix is in). Digits and clicks share `pickReading`
   everywhere the strip shows: the word being typed is confirmed reading that way (`pickTyped`, as Return
   confirms it; numbered except on 3-set, whose digit keys are jamo), the word just committed switches
-  (`pickCommitted`). Windows' and Linux's strips draw no numbers yet, though digits pick there too. The strip shows only for a switch key: the caret
+  (`pickCommitted`). Windows and Linux number the readings too, where the digits pick (`UIState.Readings.numbered`). The strip shows only for a switch key: the caret
   merely coming to an unsure word lists nothing (an automatic list there, until 0.4.5, wasn't wanted).
   With nothing marked only `firstRect` gives a place, whose origin comes at the line's top through IMK
   (TextEdit and Notes, against `attributes(forCharacterIndex:)` for the same marked text, 2026-10-29),
@@ -200,7 +200,7 @@ tests use `FakeTextField`). It owns the preview and hysteresis, commits, Esc rea
 - One slip of the fingers in a Korean word (#85, `SlipGuesser`, 2-set only): the keys with one
   slip undone (two neighbours swapped, a key extra or missing, Shift on a ㅃㅉㄸㄲㅆㅒㅖ key, the
   key next to it on QWERTY's seats) that compose to a word of the lists, by list, then how common.
-  A switch key held half a second (`Key.guess`, `InputController.switchTapChanged`; `LongPressRing` by the caret on macOS while it is held, where `canGuess`) lists them for
+  A switch key held half a second (`Key.guess`, `InputController.switchTapChanged`; `LongPressWave`, a red pen's wave under the word on macOS while it is held, where `canGuess`) lists them for
   the word just committed (the word being typed is confirmed first): `guesses`, kept in `guessing`
   while the keys of the candidate window pick one (`pickGuess` for clicks), Esc and Delete put the
   word back; a guess picked teaches nothing but forgets keys the dictionary remembers. With
@@ -215,7 +215,7 @@ tests use `FakeTextField`). It owns the preview and hysteresis, commits, Esc rea
   On Windows and Linux `TapTracker.up` returns `.guess` for a switch key held past the tap's half
   second, `UIState.guesses` and `typoFixed` carry the list (`changed` in UTF-16 units) and the note,
   and a click comes back as `pickGuess`; `StripWindow::ShowGuesses`, and fcitx5's numbered list with
-  the changed letters underlined, draw it. No ring there, and no hold on 한/영, which acts on key down.
+  the changed letters underlined, draw it. No wave there, and no hold on 한/영, which acts on key down.
 - Return on an underlined word only confirms it (`returnConfirmsOnly`, on by default); off, the
   app gets the Return too, except after Japanese. A word only confirmed is the word just committed,
   with no boundary (the macOS ← after a switch then leaves the caret before its last character, where
@@ -258,8 +258,8 @@ tests use `FakeTextField`). It owns the preview and hysteresis, commits, Esc rea
 - The pause key (`Settings.pauseKey`: a right modifier tap, by default ⌘, read from flagsChanged, or a
   shortcut caught in keyDown, both in `InputController`) pauses the session until it is pressed again,
   `activate`, or a settings change (a fresh session). The menu icon can't change, so `PauseHUD`
-  shows the icon under the caret for a moment, struck through when paused (drawn by
-  `make-icon.swift --slash`), for the menu's toggle too. It copies the system's input source
+  shows a white A under the caret for a moment, struck through on gray when paused (drawn at
+  runtime: the joined mark doesn't read at this size), for the menu's toggle too. It copies the system's input source
   indicator, measured on screen: size, gap, and the accent color's components taken as Display P3.
 - After a word ends with Space or punctuation, only the word is inserted and `handle` returns
   false, so the app types the key itself, as the system Korean IME does. Inserting "word + space"
