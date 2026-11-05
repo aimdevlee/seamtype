@@ -3,11 +3,11 @@ import Testing
 
 @Suite struct RomajiComposerTests {
     @Test(arguments: [
-        ("konnichiha", "こんにちは"), ("arigatou", "ありがとう"), ("kitte", "きって"), ("ra-men", "らーめん"),
+        ("konnnichiha", "こんにちは"), ("arigatou", "ありがとう"), ("kitte", "きって"), ("ra-men", "らーめん"),
         ("shinbun", "しんぶん"), ("kan'i", "かんい"), ("tenki", "てんき"), ("nihongo", "にほんご"),
         ("kyou", "きょう"), ("gakkou", "がっこう"), ("matcha", "まっちゃ"), ("shashin", "しゃしん"),
-        ("tsukue", "つくえ"), ("fujisan", "ふじさん"), ("jouzu", "じょうず"), ("onna", "おんな"),
-        ("konnnichiha", "こんにちは"), ("xtu", "っ"), ("dhisuku", "でぃすく"), ("wo", "を"),
+        ("tsukue", "つくえ"), ("fujisan", "ふじさん"), ("jouzu", "じょうず"), ("onnna", "おんな"),
+        ("rennai", "れんあい"), ("ren'ai", "れんあい"), ("konnichiha", "こんいちは"), ("minnna", "みんな"), ("xtu", "っ"), ("dhisuku", "でぃすく"), ("wo", "を"),
         ("benkyou", "べんきょう"), ("hon", "ほん"), ("sushi", "すし"),
     ])
     func composes(romaji: String, expected: String) {
@@ -26,21 +26,25 @@ import Testing
     }
 
     @Test func pendingWhileTyping() {
-        let r = RomajiComposer.compose("konnic", partial: true)
+        let r = RomajiComposer.compose("konnnic", partial: true)
         #expect(r.text == "こんにc")
         #expect(r.pending == "c")
         #expect(r.strayLetters == 0)
         #expect(RomajiComposer.compose("hon", partial: true).text == "ほn")
+        // nn is ん at once; a third n waits for its vowel (れんな is rennna).
+        #expect(RomajiComposer.compose("renn", partial: true).text == "れん")
+        #expect(RomajiComposer.compose("renn", partial: true).pending.isEmpty)
+        #expect(RomajiComposer.compose("rennn", partial: true).pending == "n")
     }
 
     /// Letters that don't become kana stay as typed: a capital P waiting for its vowel is P.
     @Test func lettersLeftOverKeepTheirCase() {
         #expect(RomajiComposer.compose("P", partial: true).text == "P")
         #expect(RomajiComposer.compose("P", partial: true).pending == "P")
-        #expect(RomajiComposer.compose("KonniC", partial: true).text == "こんにC")
+        #expect(RomajiComposer.compose("KonnniC", partial: true).text == "こんにC")
         #expect(RomajiComposer.compose("HoN", partial: true).text == "ほN")
         #expect(RomajiComposer.compose("Pdf").text == "Pdf")
-        #expect(RomajiComposer.compose("Konnichiha").text == "こんにちは")
+        #expect(RomajiComposer.compose("Konnnichiha").text == "こんにちは")
     }
 
     @Test(arguments: ["strength", "dkssud", "world", "keyboard", "gksrmf"])

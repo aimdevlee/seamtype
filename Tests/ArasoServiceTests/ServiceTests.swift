@@ -806,7 +806,7 @@ final class Harness {
     @Test func decideFollowsTheAppsJapanese() throws {
         let h = try Harness(settings: #"{ "japanese": true }"#, apps: #"{ "code.exe": { "japanese": false } }"#)
         var request = ServiceRequest(op: .decide)
-        request.keys = "konnichiha"
+        request.keys = "konnnichiha"
         #expect(h.runtime.handle(request).decision?.language == "japanese")
         request.app = "code.exe"
         let decision = try #require(h.runtime.handle(request).decision)
