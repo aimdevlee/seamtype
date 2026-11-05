@@ -87,7 +87,7 @@ if CommandLine.arguments.contains("--selftest") {
         // A throwaway memory folder: the self-test must not create or touch the user's.
         let memory = FileManager.default.temporaryDirectory.appendingPathComponent("araso-selftest-\(UUID().uuidString)")
         if let model = JapaneseModel.shared, let converter = AzooKeyConverter(memory: memory) {
-            let kana = model.score(keys: "konnichiha") != nil
+            let kana = model.score(keys: "konnnichiha") != nil
             let kanji = converter.candidates(for: "へんかん").contains { $0.text == "変換" }
             print("japanese model: \(kana ? "ok" : "FAILED"), dictionary: \(kanji ? "ok" : "FAILED")")
             ok = ok && kana && kanji

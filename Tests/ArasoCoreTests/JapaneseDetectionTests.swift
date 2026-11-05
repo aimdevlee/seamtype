@@ -9,7 +9,7 @@ let trilingual = HeuristicEngine(english: sharedEngine.english, korean: sharedEn
     }
 
     @Test(arguments: [
-        ("konnichiha", "こんにちは"), ("watashihagakuseidesu", "わたしはがくせいです"), ("arigatougozaimasu", "ありがとうございます"),
+        ("konnnichiha", "こんにちは"), ("watashihagakuseidesu", "わたしはがくせいです"), ("arigatougozaimasu", "ありがとうございます"),
         ("kyouhaiitenkidesune", "きょうはいいてんきですね"), ("ra-mentabetai", "らーめんたべたい"), ("sumimasen", "すみません"),
         ("yoroshikuonegaishimasu", "よろしくおねがいします"), ("daijoubu", "だいじょうぶ"),
     ])
@@ -62,6 +62,6 @@ let trilingual = HeuristicEngine(english: sharedEngine.english, korean: sharedEn
     }
 
     @Test func japaneseOffByDefault() {
-        #expect(sharedEngine.decide("konnichiha", context: DecisionContext()).language != .japanese)
+        #expect(sharedEngine.decide("konnnichiha", context: DecisionContext()).language != .japanese)
     }
 }

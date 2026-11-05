@@ -1,7 +1,8 @@
-/// Romaji → hiragana, following the conventions of the macOS and Microsoft
-/// Japanese input methods (nn/n' → ん, doubled consonants → っ, x/l small kana,
-/// - → ー). Letters that can't become kana are kept and counted: like stray jamo
-/// for Hangul, they are the strongest sign the user wasn't typing Japanese.
+/// Romaji → hiragana, following the conventions of the Microsoft and Google
+/// Japanese input methods (nn/n'/xn → ん, so rennai is れんあい and おんな is onnna;
+/// doubled consonants → っ, x/l small kana, - → ー). Letters that can't become kana
+/// are kept and counted: like stray jamo for Hangul, they are the strongest sign the
+/// user wasn't typing Japanese.
 public enum RomajiComposer {
     public struct Result: Equatable, Sendable {
         /// Kana with any unconvertible letters left in place (こんにc while typing).
@@ -48,13 +49,8 @@ public enum RomajiComposer {
             if c == "n" {
                 if let next {
                     if next == "'" { emit("ん"); i += 2; continue }
-                    if next == "n" {
-                        // "nni" → んに, "nn" → ん
-                        let after: Character? = i + 2 < chars.count ? chars[i + 2] : nil
-                        emit("ん")
-                        i += (after.map { vowels.contains($0) || $0 == "y" } ?? false) ? 1 : 2
-                        continue
-                    }
+                    // "nn" is always ん, a vowel after it too: "rennai" → れんあい, "onnna" → おんな.
+                    if next == "n" { emit("ん"); i += 2; continue }
                     if !vowels.contains(next) && next != "y" { emit("ん"); i += 1; continue }
                 } else {
                     if partial { pending = String(typed[i]) } else { emit("ん") }
@@ -108,7 +104,7 @@ public enum RomajiComposer {
     }
 
     /// The shortest table entry for each single kana (ties: alphabetical); ん as "n'" so a
-    /// vowel typed after it can't take it over (n'a is んあ, nna would be んな).
+    /// vowel typed after it can't take it over (n'a is んあ, na would be な).
     static let spelling: [Character: String] = {
         var s: [Character: String] = ["ん": "n'"]
         for (key, value) in table where value.count == 1 {
