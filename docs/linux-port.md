@@ -70,7 +70,7 @@ its protocol and much of its shape.
 | marked text, clause underlines | preedit (`setClientPreedit`, or fcitx5's panel for apps that draw none) | Underlined; while converting, the clause the candidates are for highlighted. |
 | the candidate card (`CaretPanel.swift`) | fcitx5's candidate list: nine to a page, numbered, the reading and the page under them | Drawn by fcitx5's own UI (classic UI, KDE's kimpanel), in its theme. A click chooses (`choose`). |
 | the strip of readings | a vertical candidate list: each reading with its tag, ✓ after the remembered one and ✎ after one corrected once | A click switches to it (`pick`). fcitx5 has no animated strip. |
-| the long press's guess card | a vertical candidate list, numbered, what each guess changed underlined | A click picks it (`pickGuess`). No ring while the key is held; fcitx5's list has no color or wave. "No guesses" and "✦ Typo fixed" take the panel's upper line for a moment. |
+| the long press's guess card | a vertical candidate list, numbered | A click picks it (`pickGuess`). No ring while the key is held. What each guess changed goes with an underline format, which fcitx5's classic UI doesn't draw in its list (GNOME Wayland, real keys, 2026-11-04). "No guesses" and "✦ Typo fixed" take the panel's upper line for a moment. |
 | the capsule after a correction (Noted, Learned, Reset) | the panel's upper line for a moment (`✎ 안녕 · 한 번 고침`) | |
 | `PauseHUD` (the icon under the caret) | the tray icon turns to `araso-paused`, and fcitx5 shows "Araso 일시정지" by the caret | The icon can change on Linux. |
 | input menu (`menu()`) | the status area's Araso menu (tray, kimpanel), built by `ServiceRuntime.menu` | The same items and names; a check only on what is on. |

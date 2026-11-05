@@ -113,7 +113,7 @@ pkg, not both.
 The same input method on Windows 10 (1809) or later. Deciding words, the dictionary and learning are
 the same code as on macOS; kanji conversion is AzooKey's.
 
-1. Download `Araso-Setup.exe` from the [Windows beta](https://github.com/nyttastudio/araso/releases/tag/windows-beta-3)
+1. Download `Araso-Setup.exe` from the [Windows beta](https://github.com/nyttastudio/araso/releases/tag/windows-beta-4)
    and install it. It registers Araso and adds it to Korean's input methods, on x64 and ARM64 PCs
    alike. It isn't code-signed yet: when "Windows protected your PC" shows, choose **More info → Run anyway**.
 2. Pick **Araso** in the taskbar's input indicator. Its menu is the macOS input menu.
@@ -149,7 +149,7 @@ and distributions like it (glibc 2.35 or later).
    The settings window runs on Qt 5, which the package doesn't carry: on Arch install `qt5-base`, on
    Fedora `qt5-qtbase-gui`. When it's missing, `install.sh` says which command installs it.
 2. Download `Araso-linux-<arch>.tar.gz` for your architecture (`uname -m`) from the
-   [Linux beta](https://github.com/nyttastudio/araso/releases/tag/linux-beta-4), unpack it and run
+   [Linux beta](https://github.com/nyttastudio/araso/releases/tag/linux-beta-5), unpack it and run
    its `./install.sh`; it asks for your password. To install from source instead (Swift 6.2, CMake,
    fcitx5's development files and Qt 6; the list is in [docs/linux-port.md](docs/linux-port.md)):
 
@@ -347,9 +347,9 @@ the next key is hit. Composed as Hangul, that leaves loose jamo (`clekkr` → `�
 (`djddj` → `엉어`).
 
 - **Hold a language switch key for half a second, then let go**: the words one slip away from the word just
-  committed (or being typed) are listed like kanji candidates, the first put in its place (`엉어` → `영어`). While you hold, a red wave draws under the word to show when to let go (macOS); what each guess changed is colored with a wavy underline (on Linux, just underlined). Hold
+  committed (or being typed) are listed like kanji candidates, the first put in its place (`엉어` → `영어`). While you hold, a red wave draws under the word to show when to let go (macOS); what each guess changed is colored with a wavy underline (not on Linux). Hold
   again or ↓·↑ for another, a digit, a click or Return to pick one; Esc and Delete put the word back. Any other key
-  keeps what is shown and goes on. With nothing to guess, "No guesses" shows for a moment. 2-set only, one slip only. The 한/영 key, which acts as it goes down, can't be held for this (Windows, Linux).
+  keeps what is shown and goes on. With nothing to guess, "No guesses" shows for a moment. 2-set only, one slip only. A 한/영 key of its own, which acts as it goes down, can't be held for this (Windows, Linux); 한/영 in right Alt's place can (Windows).
 - **Fix typos** (Settings → Keys, `fixSlips`, off by default): where it is clear, the word is fixed as it ends
   (Space, punctuation) and "✦ Typo fixed" shows for a moment (`clekkr` → `치다가`). Only when the keys as typed
   leave loose jamo or a syllable nobody types (a word of syllables only, only for Shift on a final: `햇어요` → `했어요`), don't

@@ -29,7 +29,18 @@ bool Verbose() {
     return verbose;
 }
 
-bool IsModifier(WPARAM vk) {
+/// Right Alt where the Korean keyboard type makes it 한/영: VK_HANGUL from right Alt's place, which
+/// is a key with a release, so it can be held. A 한/영 key of its own (some send no release) isn't.
+bool IsRightAltHangul(WPARAM vk, LPARAM lParam) {
+    if (vk != VK_HANGUL) return false;
+    int scan = (lParam >> 16) & 0xFF;
+    if (scan != 0) return scan == 0x38 && ((lParam >> 24) & 1);
+    // WPF hands TSF keys without their scan codes: where this keyboard type has the key.
+    return MapVirtualKeyW(VK_HANGUL, MAPVK_VK_TO_VSC_EX) == 0xE038;
+}
+
+bool IsModifier(WPARAM vk, LPARAM lParam) {
+    if (IsRightAltHangul(vk, lParam)) return true;
     switch (vk) {
     case VK_SHIFT: case VK_LSHIFT: case VK_RSHIFT:
     case VK_CONTROL: case VK_LCONTROL: case VK_RCONTROL:
@@ -258,11 +269,11 @@ ITfContext *TextService::FocusedContext() {
 
 /// Whether the key may go to the host at all. Modifiers do (their taps switch and pause); the
 /// host decides the rest (`HostTakes`).
-bool TextService::Takes(WPARAM vk, bool down) const {
+bool TextService::Takes(WPARAM vk, LPARAM lParam, bool down) const {
     if (!threadMgr_) return false;
     if (vk == VK_CAPITAL || vk == VK_NUMLOCK || vk == VK_SCROLL || vk == VK_PROCESSKEY || vk == VK_PACKET) return false;
     // A key going up matters only for a modifier's tap.
-    if (!down) return IsModifier(vk);
+    if (!down) return IsModifier(vk, lParam);
     return true;
 }
 
@@ -287,7 +298,12 @@ bool TextService::HostTakes(WPARAM wParam, LPARAM lParam, bool up) {
 /// A modifier went down: the host hears of it (a tap starts; Ctrl puts a held word in), and the
 /// app gets it as well. Once per press: neither a second test nor the key repeating counts.
 void TextService::SeeModifier(ITfContext *context, WPARAM wParam, LPARAM lParam) {
-    if (!context || seen_.Is(wParam, lParam) || (lParam & (1 << 30))) return;
+    if (!context || (lParam & (1 << 30))) return;
+    if (seen_.Is(wParam, lParam)) {
+        seen_.at = GetTickCount(); // WPF's repeats look like the first press: still the same one
+        return;
+    }
+    if (Verbose() && IsRightAltHangul(wParam, lParam)) Log("right Alt arrives as VK_HANGUL");
     seen_ = {true, wParam, lParam, GetTickCount(), true};
     Json key = KeyJson(wParam, lParam);
     context->AddRef();
@@ -307,9 +323,11 @@ void TextService::SeeModifier(ITfContext *context, WPARAM wParam, LPARAM lParam)
 
 STDMETHODIMP TextService::OnTestKeyDown(ITfContext *context, WPARAM wParam, LPARAM lParam, BOOL *eaten) {
     *eaten = FALSE;
-    if (!Takes(wParam, true) || replayed_.Is(wParam, 0)) return S_OK;
-    if (IsModifier(wParam)) {
+    if (!Takes(wParam, lParam, true) || replayed_.Is(wParam, 0)) return S_OK;
+    if (IsModifier(wParam, lParam)) {
         SeeModifier(context, wParam, lParam);
+        // 한/영 stays kept from the app, as it was when it acted going down.
+        if (wParam == VK_HANGUL) *eaten = HostTakes(wParam, lParam, false) ? TRUE : FALSE;
         return S_OK;
     }
     *eaten = HostTakes(wParam, lParam, false) ? TRUE : FALSE;
@@ -319,13 +337,18 @@ STDMETHODIMP TextService::OnTestKeyDown(ITfContext *context, WPARAM wParam, LPAR
 
 STDMETHODIMP TextService::OnKeyDown(ITfContext *context, WPARAM wParam, LPARAM lParam, BOOL *eaten) {
     *eaten = FALSE;
-    if (!Takes(wParam, true)) return S_OK;
+    if (!Takes(wParam, lParam, true)) return S_OK;
     if (replayed_.Is(wParam, 0)) {
         replayed_.valid = false; // the app's now
         return S_OK;
     }
-    if (IsModifier(wParam)) {
+    if (IsModifier(wParam, lParam)) {
         SeeModifier(context, wParam, lParam); // an app that didn't test the key first
+        if (wParam == VK_HANGUL) {
+            *eaten = HostTakes(wParam, lParam, false) ? TRUE : FALSE;
+            asked_.valid = false;
+            hangulKept_ = *eaten == TRUE;
+        }
         return S_OK;
     }
     bool taken = HostTakes(wParam, lParam, false);
@@ -339,25 +362,32 @@ STDMETHODIMP TextService::OnKeyDown(ITfContext *context, WPARAM wParam, LPARAM l
 }
 
 STDMETHODIMP TextService::OnTestKeyUp(ITfContext *, WPARAM wParam, LPARAM lParam, BOOL *eaten) {
+    if (seen_.vk == wParam) seen_.valid = false; // the next press is a press, however soon
     if (keptDown_[wParam & 0xFF]) {
         *eaten = TRUE;
         return S_OK;
     }
-    *eaten = Takes(wParam, false) && HostTakes(wParam, lParam, true) ? TRUE : FALSE;
+    *eaten = Takes(wParam, lParam, false) && HostTakes(wParam, lParam, true) ? TRUE : FALSE;
+    if (wParam == VK_HANGUL && hangulKept_) *eaten = TRUE; // the app never saw it go down
     return S_OK;
 }
 
 STDMETHODIMP TextService::OnKeyUp(ITfContext *context, WPARAM wParam, LPARAM lParam, BOOL *eaten) {
     *eaten = FALSE;
+    if (seen_.vk == wParam) seen_.valid = false;
     if (keptDown_[wParam & 0xFF]) {
         keptDown_[wParam & 0xFF] = false;
         *eaten = TRUE;
         if (Verbose()) Log("up kept, composing %d", composition_ ? 1 : 0);
         return S_OK;
     }
-    if (!Takes(wParam, false)) return S_OK;
+    if (!Takes(wParam, lParam, false)) return S_OK;
     bool taken = HostTakes(wParam, lParam, true);
     asked_.valid = false;
+    if (wParam == VK_HANGUL && hangulKept_) {
+        hangulKept_ = false;
+        *eaten = TRUE; // whether or not the tap did anything: the app never saw it go down
+    }
     if (!taken) return S_OK;
     HandleKey(context, wParam, lParam, "keyUp", eaten);
     *eaten = TRUE;
@@ -388,6 +418,10 @@ Json TextService::KeyJson(WPARAM wParam, LPARAM lParam) const {
     }
     key.set("scan", scan);
     key.set("extended", ((lParam >> 24) & 1) != 0);
+    if (IsRightAltHangul(wParam, lParam)) { // what the host goes by, with or without a scan code
+        key.set("scan", 0x38);
+        key.set("extended", true);
+    }
     key.set("shift", GetKeyState(VK_SHIFT) < 0);
     key.set("ctrl", GetKeyState(VK_CONTROL) < 0);
     key.set("alt", GetKeyState(VK_MENU) < 0);

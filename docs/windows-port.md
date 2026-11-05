@@ -64,7 +64,7 @@ new. This file maps each macOS piece to its Windows one and says where the two d
 | `PauseHUD` | the host's `PauseHud` | Araso's icon under the caret for a moment, struck through when paused. |
 | input menu (`menu()`) | the input indicator's menu (`LangBarButton`, `GUID_LBI_INPUTMODE`) | The same items and names, built by `ServiceRuntime.menu`, "Changed by the Dictionary" included. |
 | bundle identifier (`apps.json`) | exe name, lowercase (`notepad.exe`, `code.exe`) | A key ending in `.` still matches as a prefix. |
-| right ⌥ tap (switch key) | right Alt tap, or the 한/영 key | On Korean keyboards right Alt is 한/영 (`VK_HANGUL`), which switches as it goes down (some keyboards send no release for it). A lone right Alt's release is taken, so the app doesn't open its menu bar. |
+| right ⌥ tap (switch key) | right Alt tap, or the 한/영 key | On Korean keyboard types where right Alt is `VK_HANGUL` it is still right Alt (scan 0x38, extended; WPF gives no scan code, so `MapVirtualKey` says): it acts as it goes up, a hold lists the guesses. A 한/영 key of its own switches as it goes down (some keyboards send no release for it). A lone right Alt's release is taken, so the app doesn't open its menu bar. |
 | right ⇧ tap, ⌥Space, Esc, ⇧Esc | right Shift tap, Alt+Space, Esc, Shift+Esc | Alt+Space is taken only when chosen. |
 | ⌘ | Ctrl (the shortcut key) | Right Ctrl tapped alone pauses (`rightCommand`, the default), and Ctrl going down puts a held word in before a paste. The 한자 key pauses as it goes down. The Windows key plays ⌃ (`rightControl`). |
 | pause shortcut (⌃⌥P) | Ctrl/Alt/Win + key | settings.json keeps macOS key codes and modifier names on both, so the file is the same; `KeyMapper` maps scan codes to them. |
@@ -93,7 +93,7 @@ new. This file maps each macOS piece to its Windows one and says where the two d
   which an exclusive full-screen game may hide.
 - What CI checks (`windows/scripts/typing-test.ps1`, on `windows-latest` and `windows-11-arm`):
   real key events into a WPF TextBox, Notepad's Edit control and the settings window's Try Typing
-  (Korean, English, a switch while typing and after a word, the pause tap, and 한/영 and 한자 as
+  (Korean, English, a switch while typing and after a word, right Alt held for the guesses, the pause tap, and 한/영 and 한자 as
   `VK_HANGUL`/`VK_HANJA`, and 한/영's own scan code); a process in an AppContainer, as a Store
   app's text service runs, attaching to the host (`ArasoHost.exe --appcontainer-test`); and on
   ARM64, where the runner has no desktop to type into, the text service created through COM in an

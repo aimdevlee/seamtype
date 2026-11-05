@@ -303,8 +303,8 @@ void Engine::drawPanel(fcitx::InputContext *ic, State *st, const Json &ui) {
         panel.setCandidateList(std::move(list));
         panel.setAuxDown(fcitx::Text());
     } else if (guesses.isObject() && guesses["texts"].size() > 0) {
-        // The long press's guesses, numbered, what each changed underlined: fcitx5's list has no
-        // color or wave of its own. `changed` counts UTF-16 units; Hangul and jamo are one each.
+        // The long press's guesses, numbered, what each changed as an underline format: the classic
+        // UI doesn't draw it in the list, other UIs may. `changed` counts UTF-16 units; Hangul and jamo are one each.
         auto list = std::make_unique<fcitx::CommonCandidateList>();
         const auto &texts = guesses["texts"].items();
         list->setPageSize(std::max<int>(1, static_cast<int>(texts.size())));
