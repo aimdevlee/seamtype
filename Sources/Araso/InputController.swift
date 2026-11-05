@@ -743,6 +743,8 @@ private final class IMKClient: TextClient {
     var marksFromCaret: Bool { true }
     var insertsRightAfterAnInsert: Bool { false }
     var dropsEmptyInserts: Bool { true }
+    /// Terminal, real keys (2026-11-05). Other terminals haven't been tried.
+    var keysOnlyWhileMarked: Bool { input.bundleIdentifier() == "com.apple.Terminal" }
 }
 
 extension NSEvent.ModifierFlags {
