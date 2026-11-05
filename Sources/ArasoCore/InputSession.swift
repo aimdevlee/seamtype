@@ -30,6 +30,10 @@ public protocol TextClient: AnyObject {
     /// at the field's start has the caret put there with a zero-width space (`Fixing.placeholder`).
     /// Elsewhere (fcitx5) an empty insert takes the word away and leaves the caret there.
     var dropsEmptyInserts: Bool { get }
+    /// With nothing marked, the app takes Esc, Delete, Return and the arrows without showing them to the
+    /// input method, and the caret it reports catches up with an insert only after this key (Terminal,
+    /// real keys, 2026-11-05): a guess stays marked while its list is open, so those keys still work.
+    var keysOnlyWhileMarked: Bool { get }
 }
 
 public extension TextClient {
@@ -37,6 +41,7 @@ public extension TextClient {
     var marksFromCaret: Bool { false }
     var insertsRightAfterAnInsert: Bool { true }
     var dropsEmptyInserts: Bool { false }
+    var keysOnlyWhileMarked: Bool { false }
 
     /// A client that draws no clauses shows the plain marked text.
     func setMarkedText(_ text: String, selectedClause: NSRange, replacing range: NSRange?) {
@@ -308,8 +313,8 @@ public final class InputSession {
     /// key that picks one or goes on.
     public private(set) var guesses: Guesses?
     /// The guesses listed, the one in the word's place, and the word as it was before the list: what
-    /// Esc puts back.
-    private var guessing: (list: [SlipGuesser.Guess], selected: Int, before: Committed)?
+    /// Esc puts back. `marked`: the one shown is marked text, not in the field yet (`keysOnlyWhileMarked`).
+    private var guessing: (list: [SlipGuesser.Guess], selected: Int, before: Committed, marked: Bool)?
     /// Set by the word end that put a guess in without asking (`slipFix`): the word, for the input
     /// method to show by it; cleared by the next key.
     public private(set) var fixedSlip: String?
@@ -910,7 +915,7 @@ public final class InputSession {
     @discardableResult
     public func commandPressed(client: TextClient, heldWordOnly: Bool) -> Bool {
         if heldWordOnly, heldBoundary == nil { return false }
-        guard !keys.isEmpty || conversion != nil || fixing != nil else { return false }
+        guard !keys.isEmpty || conversion != nil || fixing != nil || guessing?.marked == true else { return false }
         readings = nil // as on any key: the strip is synced right after this
         learned = nil
         guesses = nil
@@ -924,6 +929,7 @@ public final class InputSession {
     /// Commits whatever is in progress as-is (focus change, shortcut, deactivation).
     public func commit(client: TextClient?) {
         if fixing != nil { return confirmFixing(client: client) }
+        if let client { settleMarkedGuess(client) }
         closeFlipWindow()
         if let conversion, conversion.language != .japanese { return commitPhrase(client: client) }
         if let conversion {
@@ -1074,14 +1080,18 @@ public final class InputSession {
     /// guess the list is empty, for the input method to say so, and the key goes nowhere.
     private func openGuesses(_ client: TextClient) -> Bool {
         if conversion != nil { return true }
-        if !keys.isEmpty, heldBoundary != nil || !confirmTyped(client) { commit(client: client) }
+        // Where keys need marked text, the word being typed stays marked: it needn't go in only to be
+        // taken away, and the caret wouldn't be after it yet.
+        let list = keys.isEmpty ? [] : Self.slipGuesser.guesses(for: keys)
+        let stayMarked = client.keysOnlyWhileMarked && !list.isEmpty
+        if !keys.isEmpty, heldBoundary != nil || !confirmTyped(client, insert: !stayMarked) { commit(client: client) }
         guard keys.isEmpty, let pending = lastCommit else { return true }
-        let list = Self.slipGuesser.guesses(for: pending.keys)
-        guard !list.isEmpty else {
+        let guessed = stayMarked ? list : Self.slipGuesser.guesses(for: pending.keys)
+        guard !guessed.isEmpty else {
             guesses = Guesses(texts: [], selected: 0, changed: [])
             return true
         }
-        guessing = (list, 0, pending)
+        guessing = (guessed, 0, pending, client.keysOnlyWhileMarked)
         showGuess(0, client)
         return true
     }
@@ -1089,7 +1099,7 @@ public final class InputSession {
     /// The keys while guesses are listed, as in the candidate window: the long press again or ↓ the
     /// next, ↑ the one before, a digit picks one, Return keeps the one shown, Esc and Delete put the
     /// word back as it was. The switch key and any other key keep the one shown and go on as after
-    /// any word (nil: `handle` goes on with the key).
+    /// any word (nil: `handle` goes on with the key), a guess that was marked going in first.
     private func handleGuessing(_ key: Key, client: TextClient) -> Bool? {
         guard let state = guessing, lastCommit != nil else { guessing = nil; return nil }
         let count = state.list.count
@@ -1102,16 +1112,17 @@ public final class InputSession {
             return true
         case .printable(let ch) where ch.wholeNumberValue.map({ (1...count).contains($0) }) == true:
             showGuess(ch.wholeNumberValue! - 1, client)
-            keepGuess()
+            keepGuess(client)
             return true
         case .enter:
-            keepGuess()
+            keepGuess(client)
             return true
         case .escape, .delete:
             guessing = nil
             putBack(state.before, client)
             return true
         default:
+            settleMarkedGuess(client)
             guessing = nil
             return nil
         }
@@ -1122,21 +1133,28 @@ public final class InputSession {
         guard let state = guessing, state.list.indices.contains(index) else { return }
         guesses = nil
         showGuess(index, client)
-        keepGuess()
+        keepGuess(client)
     }
 
     /// Guess `index` in the word's place, listed as selected.
     private func showGuess(_ index: Int, _ client: TextClient) {
         guard var state = guessing, let current = lastCommit else { return }
         let range = NSRange(location: current.location, length: utf16(current.text))
+        let marked = client.markedRange(), isMarked = state.marked && marked.location != NSNotFound && marked.length > 0
         let caret = client.selectedRange()
-        guard caret.location == NSMaxRange(range), caret.length == 0, client.text(in: range) == current.text else {
+        guard isMarked || (caret.location == NSMaxRange(range) && caret.length == 0 && client.text(in: range) == current.text) else {
             guessing = nil
             return
         }
         let base = state.before, guess = state.list[index]
         let text = guess.text + base.boundary(in: .korean)
-        client.insertText(text, replacing: range)
+        if !state.marked {
+            client.insertText(text, replacing: range)
+        } else if isMarked {
+            client.setMarkedText(text)
+        } else {
+            client.setMarkedText(text, replacing: range)
+        }
         if runText.hasSuffix(current.text) { runText = String(runText.dropLast(current.text.count)) + text }
         if base.inLine == nil { previousLanguage = .korean }
         var shown = Committed(keys: base.keys, decided: base.decided, committedAs: base.committedAs, language: .korean,
@@ -1156,8 +1174,9 @@ public final class InputSession {
     /// the dictionary remembers (a fix undone before, or a switch) are forgotten: the user meant a word.
     /// A fix picked again after Delete undid it (a Delete meant for the text) is no fix any more: the
     /// next Delete is the app's.
-    private func keepGuess() {
+    private func keepGuess(_ client: TextClient) {
         guard let state = guessing, let shown = lastCommit else { return }
+        settleMarkedGuess(client)
         guessing = nil
         guesses = nil
         lastCommit?.fixedTo = nil
@@ -1167,9 +1186,22 @@ public final class InputSession {
         }
     }
 
+    /// A guess shown as marked text goes in as it is.
+    private func settleMarkedGuess(_ client: TextClient) {
+        guard guessing?.marked == true, let shown = lastCommit, client.markedRange().location != NSNotFound else { return }
+        client.insertText(shown.text, replacing: nil)
+    }
+
     /// The word just committed back as `before`, where a guess was shown.
     private func putBack(_ before: Committed, _ client: TextClient) {
         guard let current = lastCommit else { return }
+        if client.keysOnlyWhileMarked, client.markedRange().location != NSNotFound {
+            client.insertText(before.text, replacing: nil)
+            if runText.hasSuffix(current.text) { runText = String(runText.dropLast(current.text.count)) + before.text }
+            if before.inLine == nil { previousLanguage = before.language.sentenceLanguage }
+            lastCommit = before
+            return
+        }
         let range = NSRange(location: current.location, length: utf16(current.text))
         guard client.text(in: range) == current.text else { lastCommit = before; return }
         client.insertText(before.text, replacing: range)
@@ -1667,15 +1699,16 @@ public final class InputSession {
 
     /// The word being typed only confirmed, the caret after it: the word just committed, with no
     /// boundary, so a switch key still changes it as after Space. False, nothing done, for a held
-    /// word or where the field gives no place for it.
-    private func confirmTyped(_ client: TextClient) -> Bool {
+    /// word or where the field gives no place for it. Without `insert`, the word stays marked, for a
+    /// guess to take its place.
+    private func confirmTyped(_ client: TextClient, insert: Bool = true) -> Bool {
         let marked = client.markedRange()
         let location = marked.location != NSNotFound ? marked.location : client.selectedRange().location
         guard heldBoundary == nil, location != NSNotFound else { return false }
         let previous = previousLanguage
         passedRun = nil
         let word = finishWord()
-        client.insertText(word.text, replacing: nil)
+        if insert { client.insertText(word.text, replacing: nil) }
         noteRun(word.text)
         lastCommit = Committed(keys: word.keys, decided: word.decided, committedAs: word.language,
                                language: word.language, text: word.text, boundary: "",

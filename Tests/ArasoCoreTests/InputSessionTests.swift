@@ -34,6 +34,14 @@ final class FakeTextField: TextClient {
     var insertsRightAfterAnInsert = true
     /// True as in macOS: an empty insert is dropped on the way to the field.
     var dropsEmptyInserts = false
+    /// True as in Terminal: with nothing marked the app takes Esc, Delete, Return and the arrows.
+    var keysOnlyWhileMarked = false
+    /// True as in Terminal: the caret reported right after an insert is where it was before, at the
+    /// start of the word, until the key is done (`caretCaughtUp`).
+    var caretLags = false
+    private var laggingCaret: Int?
+
+    func caretCaughtUp() { laggingCaret = nil }
 
     func setMarkedText(_ s: String, selectedClause: NSRange, replacing range: NSRange?) {
         if let range { setMarkedText(s, replacing: range) } else { setMarkedText(s) }
@@ -67,6 +75,7 @@ final class FakeTextField: TextClient {
         if dropsEmptyInserts, s.isEmpty { return }
         insertions.append(s)
         selectedClause = nil
+        if caretLags { laggingCaret = marked.location != NSNotFound ? marked.location : cursor }
         var target = insertsOverMarked && marked.location != NSNotFound ? marked
             : range ?? (marked.location != NSNotFound ? marked : NSRange(location: cursor, length: 0))
         if insertsFromCaret, marked.location == NSNotFound, target.location != cursor, NSMaxRange(target) != cursor {
@@ -77,7 +86,7 @@ final class FakeTextField: TextClient {
         cursor = target.location + (s as NSString).length
     }
 
-    func selectedRange() -> NSRange { NSRange(location: cursor, length: 0) }
+    func selectedRange() -> NSRange { NSRange(location: laggingCaret ?? cursor, length: 0) }
     func markedRange() -> NSRange { marked }
     func text(in range: NSRange) -> String? {
         guard readable, NSMaxRange(range) <= (text as NSString).length else { return nil }

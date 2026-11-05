@@ -36,8 +36,13 @@ import Testing
             case let c where c.isLetter: key = .letter(c)
             default: key = .printable(ch)
             }
-            guard !session.handle(key, client: field) else { continue }
+            defer { field.caretCaughtUp() }
+            // Terminal takes these itself with nothing marked: the input method never sees them.
+            let appsOwn = field.keysOnlyWhileMarked && field.markedRange().location == NSNotFound
+                && [.escape, .delete, .enter, .up, .down].contains(key)
+            guard appsOwn || !session.handle(key, client: field) else { continue }
             switch key {
+            case .escape: field.insertText("^[", replacing: nil)
             case .enter: field.insertText("\n", replacing: nil)
             case .delete:
                 let caret = field.selectedRange().location
@@ -235,5 +240,93 @@ import Testing
         #expect(session.learned?.learning == .forgot)
         type("x clekkr ")
         #expect(field.text.hasSuffix("치다가 "))
+    }
+
+    // MARK: - The long press in Terminal
+
+    /// As Terminal is, real keys: Esc, Delete, Return and the arrows reach the input method only with
+    /// text marked, and the caret reported right after an insert hasn't moved yet.
+    func likeTerminal() {
+        field.keysOnlyWhileMarked = true
+        field.caretLags = true
+    }
+
+    @Test func inTerminalEscPutsBackAWordAfterSpace() {
+        likeTerminal()
+        type("djddj ◆")
+        #expect(field.text == "영어 ")
+        #expect(field.markedRange().location == 0) // so that Esc comes to the input method
+        #expect(session.guesses?.texts.first == "영어")
+        type("⎋")
+        #expect(field.text == "엉어 ")
+        #expect(field.markedRange().location == NSNotFound)
+        #expect(session.guesses == nil)
+    }
+
+    @Test func inTerminalAWordBeingTypedListsGuesses() {
+        likeTerminal()
+        type("djddj◆")
+        #expect(field.text == "영어")
+        #expect(session.guesses?.texts.first == "영어")
+        #expect(field.insertions.isEmpty) // never went in just to be taken away
+        type("⏎")
+        #expect(field.text == "영어")
+        #expect(field.markedRange().location == NSNotFound)
+        #expect(session.guesses == nil)
+    }
+
+    @Test func inTerminalEscPutsBackAWordBeingTyped() {
+        likeTerminal()
+        type("djddj◆⎋")
+        #expect(field.text == "엉어")
+        #expect(field.markedRange().location == NSNotFound)
+        type("⌥") // the word just committed, as after Return
+        #expect(field.text == "djddj")
+    }
+
+    @Test func inTerminalTheListStepsAndADigitPicks() {
+        likeTerminal()
+        type("djddj ◆↓")
+        let second = session.guesses!.texts[1]
+        #expect(field.text == second + " ")
+        #expect(field.markedRange().location == 0)
+        type("1")
+        #expect(field.text == "영어 ")
+        #expect(field.markedRange().location == NSNotFound)
+        #expect(session.guesses == nil)
+    }
+
+    @Test func inTerminalTheNextWordKeepsTheGuess() {
+        likeTerminal()
+        type("djddj ◆vks ")
+        #expect(field.text == "영어 판 ")
+        #expect(field.markedRange().location == NSNotFound)
+    }
+
+    @Test func inTerminalLeavingKeepsTheGuess() {
+        likeTerminal()
+        type("djddj ◆")
+        #expect(session.commandPressed(client: field, heldWordOnly: false))
+        #expect(field.text == "영어 ")
+        #expect(field.markedRange().location == NSNotFound)
+        type("djddj ◆")
+        session.commit(client: field) // focus moves
+        #expect(field.text == "영어 영어 ")
+        #expect(field.markedRange().location == NSNotFound)
+    }
+
+    @Test func nothingToGuessInTerminalJustConfirms() {
+        likeTerminal()
+        type("zzzz◆")
+        #expect(field.text == "zzzz" || field.text == "ㅋㅋㅋㅋ")
+        #expect(field.markedRange().location == NSNotFound)
+        #expect(session.guesses?.texts.isEmpty == true)
+    }
+
+    @Test func aCaretThatLagsElsewhereBreaksNothing() {
+        field.caretLags = true // another terminal, not known to need marked text
+        type("djddj◆")
+        #expect(field.text == "엉어")
+        #expect(session.guesses == nil)
     }
 }
