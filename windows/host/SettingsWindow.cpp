@@ -133,6 +133,22 @@ LRESULT CALLBACK ContentProc(HWND window, UINT message, WPARAM wParam, LPARAM lP
     return DefWindowProcW(window, message, wParam, lParam);
 }
 
+/// A row of the sidebar, its title in the middle of the row's height: a plain list box draws it at
+/// the top of a row taller than the text.
+void DrawSidebarRow(const DRAWITEMSTRUCT &row) {
+    bool selected = (row.itemState & ODS_SELECTED) != 0;
+    FillRect(row.hDC, &row.rcItem, GetSysColorBrush(selected ? COLOR_HIGHLIGHT : COLOR_BTNFACE));
+    SetBkMode(row.hDC, TRANSPARENT);
+    SetTextColor(row.hDC, GetSysColor(selected ? COLOR_HIGHLIGHTTEXT : COLOR_WINDOWTEXT));
+    HGDIOBJ font = SelectObject(row.hDC, g.font);
+    RECT text = row.rcItem;
+    text.left += S(14);
+    DrawTextW(row.hDC, L(kPanes[row.itemID].title).c_str(), -1, &text,
+              DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX | DT_END_ELLIPSIS);
+    SelectObject(row.hDC, font);
+    if ((row.itemState & ODS_FOCUS) && !(row.itemState & ODS_NOFOCUSRECT)) DrawFocusRect(row.hDC, &row.rcItem);
+}
+
 LRESULT CALLBACK FrameProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
     switch (message) {
     case WM_SIZE:
@@ -145,6 +161,12 @@ LRESULT CALLBACK FrameProc(HWND window, UINT message, WPARAM wParam, LPARAM lPar
         return 0;
     case WM_CTLCOLORLISTBOX:
         return reinterpret_cast<LRESULT>(GetSysColorBrush(COLOR_BTNFACE));
+    case WM_DRAWITEM: {
+        const auto &row = *reinterpret_cast<const DRAWITEMSTRUCT *>(lParam);
+        if (row.hwndItem != g.sidebar || row.itemID >= static_cast<UINT>(kPaneCount)) break;
+        DrawSidebarRow(row);
+        return TRUE;
+    }
     case kRebuild:
         BuildPane();
         return 0;
@@ -172,6 +194,7 @@ LRESULT CALLBACK FrameProc(HWND window, UINT message, WPARAM wParam, LPARAM lPar
         g.dpi = HIWORD(wParam);
         MakeFonts();
         SendMessageW(g.sidebar, WM_SETFONT, reinterpret_cast<WPARAM>(g.font), TRUE);
+        SendMessageW(g.sidebar, LB_SETITEMHEIGHT, 0, S(34));
         auto *suggested = reinterpret_cast<RECT *>(lParam);
         SetWindowPos(window, nullptr, suggested->left, suggested->top, suggested->right - suggested->left,
                      suggested->bottom - suggested->top, SWP_NOZORDER | SWP_NOACTIVATE);
@@ -555,11 +578,12 @@ int RunSettings(const std::string &tab) {
     g.dpi = GetDpiForWindow(g.frame);
     MakeFonts();
     ChangeWindowMessageFilterEx(g.frame, WM_COPYDATA, MSGFLT_ALLOW, nullptr);
-    g.sidebar = CreateWindowExW(0, WC_LISTBOXW, L"", WS_CHILD | WS_VISIBLE | LBS_NOTIFY | LBS_NOINTEGRALHEIGHT, 0, 0, 0, 0,
+    g.sidebar = CreateWindowExW(0, WC_LISTBOXW, L"", WS_CHILD | WS_VISIBLE | LBS_NOTIFY | LBS_NOINTEGRALHEIGHT | LBS_OWNERDRAWFIXED | LBS_HASSTRINGS,
+                                0, 0, 0, 0,
                                 g.frame, nullptr, instance, nullptr);
     SendMessageW(g.sidebar, WM_SETFONT, reinterpret_cast<WPARAM>(g.font), TRUE);
     SendMessageW(g.sidebar, LB_SETITEMHEIGHT, 0, S(34));
-    for (const auto &pane : kPanes) ListBox_AddString(g.sidebar, (L"   " + L(pane.title)).c_str());
+    for (const auto &pane : kPanes) ListBox_AddString(g.sidebar, L(pane.title).c_str());
     g.content = CreateWindowExW(WS_EX_CONTROLPARENT, L"ArasoSettingsPane", L"", WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN,
                                 0, 0, 0, 0, g.frame, nullptr, instance, nullptr);
     Layout();
