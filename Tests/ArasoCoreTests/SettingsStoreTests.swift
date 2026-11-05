@@ -132,6 +132,15 @@ import Testing
         #expect(AppPolicies.load(from: apps).defaultPolicy.switchKeys == [.shiftEscape])
     }
 
+    /// Following the default again drops 0.1.8's `escapeToApp`, which changes the keys with none of its own.
+    @Test func followingTheDefaultDropsEscapeToApp() throws {
+        var entry = try JSONDecoder().decode(AppPolicy.Override.self, from: Data(#"{ "escapeToApp": false }"#.utf8))
+        #expect(entry.applied(to: .standard).switchKeys == AppPolicy.standard.switchKeys.union([.escape]))
+        entry.followDefaultKeys()
+        #expect(entry == AppPolicy.Override())
+        #expect(entry.applied(to: .standard).switchKeys == AppPolicy.standard.switchKeys)
+    }
+
     /// apps.json from 0.1.8: `escapeToApp` changes the default's Esc for an entry that doesn't
     /// name its switch keys; a later version's key name is skipped.
     @Test func oldEscapeToAppAndUnknownKeys() throws {
