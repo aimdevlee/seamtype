@@ -57,10 +57,13 @@ Source: "{#Stage}\*.dll"; Excludes: "ArasoTip.dll"; DestDir: "{app}"; Flags: ign
 Source: "{#Stage}\Resources\*"; DestDir: "{app}\Resources"; Flags: ignoreversion recursesubdirs
 ; The text service, loaded into every app: one per architecture. A copy in use is replaced at the
 ; next restart.
-Source: "{#Stage}\ArasoTip.dll"; DestDir: "{app}"; Flags: ignoreversion regserver restartreplace uninsrestartdelete
+Source: "{#Stage}\ArasoTip.dll"; DestDir: "{app}"; Flags: ignoreversion regserver restartreplace uninsrestartdelete; Check: not IsArm64
 Source: "{#Stage}\x86\ArasoTip.dll"; DestDir: "{app}\x86"; Flags: ignoreversion regserver 32bit restartreplace uninsrestartdelete
 ; ARM64: ArasoTip.dll is an ARM64X forwarder to ArasoTipArm64.dll (ARM64 apps) and ArasoTipX64.dll
-; (x64 apps under emulation), which share the one registration.
+; (x64 apps under emulation), which share the one registration. [Run] registers it. The x64 copy above
+; must not be registered here: with a file in use, Setup delays regserver to the next logon, after
+; [Run], and ARM64 apps can't load that copy.
+Source: "{#Stage}\ArasoTip.dll"; DestDir: "{app}"; Flags: ignoreversion restartreplace uninsrestartdelete; Check: IsArm64
 Source: "{#Stage}\arm64\*.dll"; DestDir: "{app}\arm64"; Flags: ignoreversion restartreplace uninsrestartdelete; Check: IsArm64
 Source: "{#Stage}\vim\*"; DestDir: "{app}\vim"; Flags: ignoreversion
 Source: "{#Stage}\ArasoHost.exe"; DestDir: "{app}"; Flags: ignoreversion
