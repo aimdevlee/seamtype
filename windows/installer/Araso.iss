@@ -51,18 +51,26 @@ english.DeleteData=Also delete settings and learned words?%n(%APPDATA%\Araso)
 english.AddedNote=Araso was added to your input methods. Pick it in the taskbar's input indicator.
 
 [Files]
-; The host and the Swift core it loads, with the Swift runtime beside them.
-Source: "{#Stage}\ArasoHost.exe"; DestDir: "{app}"; Flags: ignoreversion
+; The Swift core the host loads, with the Swift runtime beside it. The host itself is last: any app's
+; text service starts it as soon as the file is there, and it would hold the files still to come.
 Source: "{#Stage}\*.dll"; Excludes: "ArasoTip.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#Stage}\Resources\*"; DestDir: "{app}\Resources"; Flags: ignoreversion recursesubdirs
 ; The text service, loaded into every app: one per architecture. A copy in use is replaced at the
 ; next restart.
-Source: "{#Stage}\ArasoTip.dll"; DestDir: "{app}"; Flags: ignoreversion regserver restartreplace uninsrestartdelete
+Source: "{#Stage}\ArasoTip.dll"; DestDir: "{app}"; Flags: ignoreversion regserver restartreplace uninsrestartdelete; Check: not IsArm64
 Source: "{#Stage}\x86\ArasoTip.dll"; DestDir: "{app}\x86"; Flags: ignoreversion regserver 32bit restartreplace uninsrestartdelete
 ; ARM64: ArasoTip.dll is an ARM64X forwarder to ArasoTipArm64.dll (ARM64 apps) and ArasoTipX64.dll
-; (x64 apps under emulation), which share the one registration.
+; (x64 apps under emulation), which share the one registration. [Run] registers it. The x64 copy above
+; must not be registered here: with a file in use, Setup delays regserver to the next logon, after
+; [Run], and ARM64 apps can't load that copy.
+Source: "{#Stage}\ArasoTip.dll"; DestDir: "{app}"; Flags: ignoreversion restartreplace uninsrestartdelete; Check: IsArm64
 Source: "{#Stage}\arm64\*.dll"; DestDir: "{app}\arm64"; Flags: ignoreversion restartreplace uninsrestartdelete; Check: IsArm64
 Source: "{#Stage}\vim\*"; DestDir: "{app}\vim"; Flags: ignoreversion
+Source: "{#Stage}\ArasoHost.exe"; DestDir: "{app}"; Flags: ignoreversion
+
+[UninstallDelete]
+; What PrepareToInstall moved aside, if a process no one could stop kept it from going.
+Type: files; Name: "{app}\ArasoHost.exe.old"
 
 [Registry]
 ; The host starts at sign-in for every user.
@@ -88,16 +96,46 @@ begin
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM ArasoHost.exe', '', SW_HIDE, ewWaitUntilTerminated, Code);
 end;
 
+var
+  // The running host moved aside for this install, once PrepareToInstall has.
+  MovedHost: String;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  Host: String;
 begin
+  // Moved before it is stopped: the text service in every app starts the host again when it finds
+  // it gone (HostConnection::LaunchHost, also in the versions being replaced), and a running exe
+  // can't be replaced (#102). A running exe can be renamed, and with no file nothing starts.
+  Host := ExpandConstant('{app}\ArasoHost.exe');
+  if FileExists(Host + '.old') then begin
+    // A host an earlier install couldn't stop may still be running from it.
+    StopHost();
+    Sleep(500);
+    DeleteFile(Host + '.old');
+  end;
+  if FileExists(Host) and RenameFile(Host, Host + '.old') then
+    MovedHost := Host;
   StopHost();
+  Sleep(500); // the core's DLLs are free once it has really gone
   Result := '';
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
+  if (CurStep = ssPostInstall) and (MovedHost <> '') then begin
+    DeleteFile(MovedHost + '.old');
+    MovedHost := '';
+  end;
   if (CurStep = ssDone) and not WizardSilent() then
     MsgBox(CustomMessage('AddedNote'), mbInformation, MB_OK);
+end;
+
+procedure DeinitializeSetup();
+begin
+  // Cancelled: the version that stays needs its host back.
+  if (MovedHost <> '') and not FileExists(MovedHost) then
+    RenameFile(MovedHost + '.old', MovedHost);
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);

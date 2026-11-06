@@ -144,9 +144,12 @@ void BuildKeys() {
     Note(L("A Korean word with one key slipped (치다ㅏㄱ) goes in as the word meant (치다가); Delete right after undoes it. Hold the switch key for guesses either way."), S(20));
 
     Heading(L("Pause"));
-    // Off, the right-hand taps (Ctrl plays ⌘'s part on Windows), and a recorded shortcut.
+    // Off, the right-hand taps (Ctrl plays ⌘'s part on Windows), and a recorded shortcut. Right Win
+    // is listed only for a settings file that has it: a tap opens Windows' search and never pauses
+    // (#104).
     std::vector<std::wstring> items = {L("Off"), L("Right Ctrl tap (한자 on Korean keyboards)"), L("Right Alt tap"),
-                                       L("Right Shift tap"), L("Right Win tap")};
+                                       L("Right Shift tap")};
+    if (pause.isString() && pause.asString() == "rightControl") items.push_back(L("Right Win tap"));
     const char *taps[] = {"off", "rightCommand", "rightOption", "rightShift", "rightControl"};
     for (int k = 2; k <= 3; k++) {
         if (HasKey(keys, taps[k])) items[k] = L("%@ — switches languages", {items[k]});
