@@ -135,7 +135,10 @@ tests use `FakeTextField`). It owns the preview and hysteresis, commits, Esc rea
 - Words of the line can be fixed later (`Fixing`, `FixingTests`): `finalize` keeps each word that
   went in with a boundary in `recent` (20, cleared by Return and `activate`, kept across clicks and
   arrows, each checked against the field when used; text deleted or typed over drops the words from
-  there, `forgetRecent`). A `.cycle` (not Esc, often the app's) with the caret on one marks that word
+  there, `forgetRecent`; a capital the app put on a word's first letter, macOS's automatic
+  capitalization, is taken in when a switch key comes, `adoptAppCapitals`, the keys staying as typed;
+  in Notes with that on, the first ⇧Esc on such a word never reaches the input method, the first of
+  two, while a right ⌥ tap does, real keys, 2026-11-07). A `.cycle` (not Esc, often the app's) with the caret on one marks that word
   again (`Fixing.marked` words; the rest of the line, `trailing`, isn't touched), read the next way;
   the switch key cycles the clause, ←/→ resize it as in kanji conversion (the next words past a
   word's end, a cut inside one leaving the rest read on its own), ⇧←/⇧→ move its start inside the first word

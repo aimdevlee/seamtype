@@ -220,8 +220,9 @@ public final class InputSession {
         /// What it went in as (Esc after the commit changes `language`).
         let committedAs: Language
         let language: Language
-        /// Exactly what was inserted: the word plus its boundary character.
-        let text: String
+        /// Exactly what was inserted: the word plus its boundary character. The app's capital on its
+        /// first letter is taken in when a switch key comes (`adoptAppCapitals`); `keys` stay as typed.
+        var text: String
         let boundary: String
         let location: Int
         let previous: Language?
@@ -585,11 +586,12 @@ public final class InputSession {
         case .letter, .printable, .escape, .cycle: break
         default: passedRun = nil
         }
-        let pending = lastCommit
-        lastCommit = nil
         // Esc switches languages where it is a switch key (and no reporting vim owns it); the
         // other switch keys arrive as `.cycle` only where they are chosen.
         let switchesLanguage = key == .cycle || (key == .escape && policy.switchKeys.contains(.escape) && vimMode == nil)
+        if switchesLanguage, keys.isEmpty { adoptAppCapitals(client) }
+        let pending = lastCommit
+        lastCommit = nil
         // A digit right after a switch key changed the word just committed (or one switched in place):
         // that reading of the list, numbered under it, as in the candidate window, which then closes:
         // ←/→ move the caret, as after any word.
@@ -1324,7 +1326,9 @@ public final class InputSession {
 
             /// The piece in `language`: the guess it went in as in its own, else its keys' reading.
             func reading(as language: Language, _ keysReading: (String, Language) -> String) -> String {
-                guessed != nil && language == self.language ? text : keysReading(keys, language)
+                let own = keysReading(keys, language)
+                guard language == self.language else { return own }
+                return guessed != nil || capitalizedByTheApp(own, text) ? text : own
             }
 
             func boundary(in language: Language) -> String {
@@ -1765,6 +1769,30 @@ public final class InputSession {
         }
     }
 
+    /// Words the app gave a capital since they went in (macOS's automatic capitalization, as in Notes)
+    /// are the words that went in, as they now read: every check against the field goes by `text`. Their
+    /// keys stay as typed, a capital being another jamo on some keys. Asked when a switch key comes.
+    private func adoptAppCapitals(_ cased: TextClient) {
+        let client = Self.uncased(cased)
+        let words = (recent + (lastCommit.map { [$0] } ?? [])).filter { $0.location != NSNotFound }
+        guard let start = words.map(\.location).min(), let end = words.map({ $0.location + utf16($0.text) }).max(),
+              let line = client.text(in: NSRange(location: start, length: end - start)), utf16(line) == end - start
+        else { return }
+        func adopt(_ word: inout Committed) {
+            guard word.location != NSNotFound else { return }
+            let now = (line as NSString).substring(with: NSRange(location: word.location - start, length: utf16(word.text)))
+            guard capitalizedByTheApp(word.text, now) else { return }
+            if runText.hasSuffix(word.text) { runText = String(runText.dropLast(word.text.count)) + now }
+            if word.firstText == word.text { word.firstText = now }
+            word.text = now
+        }
+        for index in recent.indices { adopt(&recent[index]) }
+        if var commit = lastCommit {
+            adopt(&commit)
+            lastCommit = commit
+        }
+    }
+
     /// An unchanged recent word containing the caret, including its start and end: its index in
     /// `recent` and the caret's UTF-16 offset. Clients without `marksFromCaret` also allow the caret
     /// immediately after the boundary. Nil for a selection, unreadable word, or no matching entry;
@@ -2125,7 +2153,10 @@ public final class InputSession {
 
     /// The first piece's first `lead` keys, read as they went in.
     private func leadReading(_ fixing: Fixing, _ lead: Int) -> String {
-        lead > 0 ? committedReading(String(fixing.pieces[0].keys.prefix(lead)), as: asItWentIn(fixing)) : ""
+        guard lead > 0 else { return "" }
+        let reading = committedReading(String(fixing.pieces[0].keys.prefix(lead)), as: asItWentIn(fixing))
+        let own = String(fixing.pieces[0].text.prefix(reading.count))
+        return capitalizedByTheApp(reading, own) ? own : reading
     }
 
     /// Whether the clause can start `lead` keys in, the text before it being the word's own start. So it
@@ -3495,4 +3526,10 @@ public final class InputSession {
         recent.append(commit)
         if recent.count > Self.recentLimit { recent.removeFirst(recent.count - Self.recentLimit) }
     }
+}
+
+/// `field` is `text` with only its first letter capitalized, what an app's automatic capitalization does.
+private func capitalizedByTheApp(_ text: String, _ field: String) -> Bool {
+    guard let first = text.first, first.isASCII, first.isLowercase else { return false }
+    return first.uppercased() + text.dropFirst() == field
 }
