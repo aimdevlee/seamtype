@@ -336,7 +336,7 @@ import Testing
     @Test func shiftLeftCutsTheWordBeingTyped() throws {
         type("helloab")
         #expect(session.handle(.shiftLeft, client: field))
-        session.handle(.shiftLeft, client: field)
+        session.handle(.left, client: field)
         let fixing = try #require(session.fixing)
         #expect(fixing.cut == 5)
         #expect(field.selectedClause == NSRange(location: 0, length: 5))
@@ -355,6 +355,278 @@ import Testing
         #expect(session.fixing == nil)
     }
 
+    /// ⇧→ and ←: only the middle of a word is fixed, the keys before and after it as they went in. The
+    /// mark stays where it is: only what it shows is drawn again.
+    @Test func bothEndsFixOnlyTheMiddle() throws {
+        type("hellodkssudworld ")
+        let end = field.cursor
+        caret(at: 0)
+        session.handle(.cycle, client: field)
+        while session.fixing?.language != .english { session.handle(.cycle, client: field) }
+        #expect(session.fixing?.pieces[0].language == .english)
+        for _ in 0..<5 { session.handle(.shiftRight, client: field) }
+        #expect(session.fixing?.lead == 5)
+        #expect(field.selectedClause == NSRange(location: 5, length: 11))
+        for _ in 0..<5 { session.handle(.left, client: field) }
+        #expect(session.fixing?.cut == 11)
+        #expect(field.selectedClause == NSRange(location: 5, length: 6))
+        while session.fixing?.language != .korean { session.handle(.cycle, client: field) }
+        let middle = korean("dkssud"), length = (middle as NSString).length
+        #expect(field.text == "hello\(middle)world ")
+        #expect(field.selectedClause == NSRange(location: 5, length: length))
+        #expect(field.marked == NSRange(location: 0, length: 5 + length + 5))
+        // The strip lists the middle's readings.
+        let readings = try #require(session.readings)
+        #expect(readings.texts.contains(middle) && readings.texts.contains("dkssud"))
+        #expect(!readings.texts.contains { $0.contains("hello") || $0.contains("world") })
+
+        session.handle(.enter, client: field) // hello and the middle settled; world is the clause now
+        #expect(session.fixing?.settled == "hello\(middle)")
+        #expect(session.fixing?.lead == 0)
+        session.handle(.enter, client: field)
+        #expect(field.text == "hello\(middle)world ")
+        #expect(field.marked.location == NSNotFound)
+        #expect(field.cursor == end + length - 6)
+        #expect(session.engine.correctedOnce("hellodkssudworld", app: nil) == nil) // part of a word teaches nothing
+    }
+
+    /// The clause's start stops at the word's start and one key before the clause's end, and comes
+    /// back: back at the start the word is whole again, and learned as such.
+    @Test func theStartStopsAtBothEnds() throws {
+        type("hello ")
+        caret(at: 0)
+        session.handle(.cycle, client: field)
+        session.handle(.shiftLeft, client: field)
+        #expect(session.fixing?.lead == 0)
+        for _ in 0..<9 { session.handle(.shiftRight, client: field) }
+        #expect(session.fixing?.lead == 4) // one key left
+        #expect(session.handle(.left, client: field))
+        #expect(session.fixing?.cut == nil) // one key: nothing to cut
+        for _ in 0..<9 { session.handle(.shiftLeft, client: field) }
+        #expect(session.fixing?.lead == 0)
+        session.handle(.enter, client: field)
+        #expect(field.text == "\(korean("hello")) ")
+        #expect(session.engine.correctedOnce("hello", app: nil) == .korean)
+    }
+
+    /// Korean's start goes by whole syllables, so the text before it stays as it went in.
+    @Test func theStartGoesBySyllables() {
+        type("gksrmf ")
+        #expect(field.text == "한글 ")
+        caret(at: 0)
+        _ = session.handle(.cycle, client: field)
+        _ = session.handle(.shiftRight, client: field)
+        #expect(session.fixing?.lead == 3)
+        #expect(field.text.hasPrefix("한"))
+        _ = session.handle(.shiftRight, client: field) // 그 isn't 글's start: it stays
+        #expect(session.fixing?.lead == 3)
+        _ = session.handle(.shiftLeft, client: field)
+        #expect(session.fixing?.lead == 0)
+    }
+
+    /// Where a text service asks before it sends a key, ⇧ arrows right after a switch key on the word
+    /// just committed are kept from the app too, as ←/→ are.
+    @Test func shiftArrowsAfterASwitchAreTaken() {
+        type("hello ")
+        #expect(!session.takesArrow(.shiftRight))
+        _ = session.handle(.cycle, client: field)
+        #expect(session.takesArrow(.shiftRight) && session.takesArrow(.shiftLeft))
+    }
+
+    /// With the start moved, the end goes by what is left after it too: 세요 and 요, never ㅛ or ㅔ요.
+    @Test func bothEndsKeepWhatIsOutsideAsItWentIn() {
+        type("dkssudgktpdy ")
+        #expect(field.text == "안녕하세요 ")
+        caret(at: 0)
+        _ = session.handle(.cycle, client: field) // English
+        for _ in 0..<2 { _ = session.handle(.shiftRight, client: field) }
+        #expect(session.fixing?.lead == 6)
+        _ = session.handle(.left, client: field)
+        #expect(session.fixing?.cut == 10)
+        #expect(field.text == "안녕gktp요 ")
+        _ = session.handle(.left, client: field)
+        #expect(session.fixing?.cut == 8)
+        #expect(field.text == "안녕gk세요 ")
+        _ = session.handle(.left, client: field) // ㅏ세요 is no word's end: it stays
+        #expect(session.fixing?.cut == 8)
+        _ = session.handle(.right, client: field)
+        #expect(session.fixing?.cut == 10)
+        _ = session.handle(.right, client: field)
+        #expect(session.fixing?.cut == nil)
+    }
+
+    /// A cut made first moves on to where the rest is the word's end once the start moves in.
+    @Test func aCutMovesWhenTheStartComesIn() {
+        type("dkssudgktpdy ")
+        caret(at: 0)
+        _ = session.handle(.cycle, client: field)
+        _ = session.handle(.left, client: field)
+        #expect(session.fixing?.cut == 11) // the rest ㅛ, read on its own
+        _ = session.handle(.shiftRight, client: field)
+        #expect(session.fixing?.lead == 3)
+        #expect(session.fixing?.cut == nil) // no rest but the word's own: 요 is 2 keys, past the cut
+    }
+
+    /// An arrow at the end of what it can do keeps the strip up: a digit still picks from it.
+    @Test func theStripStaysAtTheEnds() throws {
+        type("hello world ")
+        caret(at: 0)
+        _ = session.handle(.cycle, client: field)
+        let listed = try #require(session.readings)
+        _ = session.handle(.shiftLeft, client: field) // already at the word's start
+        #expect(session.readings?.texts == listed.texts)
+        for _ in 0..<9 { _ = session.handle(.shiftRight, client: field) }
+        #expect(session.fixing?.lead == 4)
+        let short = try #require(session.readings)
+        _ = session.handle(.shiftRight, client: field)
+        #expect(session.readings?.texts == short.texts)
+        _ = session.handle(.left, client: field) // one key: nothing to cut
+        #expect(session.readings?.texts == short.texts)
+    }
+
+    /// With a cut, the start stops one key before it, and the end one key after the start.
+    @Test func theStartAndACutKeepAKeyBetweenThem() throws {
+        type("hello ")
+        caret(at: 0)
+        session.handle(.cycle, client: field)
+        session.handle(.left, client: field)
+        session.handle(.left, client: field) // cut at 3
+        for _ in 0..<5 { session.handle(.shiftRight, client: field) }
+        #expect(session.fixing?.lead == 2)
+        #expect(session.fixing?.cut == 3)
+        session.handle(.left, client: field)
+        #expect(session.fixing?.cut == 3)
+    }
+
+    /// A clause of several words can start inside the first.
+    @Test func theStartInsideTheFirstOfSeveralWords() throws {
+        type("hello world ")
+        caret(at: 0)
+        session.handle(.cycle, client: field) // Korean
+        session.handle(.right, client: field)
+        #expect(session.fixing?.count == 2)
+        for _ in 0..<3 { session.handle(.shiftRight, client: field) }
+        let rest = "\(korean("lo")) \(korean("world"))"
+        #expect(field.text == "hel\(rest) ")
+        #expect(field.selectedClause == NSRange(location: 3, length: (rest as NSString).length))
+        session.handle(.enter, client: field)
+        #expect(field.text == "hel\(rest) ")
+        #expect(field.cursor == (field.text as NSString).length)
+    }
+
+    /// Part of a word fixed: `recent` doesn't keep that word, whose text its keys no longer give, but
+    /// the words after it can still be fixed, wherever the fix moved them.
+    @Test func wordsAfterACutWordCanStillBeFixed() {
+        type("the hello again ")
+        caret(at: 4)
+        session.handle(.cycle, client: field)
+        session.handle(.left, client: field) // a cut
+        session.handle(.enter, client: field) // the front settled
+        session.handle(.enter, client: field) // the rest in
+        #expect(session.fixing == nil)
+        let line = field.text
+        #expect(line.hasPrefix("the ") && line.hasSuffix(" again "))
+
+        let again = (line as NSString).length - 6
+        caret(at: again)
+        #expect(session.handle(.cycle, client: field))
+        #expect(field.marked == NSRange(location: again, length: (korean("again") as NSString).length))
+        session.handle(.enter, client: field)
+        #expect(field.text == "\(line.dropLast(6))\(korean("again")) ")
+    }
+
+    @Test func wordsAfterAWordFixedFromInsideCanStillBeFixed() {
+        type("the hello again ")
+        caret(at: 4)
+        session.handle(.cycle, client: field)
+        session.handle(.shiftRight, client: field) // the start inside hello
+        session.handle(.enter, client: field)
+        let line = field.text
+        #expect(line == "the h\(korean("ello")) again ")
+
+        caret(at: (line as NSString).length - 6)
+        #expect(session.handle(.cycle, client: field))
+        session.handle(.enter, client: field)
+        #expect(field.text == "the h\(korean("ello")) \(korean("again")) ")
+    }
+
+    /// A clause that starts inside a word and takes in the next: that next word is whole, read as
+    /// the fix left it, and the one after it as it was.
+    @Test func wordsInAClauseFromInsideAreKeptAsTheyRead() {
+        type("hello world again ")
+        caret(at: 0)
+        session.handle(.cycle, client: field) // Korean
+        session.handle(.right, client: field)
+        session.handle(.shiftRight, client: field)
+        session.handle(.enter, client: field)
+        let line = "h\(korean("ello")) \(korean("world")) again "
+        #expect(field.text == line)
+
+        caret(at: (line as NSString).length - 2)
+        #expect(session.handle(.cycle, client: field))
+        session.handle(.enter, client: field)
+        #expect(field.text == "h\(korean("ello")) \(korean("world")) \(korean("again")) ")
+
+        // The whole word in the clause reads Korean now: its next reading is English.
+        let world = ("h\(korean("ello")) " as NSString).length
+        caret(at: world)
+        #expect(session.handle(.cycle, client: field))
+        #expect(field.text.hasPrefix("h\(korean("ello")) world "))
+        session.handle(.enter, client: field)
+        #expect(field.text == "h\(korean("ello")) world \(korean("again")) ")
+    }
+
+    /// With the caret moved first and a zero-width space before the field's first word, as in a
+    /// macOS text view.
+    @Test func wordsAfterAPartOfTheFieldsFirstWordKeepTheirPlace() {
+        field.marksFromCaret = true
+        type("hello again ")
+        caret(at: 2)
+        session.handle(.cycle, client: field)
+        session.handle(.shiftRight, client: field)
+        session.handle(.enter, client: field)
+        let line = "h\(korean("ello")) again "
+        #expect(field.text == line)
+
+        caret(at: (line as NSString).length - 6)
+        #expect(session.handle(.cycle, client: field))
+        session.handle(.enter, client: field)
+        #expect(field.text == "h\(korean("ello")) \(korean("again")) ")
+    }
+
+    /// The word fixed in part is gone from `recent`, and with it the way from a word before it to one
+    /// after: → past that word doesn't reach across.
+    @Test func aWordFixedInPartStaysOutOfLaterFixes() {
+        type("the hello again ")
+        caret(at: 4)
+        session.handle(.cycle, client: field)
+        session.handle(.shiftRight, client: field)
+        session.handle(.enter, client: field)
+        let line = field.text
+
+        caret(at: 6) // inside what was hello
+        session.handle(.cycle, client: field)
+        #expect(session.fixing == nil)
+        #expect(field.text == line)
+
+        caret(at: 0)
+        session.handle(.cycle, client: field)
+        #expect(session.fixing?.pieces.count == 1)
+        session.handle(.escape, client: field)
+        #expect(field.text == line)
+    }
+
+    @Test func escapeAfterMovingTheStartPutsItBack() {
+        type("hello world ")
+        caret(at: 0)
+        session.handle(.cycle, client: field)
+        session.handle(.shiftRight, client: field)
+        session.handle(.escape, client: field)
+        #expect(field.text == "hello world ")
+        #expect(field.marked.location == NSNotFound)
+        #expect(field.cursor == 12)
+    }
+
     /// A field that doesn't give its marked text back (Chrome) still lets ⇧← fix the word being
     /// typed, from the text the session marked: before, ⇧← went to the app, which selected the
     /// word, and the next key typed over it.
@@ -363,7 +635,7 @@ import Testing
         let shown = field.text
         field.readable = false
         #expect(session.handle(.shiftLeft, client: field))
-        session.handle(.shiftLeft, client: field)
+        session.handle(.left, client: field)
         #expect(session.fixing?.cut == 5)
         #expect(field.text == shown)
         session.handle(.enter, client: field)
@@ -872,7 +1144,7 @@ import Testing
         field.cursor = 0
         type("helloab")
         session.handle(.shiftLeft, client: field)
-        session.handle(.shiftLeft, client: field) // hello|ab
+        session.handle(.left, client: field) // hello|ab
         let korean5 = try #require(session.readings?.languages.firstIndex(of: .korean))
         #expect(session.handle(.printable(Character(String(korean5 + 1))), client: field))
         #expect(session.fixing?.settled == korean("hello"))

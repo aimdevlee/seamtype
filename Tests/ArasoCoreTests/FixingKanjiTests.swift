@@ -36,6 +36,34 @@ import Testing
         #expect(field.text == "まで it ")
     }
 
+    /// The Korean half of a mixed word can't be left in front of the clause: the keys alone don't read so.
+    @Test func theStartStaysOutOfAMixedWordsKoreanHalf() throws {
+        type("githubdp ")
+        #expect(field.text == "github에 ")
+        field.cursor = 0
+        _ = session.handle(.cycle, client: field)
+        #expect(session.fixing?.pieces[0].language == .mixed)
+        for _ in 0..<9 { _ = session.handle(.shiftRight, client: field) }
+        let fixing = try #require(session.fixing)
+        #expect(fixing.lead == 6)
+        #expect(field.text.hasPrefix("github"))
+    }
+
+    /// Space converts a whole word only: with its start moved, it confirms the fix as before; moved
+    /// back, the word is whole again and converts.
+    @Test func spaceConvertsOnlyAWholeWord() {
+        fixMadeAsKana()
+        _ = session.handle(.shiftRight, client: field)
+        _ = session.handle(.shiftLeft, client: field)
+        #expect(session.handle(.printable(" "), client: field))
+        #expect(session.conversion != nil)
+        _ = session.handle(.escape, client: field) // back to the kana
+        _ = session.handle(.shiftRight, client: field)
+        _ = session.handle(.printable(" "), client: field)
+        #expect(session.conversion == nil)
+        #expect(session.fixing == nil)
+    }
+
     @Test func spaceOpensTheCandidatesInPlace() {
         fixMadeAsKana()
         #expect(session.handle(.printable(" "), client: field))

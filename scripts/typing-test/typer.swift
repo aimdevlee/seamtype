@@ -4,7 +4,7 @@
 //
 // usage: typer <cases.tsv> <Araso.app> [probe]    each line: script<TAB>expected
 // probe: the keys of 안녕 + Space on the suite's layout (dkssud on 2-set, the default).
-// script: characters as typed; ⏎ Return, ⎋ Esc, ⇧ Shift+Esc, ⌫ Delete, ← → ↑ ↓ arrows;
+// script: characters as typed; ⏎ Return, ⎋ Esc, ⇧ Shift+Esc, ⌫ Delete, ← → ↑ ↓ arrows, ⇠ ⇢ Shift+←/→;
 // ◆ right ⌥ held past the long press (lists guesses, `SlipGuesser`);
 // 🔒 a terminal starts waiting for a password, 🅡 a full-screen program (vim), 🔓 neither (a shell);
 // 🔏 a pty nobody's terminal is in a password's mode (WebDriverAgent's output, #83), until 🔓.
@@ -60,6 +60,7 @@ let keyCodes: [Character: (CGKeyCode, Bool)] = {
     m["@"] = (19, true); m["_"] = (27, true); m["("] = (25, true); m[")"] = (29, true)
     m["⏎"] = (36, false); m["⎋"] = (53, false); m["⇧"] = (53, true); m["⌫"] = (51, false)
     m["←"] = (123, false); m["→"] = (124, false); m["↓"] = (125, false); m["↑"] = (126, false)
+    m["⇠"] = (123, true); m["⇢"] = (124, true)
     return m
 }()
 
