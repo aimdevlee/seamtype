@@ -368,7 +368,7 @@ Right after a word is committed with Space or punctuation (or only confirmed wit
 next reading, and pressing it again keeps cycling. More symbols, digits and a space after the punctuation
 (`world. `, `world?! `, `안녕.12`) or deleting the space or punctuation first keep that chance; any other key ends it. This needs the caret still right after the word, and an app that
 lets Araso read the text there. Right after such a switch the strip is numbered, and a digit picks that
-reading and closes it, as a click in the strip does; ←/→ then move the caret (a digit typed without a switch goes in as usual).
+reading and closes it, as a click in the strip does; Return keeps the reading shown and closes it, with no new line; ←/→ then move the caret (a digit typed without a switch goes in as usual).
 
 A word earlier in the line can be fixed too. Put the caret anywhere in it (click, ⌥←, ⌥→) and tap
 right ⌥ (or ⇧Esc, or ⌥Space if chosen): that word alone is underlined again, read the next way,
