@@ -194,7 +194,8 @@ tests use `FakeTextField`). It owns the preview and hysteresis, commits, Esc rea
   candidate window (a cut's front settles, else the fix is in). Digits and clicks share `pickReading`
   everywhere the strip shows: the word being typed is confirmed reading that way (`pickTyped`, as Return
   confirms it; numbered except on 3-set, whose digit keys are jamo), the word just committed switches
-  (`pickCommitted`). Windows and Linux number the readings too, where the digits pick (`UIState.Readings.numbered`). The strip shows only for a switch key: the caret
+  (`pickCommitted`). Return in that list keeps the reading shown and closes it, never the app's newline
+  (the word being typed confirmed so, `returnConfirmsOnly` or not; `takesArrow` keeps it on Windows). Windows and Linux number the readings too, where the digits pick (`UIState.Readings.numbered`). The strip shows only for a switch key: the caret
   merely coming to an unsure word lists nothing (an automatic list there, until 0.4.5, wasn't wanted).
   With nothing marked only `firstRect` gives a place, whose origin comes at the line's top through IMK
   (TextEdit and Notes, against `attributes(forCharacterIndex:)` for the same marked text, 2026-10-29),
