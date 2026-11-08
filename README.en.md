@@ -382,9 +382,12 @@ back reads as it was but keeps a thin underline.
 The strip under it follows, listing the readings of the part being fixed, numbered: a digit or a click
 picks that reading and goes on as Return does, as in the candidate window: a cut front part settles
 and the rest is fixed next, else the fix is done. Return on such a front
-part settles it and goes on with the rest. ⇧←/⇧→ do the same. The word being
-typed can be cut the same way: after a switch key changed its reading ←/→ do it, before that ⇧←
-(`helloab`, ⇧←⇧← → `hello` | `ab`; ← before a switch puts the word in and moves the caret, as
+part settles it and goes on with the rest. ⇧←/⇧→ move the part's start (by whole syllables in Korean and kana in Japanese), what is
+left before it staying as it went in, so not into a mixed word's Korean half or into kanji; ←/→ then stop only where what is left after it is as it went in too; with ← only the middle of a word changes (`hellodkssudworld`,
+⇧→ five times and ← five times → `hello` | `안녕` | `world`). The start moves inside the first word only:
+to fix the word before it too, start on that word and grow with →. The word being
+typed can be cut the same way: after a switch key changed its reading ←/→ do it at once, before that
+⇧← starts it, a key cut (`helloab`, ⇧←← → `hello` | `ab`; ← before a switch puts the word in and moves the caret, as
 before). A whole word fixed as Japanese opens the candidate window on Space, chosen as for a word
 being typed (Space and ↑/↓ for candidates, ←/→ resize the clause, Return or a digit picks and ends
 the fix, Esc goes back to the kana). A word just committed with Space or Return becomes such a fix too
