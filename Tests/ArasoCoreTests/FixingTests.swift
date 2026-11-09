@@ -269,6 +269,32 @@ import Testing
         #expect(session.readings == nil)
     }
 
+    /// Chrome and Electron apps (the Claude app) report the marked range from the caret before the word
+    /// was taken away: the field's text shows the fix in its place, so the arrows resize the clause
+    /// instead of dropping the fix.
+    @Test(arguments: [7, 8, 11]) func whereTheMarkedRangeIsGuessed(at offset: Int) {
+        field.marksFromCaret = true
+        field.insertsFromCaret = true
+        field.guessesMarkedRange = true
+        type("hello world again ")
+        caret(at: offset) // inside world, or at its end
+        field.rendererCaughtUp()
+        session.handle(.cycle, client: field)
+        let world = korean("world")
+        #expect(field.marked == NSRange(location: 6, length: (world as NSString).length))
+        field.rendererCaughtUp()
+        #expect(session.handle(.right, client: field))
+        let clause = "\(world) \(korean("again"))"
+        #expect(session.fixing?.count == 2)
+        #expect(field.marked == NSRange(location: 6, length: (clause as NSString).length))
+        field.rendererCaughtUp()
+        #expect(session.handle(.left, client: field))
+        #expect(session.fixing?.count == 1)
+        session.handle(.enter, client: field)
+        #expect(field.text == "hello \(world) again ")
+        #expect(field.cursor == (field.text as NSString).length)
+    }
+
     /// The words after the fixed one are never written while it is fixed, only once it goes in, over
     /// themselves, to bring the caret back; a word ← gives back stays marked as it was.
     @Test func theTextAfterTheWordStaysAsItIs() {
