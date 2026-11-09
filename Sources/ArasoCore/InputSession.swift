@@ -1399,6 +1399,9 @@ public final class InputSession {
         /// A zero-width space put before the word at the field's start, to have the caret there
         /// (`takeAway`), and taken away when the fix ends (`removePlaceholder`); `start` and `end` count it.
         var placeholder = false
+        /// Where the app said the marked text was right after the fix marked it at the caret, when
+        /// that wasn't the fix's start but its length was right (`noteReportedMark`).
+        var reportedMark: Int?
         /// The word just committed, as it went in before the switch key changed it: Esc puts it back,
         /// in the flip window again (`startFixingCommitted`, `caretMoved`).
         var revert: Committed?
@@ -1472,6 +1475,7 @@ public final class InputSession {
             }
             takeAway(&fixing, to: markEnd, client)
             showFixing(&fixing, client)
+            noteReportedMark(&fixing, client)
         } else {
             showFixing(&fixing, client, replacing: NSRange(location: entry.location, length: utf16(fixing.markOriginal)))
         }
@@ -1645,6 +1649,7 @@ public final class InputSession {
         } else if client.marksFromCaret {
             takeAway(&fixing, to: caret.location, client)
             showFixing(&fixing, client)
+            noteReportedMark(&fixing, client)
         } else {
             showFixing(&fixing, client, replacing: range)
         }
@@ -2401,13 +2406,53 @@ public final class InputSession {
     /// as changed through it, so it isn't fixed.
     private static func uncased(_ client: TextClient) -> TextClient { (client as? CapsLockClient)?.base ?? client }
 
-    /// Whether the marked range matches the fix's expected location and UTF-16 length. Records
-    /// mismatched ranges in `fixingDropped`; this does not verify the marked text's contents.
+    /// Whether the fix's marked text is where the fix put it: the marked range the app reports, or
+    /// the place it reported right after the fix marked it (`Fixing.reportedMark`) with the length
+    /// shown now. Notes a mismatch for the log.
     private func markLanded(_ fixing: Fixing, _ client: TextClient) -> Bool {
         let wanted = NSRange(location: fixing.start, length: utf16(fixing.shown))
         let marked = client.markedRange()
-        if marked != wanted { fixingDropped = (marked, wanted) }
-        return marked == wanted
+        if marked == wanted { return true }
+        if let reported = fixing.reportedMark, marked.location == reported, marked.length == wanted.length { return true }
+        noteFixing("dropped", fixing, client)
+        return false
+    }
+
+    /// The place the app reports for the fix's marked text right after it went in at the caret, kept
+    /// when it isn't the fix's start though its length is right. Chrome and Electron apps (the Claude
+    /// app, real keys, 2026-11-09) report the place where the caret was before the word was taken away,
+    /// and keep it while the marked text is up, only its length following the text; the marked text
+    /// itself is where the fix put it, and the field's text under it can't be read back there.
+    private func noteReportedMark(_ fixing: inout Fixing, _ client: TextClient) {
+        let reported = client.markedRange()
+        guard reported.location != NSNotFound, reported.location != fixing.start,
+              reported.length == utf16(fixing.shown) else { return }
+        fixing.reportedMark = reported.location
+    }
+
+    /// Where the fix is and what the field holds around it, for the log: positions, lengths, and
+    /// which of the fix's texts is where, never the text itself.
+    private func noteFixing(_ what: String, _ fixing: Fixing, _ client: TextClient) {
+        let wanted = NSRange(location: fixing.start, length: utf16(fixing.shown))
+        let marked = client.markedRange()
+        let original = NSRange(location: fixing.start, length: utf16(fixing.markOriginal))
+        func kind(_ range: NSRange) -> String {
+            guard range.location != NSNotFound, let text = client.text(in: range) else { return "nil" }
+            if text == fixing.shown { return "shown" }
+            if text == fixing.markOriginal { return "original" }
+            return "other\(utf16(text))"
+        }
+        func find(_ text: String, in line: String) -> String {
+            guard !text.isEmpty else { return "-" }
+            let found = (line as NSString).range(of: text)
+            return found.location == NSNotFound ? "none" : "\(found.location)"
+        }
+        let line = client.text(in: NSRange(location: 0, length: fixing.end + 64)) ?? ""
+        let note = "fix \(what): wanted \(NSStringFromRange(wanted)) marked \(NSStringFromRange(marked)) "
+            + "selected \(NSStringFromRange(client.selectedRange())) atWanted=\(kind(wanted)) atMarked=\(kind(marked)) "
+            + "atOriginal=\(kind(original)) line=\(utf16(line)) shownAt=\(find(fixing.shown, in: line)) "
+            + "originalAt=\(find(fixing.markOriginal, in: line)) start=\(fixing.start) end=\(fixing.end)"
+        fixingNote = fixingNote.map { "\($0) | \(note)" } ?? note
     }
 
     /// A fix's marked text the app put somewhere else (at the caret): taken away, so the app can't
@@ -2422,9 +2467,9 @@ public final class InputSession {
         removePlaceholder(fixing, client)
     }
 
-    /// Where the app had the marked text, and where the fix had put it, when a fix was dropped for
-    /// it (`markLanded`): positions only, for the log.
-    public var fixingDropped: (marked: NSRange, wanted: NSRange)?
+    /// Where a fix dropped for its mark (`markLanded`) was, and what the field held around it:
+    /// positions only, for the log.
+    public var fixingNote: String?
 
     // MARK: - Japanese conversion
 

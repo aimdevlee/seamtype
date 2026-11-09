@@ -160,7 +160,10 @@ tests use `FakeTextField`). It owns the preview and hysteresis, commits, Esc rea
   starts or ends at the caret, and marked text with a range, which goes at the caret with that much
   replaced from there. So where `TextClient.marksFromCaret` (macOS), a caret elsewhere in the word is
   moved first: the rest of the word over itself, then the word replaced by the character before it,
-  and the word marked at its start (Notes, real keys, 2026-10-29). → past the marked words
+  and the word marked at its start (Notes, real keys, 2026-10-29). The Claude app (Electron) then reports the
+  marked range from the caret before the word was taken away, keeping that place while only its length follows,
+  and can't read back the text under it, though the marked text is in its place (Chrome reports it right): a fix
+  keeps the place first reported (`Fixing.reportedMark`, `markLanded`; real keys, 2026-11-09). → past the marked words
   (`growMark`) takes the marked text away (the caret at its start) and marks it again over the next
   word; inserts there right after the marked text went in landed at the caret instead (Notes, real
   keys, 2026-10-29). Only forward: the caret can't be put before text that stays after it, so a word

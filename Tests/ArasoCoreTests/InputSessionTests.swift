@@ -42,8 +42,29 @@ final class FakeTextField: TextClient {
     private var laggingCaret: Int?
     /// True as in Ghostty: the caret is always reported at the start of the field.
     var caretStaysAtStart = false
+    /// True as in Chrome and Electron apps (the Claude app, 2026-11-08): the marked range reported
+    /// starts where the caret was before inserts with a range moved it, whatever range the marked
+    /// text names; the marked text itself goes where the field says, and its length is reported right.
+    /// The field's text under the marked text can't be read.
+    var guessesMarkedRange = false
+    private var guessedMarked = NSRange(location: NSNotFound, length: 0)
+    private var browserCaret: Int?
+
+    private func guessMarked(_ s: String) {
+        let length = (s as NSString).length
+        if length == 0 {
+            guessedMarked = NSRange(location: NSNotFound, length: 0)
+        } else if guessedMarked.location == NSNotFound {
+            guessedMarked = NSRange(location: browserCaret ?? cursor, length: length)
+        } else {
+            guessedMarked.length = length
+        }
+        browserCaret = guessedMarked.location == NSNotFound ? nil : NSMaxRange(guessedMarked)
+    }
 
     func caretCaughtUp() { laggingCaret = nil }
+    /// The renderer has told the browser where the caret is (`guessesMarkedRange`), as between keys.
+    func rendererCaughtUp() { browserCaret = nil }
 
     func setMarkedText(_ s: String, selectedClause: NSRange, replacing range: NSRange?) {
         if let range { setMarkedText(s, replacing: range) } else { setMarkedText(s) }
@@ -51,6 +72,7 @@ final class FakeTextField: TextClient {
     }
 
     func setMarkedText(_ s: String) {
+        guessMarked(s)
         selectedClause = nil
         let ns = text as NSString
         let target = marked.location != NSNotFound ? marked : NSRange(location: cursor, length: 0)
@@ -61,6 +83,7 @@ final class FakeTextField: TextClient {
     }
 
     func setMarkedText(_ s: String, replacing range: NSRange) {
+        guessMarked(s)
         selectedClause = nil
         let ns = text as NSString
         let atCaret = NSRange(location: cursor, length: min(range.length, ns.length - cursor))
@@ -76,6 +99,8 @@ final class FakeTextField: TextClient {
     func insertText(_ s: String, replacing range: NSRange?) {
         if dropsEmptyInserts, s.isEmpty { return }
         insertions.append(s)
+        guessedMarked = NSRange(location: NSNotFound, length: 0)
+        if range == nil { browserCaret = nil } else if browserCaret == nil { browserCaret = cursor }
         selectedClause = nil
         if caretLags { laggingCaret = marked.location != NSNotFound ? marked.location : cursor }
         var target = insertsOverMarked && marked.location != NSNotFound ? marked
@@ -89,9 +114,14 @@ final class FakeTextField: TextClient {
     }
 
     func selectedRange() -> NSRange { NSRange(location: caretStaysAtStart ? 0 : laggingCaret ?? cursor, length: 0) }
-    func markedRange() -> NSRange { marked }
+    func markedRange() -> NSRange { guessesMarkedRange ? guessedMarked : marked }
     func text(in range: NSRange) -> String? {
         guard readable, NSMaxRange(range) <= (text as NSString).length else { return nil }
+        // Chrome and Electron apps: the text under the marked text can't be read back.
+        if guessesMarkedRange, marked.location != NSNotFound,
+           NSIntersectionRange(range, marked).length > 0 || (range.length == 0 && range.location == marked.location) {
+            return nil
+        }
         return (text as NSString).substring(with: range)
     }
 }
