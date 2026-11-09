@@ -174,3 +174,41 @@ public enum DubeolsikLayout {
         return lower[lowered]
     }
 }
+
+extension DubeolsikLayout {
+    private static let keyOf: [Character: Character] = {
+        var map: [Character: Character] = [:]
+        for (key, jamo) in lower { map[jamo] = key }
+        for (key, jamo) in shifted { map[jamo] = key }
+        return map
+    }()
+
+    /// The 2-set QWERTY keys that type `word` (G마켓 → Gakzpt), letters and digits as themselves;
+    /// nil on 3-set, another Latin layout, or a character no key types.
+    static func keys(spelling word: String) -> String? {
+        guard KoreanLayout.current == .dubeolsik, LatinLayout.current == .qwerty else { return nil }
+        let splitVowel = Dictionary(uniqueKeysWithValues: Jamo.vowelCombos.map { ($1, $0) })
+        func keys(_ jamo: Character) -> String? {
+            let parts = splitVowel[jamo].map(Array.init) ?? Jamo.finalSplits[jamo].map { [$0.0, $0.1] } ?? [jamo]
+            let typed = parts.compactMap { keyOf[$0] }
+            return typed.count == parts.count ? String(typed) : nil
+        }
+        var out = ""
+        for ch in word {
+            if ch.isASCII, ch.isLetter || ch.isNumber { out.append(ch); continue }
+            guard let v = ch.unicodeScalars.first?.value, ch.unicodeScalars.count == 1 else { return nil }
+            if (0xAC00...0xD7A3).contains(v) {
+                let index = Int(v - 0xAC00)
+                let jong = Jamo.jongseong[index % 28]
+                guard let cho = keys(Jamo.choseong[index / 588]), let jung = keys(Jamo.jungseong[index % 588 / 28]) else { return nil }
+                out += cho + jung
+                if let jong { guard let typed = keys(jong) else { return nil }; out += typed }
+            } else if let typed = keys(ch) {
+                out += typed // a jamo on its own (ㅋㅋ)
+            } else {
+                return nil
+            }
+        }
+        return out
+    }
+}

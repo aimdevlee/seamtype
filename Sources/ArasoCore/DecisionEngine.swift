@@ -118,7 +118,8 @@ extension DecisionEngine {
         case .mixed:
             // The engine's own split (hello월드, github에); the particle split for engines without one.
             let decision = decide(keys, context: DecisionContext())
-            return decision.language == .mixed ? decision.output : MixedWord.split(keys)?.text ?? keys
+            return decision.language == .mixed ? decision.output
+                : (MixedWord.split(keys) ?? MixedWord.splitShortFront(keys))?.text ?? keys
         case .japanese: return RomajiComposer.compose(keys).text
         }
     }

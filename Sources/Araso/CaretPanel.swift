@@ -576,6 +576,7 @@ private final class StripCell: NSView {
     private enum Shown: Equatable {
         case readings([String], [Mark?], numbered: Bool)
         case candidates([String], page: Int)
+        case suggestions([String])
     }
 
     /// A capsule on its own on one line; the readings and candidates in a card `width` wide and
@@ -648,6 +649,25 @@ private final class StripCell: NSView {
         let text = readings.texts[readings.selected]
         root?.setAccessibilityLabel(L("Readings, %@ selected", text))
         announce(L("%@, %ld of %ld", text, readings.selected + 1, readings.texts.count))
+    }
+
+    /// What Tab finishes the word being typed with, in a card under it; `selected` is the one
+    /// Tab put in its place, else the first is on the thumb, as the one Tab takes next.
+    static func show(suggestions: [String], selected: Int?, word: NSRect) {
+        guard word != .zero else { return hide(force: true) }
+        let next = Shown.suggestions(suggestions)
+        if isUp, !settling, shown == next { return select(selected ?? 0) }
+        pick = nil
+        choose = nil
+        generation += 1
+        settling = false
+        pageStart = 0
+        let footer = "⇥"
+        build(suggestions.map { StripCell($0) },
+              layout: .card(width: cardWidth(suggestions, footer: footer), rows: suggestions.count, footer: (footer, nil)),
+              selected: selected ?? 0, word: word)
+        shown = next
+        root?.setAccessibilityLabel(L("Suggestions, %@ selected", suggestions[selected ?? 0]))
     }
 
     /// `clause` is where the clause being converted starts; `choose` commits candidate `index` of

@@ -198,7 +198,7 @@ public struct UserDictionary: Equatable, Sendable {
         switch language {
         case .english: return keys
         case .korean: return HangulComposer.compose(keys: keys)?.text ?? keys
-        case .mixed: return MixedWord.split(keys)?.text ?? keys
+        case .mixed: return (MixedWord.split(keys) ?? MixedWord.splitShortFront(keys))?.text ?? keys
         case .japanese: return RomajiComposer.compose(keys).text
         }
     }
@@ -295,7 +295,7 @@ public final class DictionaryEngine: DecisionEngine, @unchecked Sendable {
     }
 
     private static func index(_ store: UserDictionary) -> [String: [UserDictionary.Entry]] {
-        Dictionary(grouping: store.entries.filter { $0.language != nil }, by: \.keys)
+        Dictionary(grouping: store.entries.filter { $0.language != nil || $0.text?.isEmpty == false }, by: \.keys)
     }
 
     /// `UserDictionary.languageEntry`, from the index: the app's own entry, else the one for every app.
@@ -435,6 +435,13 @@ public final class DictionaryEngine: DecisionEngine, @unchecked Sendable {
         persist(lock.withLock { store.pin(id) ? store : nil })
     }
 
+    /// A word picked from the suggestions that its keys alone don't type (G마켓, no English word
+    /// with a particle): its keys come out as it from now on, as My text, learned.
+    public func learnText(_ text: String, keys: String) {
+        guard keys.count <= UserDictionary.longestLearned else { return }
+        add(UserDictionary.Entry(keys: keys, text: text, source: .learned, strength: .sure, last: UserDictionary.day(today())))
+    }
+
     /// Forgets every learned word; words the user added stay.
     public func forgetAll() {
         persist(lock.withLock {
@@ -445,6 +452,15 @@ public final class DictionaryEngine: DecisionEngine, @unchecked Sendable {
 
     public func decide(_ keys: String, context: DecisionContext) -> Decision {
         let entry = lock.withLock { self.entry(for: keys, app: context.app) }
+        if let entry, entry.language == nil, let text = entry.text, !text.isEmpty {
+            // My text (G마켓 for Gakzpt): written as it is, as a mixed word, so the switch key
+            // still offers the keys as English and Korean.
+            var decision = Decision(language: .mixed, confidence: 1, output: text,
+                                    explanation: entry.source == .user ? "added" : "learned")
+            decision.remembered = text.count
+            decision.rememberedKeys = keys
+            return decision
+        }
         if let entry, entry.wins, let language = entry.language {
             // Rendered by the base engine: this engine's own render(.mixed) would ask it to
             // decide the keys again, find them in the dictionary, and so on without end.

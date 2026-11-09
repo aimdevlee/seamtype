@@ -62,6 +62,7 @@ final class InputController: IMKInputController {
         static let rightCommand: UInt16 = 54
         static let rightShift: UInt16 = 60
         static let space: UInt16 = 49
+        static let tab: UInt16 = 48
     }
 
     override func activateServer(_ sender: Any!) {
@@ -71,6 +72,7 @@ final class InputController: IMKInputController {
         let app = client?.bundleIdentifier()
         MainActor.assumeIsolated {
             Runtime.shared.active = self
+            if app?.hasPrefix("com.apple.Safari") == true { refreshAddressBar() }
             session.activate(app: app)
             session.replacements = Runtime.shared.textReplacements
             if let last = Runtime.shared.lastVim { vimChanged(to: last.signal, from: last.app) }
@@ -115,6 +117,68 @@ final class InputController: IMKInputController {
     /// The field as the session writes to it: through `cased`, so a word typed with Caps Lock
     /// goes in in capitals wherever the session is handed the field.
     @MainActor private func textClient(_ input: IMKTextInput) -> TextClient { session.cased(IMKClient(input, marks: self)) }
+
+    /// Safari's address bar, where Araso stays out of the way: a text field of Safari's own, not
+    /// one on a web page (those are inside an AXWebArea). Never asked while a key is being handled: Safari waits on the input method
+    /// for the key, so it can't answer Accessibility then (-25204 after the timeout, every key
+    /// slowed). The answer from the last read is used, and a new read starts in the background,
+    /// so a click into the address bar may count from the key after it.
+    /// ponytail: Safari only; Chrome's omnibox is a web-free text field too, add its bundle IDs if wanted.
+    @MainActor private func completesTyping(_ input: IMKTextInput) -> Bool {
+        guard input.bundleIdentifier()?.hasPrefix("com.apple.Safari") == true else { return false }
+        refreshAddressBar()
+        return Self.addressBar
+    }
+
+    @MainActor private static var addressBar = false
+    @MainActor private static var readingField = false
+
+    @MainActor private func refreshAddressBar() {
+        guard !Self.readingField, AXIsProcessTrusted(),
+              let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier else { return }
+        Self.readingField = true
+        Task.detached {
+            let address = Self.focusedIsAddressBar(pid)
+            await MainActor.run {
+                Self.readingField = false
+                if let address { Self.addressBar = address }
+            }
+        }
+    }
+
+    /// nil when Safari didn't answer.
+    private nonisolated static func focusedIsAddressBar(_ pid: pid_t) -> Bool? {
+        let app = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(app, 0.3)
+        guard let focused = axElement(app, kAXFocusedUIElementAttribute) else {
+            log.info("field: no focused element")
+            return nil
+        }
+        let role = axString(focused, kAXRoleAttribute) ?? "?"
+        var address = [kAXTextFieldRole, kAXComboBoxRole].contains(role)
+        var element = focused
+        for _ in 0..<40 where address {
+            guard let parent = axElement(element, kAXParentAttribute) else { break }
+            if axString(parent, kAXRoleAttribute) == "AXWebArea" { address = false }
+            element = parent
+        }
+        // The role only, never the field's text.
+        log.info("field role=\(role, privacy: .public) address=\(address)")
+        return address
+    }
+
+    private nonisolated static func axElement(_ element: AXUIElement, _ attribute: String) -> AXUIElement? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success, let value,
+              CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
+        return (value as! AXUIElement)
+    }
+
+    private nonisolated static func axString(_ element: AXUIElement, _ attribute: String) -> String? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success else { return nil }
+        return value as? String
+    }
 
     override func recognizedEvents(_ sender: Any!) -> Int {
         Int(NSEvent.EventTypeMask.keyDown.rawValue | NSEvent.EventTypeMask.flagsChanged.rawValue)
@@ -165,6 +229,21 @@ final class InputController: IMKInputController {
                 togglePause(client: input)
                 return true
             }
+            if completesTyping(input) {
+                // Safari's address bar: an address as typed, with Safari's own completion; a
+                // search that reads Korean composes as anywhere.
+                StripHUD.hide(force: true)
+                return session.handleAddressBar(key(for: event), client: textClient(input))
+            }
+            if event.keyCode == KeyCode.tab, event.modifierFlags.intersection([.command, .control, .option, .shift]).isEmpty,
+               session.nextSuggestion(client: textClient(input)) {
+                syncStrip(input)
+                return true
+            }
+            ScreenText.shared.refresh()
+            session.screenText = ScreenText.shared.text
+        // Nothing typed while a password may be is counted.
+        session.history = IsSecureEventInputEnabled() ? nil : TypedHistory.shared
             let key = key(for: event)
             noteWordRect(input)
             // The raw field: this `handle` notes Caps Lock for the word first, then applies `cased`.
@@ -317,6 +396,8 @@ final class InputController: IMKInputController {
             }
         } else if let learned = session.learned {
             StripHUD.settle(learned, word: learnedRect(learned) ?? caretRect(client))
+        } else if !session.suggestions.isEmpty {
+            StripHUD.show(suggestions: session.suggestions, selected: session.suggestionIndex, word: caretRect(client))
         } else {
             StripHUD.hide()
         }

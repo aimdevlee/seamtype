@@ -8,7 +8,7 @@ public final class EnglishModel: @unchecked Sendable {
     private var trigrams: [Float]
     private var contexts: [Float]
     /// SCOWL level of each word (lowercase, letters only).
-    private let levels: [String: Int]
+    let levels: [String: Int]
     /// The levels a guessed inflection may take from its stem: the list's own, not `commonWords`
     /// (nil: `levels`).
     private let stemLevels: [String: Int]?

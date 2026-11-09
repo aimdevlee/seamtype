@@ -327,6 +327,20 @@ public final class InputSession {
     /// that word at its end (`Settings.fixSlips`).
     public let fixSlips: Bool
     private static let slipGuesser = SlipGuesser(korean: koreanModel)
+    /// What Tab finishes the word being typed with (`Completion`), while there is any.
+    public private(set) var suggestions: [String] = []
+    /// The suggestion Tab put in the word's place, still underlined: the next key commits it.
+    public private(set) var suggestionIndex: Int?
+    /// How much text before the word `Completion` looks through (UTF-16).
+    static let completionContext = 4000
+    /// The text on screen, as the host last read it (Accessibility): offered from with the text before the
+    /// word, which counts as later.
+    public var screenText = ""
+    /// Where the words and sentences typed are counted (`Completion` offers the usual ones
+    /// first); nil: not counted (tests, and a password being typed).
+    public var history: TypedHistory?
+    /// What went in since the last sentence end or line break, for `history`.
+    private var sentenceText = ""
     private let policies: AppPolicies
     private var forced: Language?
     /// Whether `forced` is the user's choice (Esc) rather than "back to kana" after converting
@@ -539,6 +553,7 @@ public final class InputSession {
         let inKoreanSymbols = afterKoreanSymbol
         afterKoreanSymbol = false
         guard policy.enabled, !paused else { return false }
+        if suggestionIndex != nil, let handled = handleSuggestion(key, client: client) { return handled }
         if vimMode == .normal {
             // Vim's normal mode: every key is a command. ⇧Esc is the way out if vim's last word
             // was lost (Vim not seeing the terminal's focus change): it only says "decide words".
@@ -953,6 +968,7 @@ public final class InputSession {
         if fixing != nil { return confirmFixing(client: client) }
         if let client { settleMarkedGuess(client) }
         closeFlipWindow()
+        if suggestionIndex != nil { return commitSuggestion(client) }
         if let conversion, conversion.language != .japanese { return commitPhrase(client: client) }
         if let conversion {
             client?.insertText(conversion.display, replacing: nil)
@@ -1024,6 +1040,60 @@ public final class InputSession {
         liveSuppressed = false
         liveKept = nil
         updatePreview(client)
+    }
+
+    /// Where Araso steps aside (Safari's address bar): the word being typed goes in as its keys,
+    /// English, whatever it was shown as; the keys after it are the app's.
+    public func passThrough(client: TextClient) {
+        closeFlipWindow()
+        lastCommit = nil
+        guard !keys.isEmpty, conversion == nil else { return commit(client: client) }
+        let typed = keys
+        cancelComposition(client)
+        client.insertText(typed, replacing: nil)
+        noteRun(typed)
+    }
+
+    /// Safari's address bar: a word that reads Korean (a search) is composed as anywhere, taking
+    /// in the letters the app already typed for it; one that reads English goes in as typed, so
+    /// Safari completes the address. False: the app types the key.
+    public func handleAddressBar(_ key: Key, client: TextClient) -> Bool {
+        if keys.isEmpty, case .letter(let ch) = key, let run = typedLettersBeforeCaret(client),
+           readsKorean(run.text + String(ch)) {
+            keys = run.text
+            client.setMarkedText(run.text, replacing: run.range) // Safari's completed tail goes too
+        }
+        guard !keys.isEmpty else {
+            passThrough(client: client)
+            return false
+        }
+        let handled = handle(key, client: client)
+        if case .letter = key, !keys.isEmpty, currentLanguage() == .english {
+            passThrough(client: client) // an address after all: as typed, for Safari to complete
+            return true
+        }
+        return handled
+    }
+
+    /// The letters before the caret since the last space, when that's all there is (not an
+    /// address: naver.com), with the selection after it (Safari's completion).
+    private func typedLettersBeforeCaret(_ client: TextClient) -> (text: String, range: NSRange)? {
+        let cursor = client.selectedRange()
+        guard cursor.location != NSNotFound, client.markedRange().location == NSNotFound else { return nil }
+        let start = max(0, cursor.location - Self.runLookBehind)
+        guard let before = client.text(in: NSRange(location: start, length: cursor.location - start)) else { return nil }
+        let word = String(before.reversed().prefix { !$0.isWhitespace }.reversed())
+        guard word.allSatisfy({ $0.isASCII && $0.isLetter }) else { return nil }
+        let length = (word as NSString).length
+        return (word, NSRange(location: cursor.location - length, length: length + cursor.length))
+    }
+
+    private func readsKorean(_ candidate: String) -> Bool {
+        let saved = keys
+        keys = candidate
+        defer { keys = saved }
+        let d = decide(partial: true)
+        return d.language == .korean && d.confidence >= Self.previewFlipConfidence
     }
 
     /// Commits what's in progress after the caret was moved elsewhere (a click; the app asks):
@@ -1284,7 +1354,9 @@ public final class InputSession {
     /// counts as English for the next word.
     private func noteRun(_ text: String) {
         for ch in text {
+            noteSentence(ch)
             if ch.isWhitespace {
+                noteWord(runText)
                 if Self.hasURLMarker(runText) { previousLanguage = .english }
                 runText = ""
                 runKnown = true
@@ -1297,10 +1369,32 @@ public final class InputSession {
     /// The app deleted the character before the caret, nothing being typed.
     private func noteDeleted() {
         if runText.isEmpty { runKnown = false } else { runText.removeLast() }
+        if !sentenceText.isEmpty { sentenceText.removeLast() }
+    }
+
+    /// Counts a word typed (its punctuation off) in `history`.
+    private func noteWord(_ run: String) {
+        let word = run.trimmingCharacters(in: .punctuationCharacters.union(.symbols))
+        guard let history, word.count >= 2, word.allSatisfy(\.isLetter) else { return }
+        history.noteWord(word)
+    }
+
+    /// Counts a sentence in `history` when it ends (sentence end or line break).
+    private func noteSentence(_ ch: Character) {
+        let ends = Completion.sentenceEnds.contains(ch)
+        if !ch.isNewline { sentenceText.append(ch) }
+        guard ends || ch.isNewline else { return }
+        let sentence = sentenceText.trimmingCharacters(in: .whitespaces)
+        sentenceText = ""
+        // A sentence of one word is counted as the word.
+        guard let history, sentence.contains(" "), sentence.count <= Completion.sentenceLength,
+              sentence.first?.isLetter == true else { return }
+        history.noteSentence(sentence)
     }
 
     /// The caret moved or the field changed: what is before the caret is read again when needed.
     private func resetRun() {
+        sentenceText = ""
         runText = ""
         runKnown = false
     }
@@ -3215,6 +3309,8 @@ public final class InputSession {
             heldBoundary = nil
             previewLanguage = nil
             enginePreview = nil
+            suggestions = []
+            suggestionIndex = nil
             client.setMarkedText("")
         } else if let forced = forced ?? pinned {
             previewLanguage = forced
@@ -3270,6 +3366,9 @@ public final class InputSession {
 
     /// The word being composed as the marked text, with its boundary while it is held.
     private func show(_ text: String, _ client: TextClient) {
+        // A held word has ended: its boundary is shown, nothing is left to finish.
+        suggestionIndex = nil
+        suggestions = heldBoundary == nil ? previewLanguage.map { Completion.suggest(text, as: $0, context: textBefore(client), history: history, keys: keys) } ?? [] : []
         shownWord = heldBoundary(in: previewLanguage).map { text + String($0) } ?? text
         client.setMarkedText(shownWord)
     }
@@ -3439,7 +3538,62 @@ public final class InputSession {
         addedNMarker = false
         previewLanguage = nil
         enginePreview = nil
+        suggestions = []
+        suggestionIndex = nil
         return word
+    }
+
+    /// Tab: the next suggestion in the word's place, still underlined. False when nothing is
+    /// offered (the app gets the Tab).
+    public func nextSuggestion(client: TextClient) -> Bool {
+        guard !suggestions.isEmpty, conversion == nil else { return false }
+        let index = suggestionIndex.map { ($0 + 1) % suggestions.count } ?? 0
+        suggestionIndex = index
+        client.setMarkedText(suggestions[index])
+        return true
+    }
+
+    /// A key while a suggestion is shown: Esc, a switch key or Delete go back to the word as
+    /// typed; Return commits the suggestion; anything else commits it, then is handled as after
+    /// any commit (nil).
+    private func handleSuggestion(_ key: Key, client: TextClient) -> Bool? {
+        switch key {
+        case .escape, .cycle, .delete:
+            updatePreview(client)
+            return true
+        case .enter:
+            commitSuggestion(client)
+            return true
+        default:
+            commitSuggestion(client)
+            return nil
+        }
+    }
+
+    /// The suggestion goes in as typed out. Only a word mixing Latin and Hangul is learned (as
+    /// My text, for the keys that type it): no reading of its keys gives it otherwise.
+    private func commitSuggestion(_ client: TextClient?) {
+        guard let index = suggestionIndex else { return }
+        let text = suggestions[index], language = previewLanguage
+        if !inURLRun, history != nil, Completion.mixesLatinAndHangul(text), let spelled = DubeolsikLayout.keys(spelling: text),
+           spelled.hasPrefix(keys), engine.render(spelled, as: .mixed) != text {
+            engine.learnText(text, keys: spelled)
+        }
+        if let client { cancelComposition(client) } else { keys = "" }
+        client?.insertText(text, replacing: nil)
+        noteRun(text)
+        previousLanguage = language?.sentenceLanguage
+    }
+
+    /// For `Completion`: the screen's text where the host read it (the field's text is on it, and
+    /// read so it already leaves out what is being typed), else the text before the sentence being typed.
+    private func textBefore(_ client: TextClient) -> String {
+        guard screenText.isEmpty else { return screenText }
+        let marked = client.markedRange()
+        let end = marked.location != NSNotFound ? marked.location : client.selectedRange().location
+        guard end != NSNotFound, end > 0 else { return "" }
+        let start = max(0, end - Self.completionContext)
+        return Completion.beforeSentence(client.text(in: NSRange(location: start, length: end - start)) ?? "")
     }
 
     /// Takes the last kana off a Japanese phrase, as a Japanese IME does (かんこく → かんこ, not

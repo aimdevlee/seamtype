@@ -136,7 +136,7 @@ public struct KoreanModel: Sendable {
     private static let vocabulary = Set(vocabularyCounts.filter { $0.count >= commonCount }.map(\.word))
     private static let rareVocabulary = Set(vocabularyCounts.filter { $0.count < commonCount }.map(\.word))
 
-    private static let vocabularyCounts: [(word: String, count: Int)] = {
+    static let vocabularyCounts: [(word: String, count: Int)] = {
         guard let url = Resources.koreanVocabulary, let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
         return text.split(whereSeparator: \.isNewline).compactMap {
             let parts = $0.split(separator: "\t")

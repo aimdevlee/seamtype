@@ -114,6 +114,8 @@ guard let server = IMKServer(name: connectionName, bundleIdentifier: Bundle.main
 MainActor.assumeIsolated {
     _ = Runtime.shared.engine.decide("warmup", context: DecisionContext())
     _ = Runtime.shared.converter?.candidates(for: "あ")
+    _ = Completion.suggest("가나", as: .korean)
+    _ = Completion.suggest("abcd", as: .english)
     Updater.shared.startDailyChecks()
 }
 

@@ -84,6 +84,21 @@ public struct MixedWord: Equatable, Sendable {
         return MixedWord(english: String(first), koreanKeys: suffixKeys, korean: composed.text)
     }
 
+    /// Two lowercase letters and a Korean word (`ipwnth` → `ip주소`, `osdjqepdlxm` → `os업데이트`).
+    /// Too short a front for the engine to decide on (so + が), so it is only offered as a
+    /// reading to switch to, never picked on its own.
+    public static func splitShortFront(_ keys: String) -> MixedWord? {
+        let chars = Array(keys)
+        // Letters only: 3-set types jamo on digits and symbols (ldhr2jtB is 지냈어?).
+        guard chars.count >= 4, chars.allSatisfy({ $0.isASCII && $0.isLetter }),
+              chars[..<2].allSatisfy(\.isLowercase) else { return nil }
+        let back = String(chars[2...])
+        guard back.first.map(DubeolsikLayout.startsSyllable) == true,
+              let composed = HangulComposer.compose(keys: back), composed.strayJamo.isEmpty,
+              composed.syllables.count >= 2 else { return nil }
+        return MixedWord(english: String(chars[..<2]), koreanKeys: back, korean: composed.text)
+    }
+
     /// Splits off the longest Korean particle/ending at the end of `keys`.
     /// Only the shape is checked here; whether the front really is English is
     /// up to the caller (see `SplittingEngine`).
