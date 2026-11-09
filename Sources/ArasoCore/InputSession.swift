@@ -592,6 +592,20 @@ public final class InputSession {
         if switchesLanguage, keys.isEmpty { adoptAppCapitals(client) }
         let pending = lastCommit
         lastCommit = nil
+        // Return in the readings a switch key just listed keeps the one shown, as in the candidate
+        // window, and the list closes: the word just committed stays as it now reads (←/→ then move
+        // the caret), the word being typed is confirmed so (`pickTyped`), whatever `returnConfirmsOnly`
+        // says. The app gets no Return: the list was the candidate window.
+        if key == .enter, let listed, conversion == nil {
+            if keys.isEmpty, let pending {
+                lastCommit = pending
+                return true
+            }
+            if !keys.isEmpty, listed.languages.indices.contains(listed.selected) {
+                pickTyped(listed.languages[listed.selected], client: client)
+                return true
+            }
+        }
         // A digit right after a switch key changed the word just committed (or one switched in place):
         // that reading of the list, numbered under it, as in the candidate window, which then closes:
         // ←/→ move the caret, as after any word.
@@ -1638,10 +1652,11 @@ public final class InputSession {
         return true
     }
 
-    /// ←/→ right after a switch key changed the word just committed, which make it the fix: a text
-    /// service that asks whether it wants a key before sending it (Windows' `test`) keeps them then.
+    /// ←/→ right after a switch key changed the word just committed, which make it the fix, and ↑/↓
+    /// and Return in the readings it listed: a text service that asks whether it wants a key before
+    /// sending it (Windows' `test`) keeps them then.
     public func takesArrow(_ key: Key) -> Bool {
-        if key == .up || key == .down { return readings != nil && conversion == nil }
+        if key == .up || key == .down || key == .enter { return readings != nil && conversion == nil }
         return (key == .left || key == .right || key == .shiftLeft || key == .shiftRight)
             && keys.isEmpty && conversion == nil && fixing == nil
             && lastCommit != nil && readings != nil

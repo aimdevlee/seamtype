@@ -914,12 +914,13 @@ import Testing
     }
 
     /// A word Return only confirmed is the word just committed too, with no boundary: a switch key
-    /// changes it, learned when the next Return closes the window.
+    /// changes it; Return then closes its list, and the next, the app's, closes the window and learns it.
     @Test func switchKeyAfterReturnConfirmedAWord() {
         type("hello world")
         #expect(session.handle(.enter, client: field))
         #expect(session.handle(.cycle, client: field))
         #expect(field.text == "hello \(korean("world"))")
+        #expect(session.handle(.enter, client: field)) // keeps the reading listed
         #expect(!session.handle(.enter, client: field)) // the app's newline
         #expect(session.engine.correctedOnce("world", app: nil) == .korean)
     }
@@ -1295,6 +1296,31 @@ import Testing
         #expect(!session.handle(.printable("9"), client: field)) // none: the app types it
         type("the 2")
         #expect(field.text.hasSuffix(" 2")) // no switch before it: the digit goes in
+    }
+
+    /// Return in the readings a switch key listed keeps the one shown and closes the list, as in the
+    /// candidate window: the app gets no Return, for the word just committed and the word being typed,
+    /// with `returnConfirmsOnly` off too.
+    @Test func returnKeepsTheReadingShown() {
+        type("hello ")
+        #expect(session.handle(.cycle, client: field))
+        let switched = field.text
+        #expect(session.takesArrow(.enter))
+        #expect(session.handle(.enter, client: field)) // not the app's newline
+        #expect(field.text == switched)
+        #expect(session.readings == nil)
+        #expect(!session.takesArrow(.enter))
+        #expect(!session.handle(.enter, client: field)) // list closed: the next Return is the app's
+
+        let passing = InputSession(engine: DictionaryEngine(base: sharedEngine, storeURL: FileManager.default.temporaryDirectory.appendingPathComponent("araso-return-\(UUID().uuidString).json")), returnConfirmsOnly: false)
+        let other = FakeTextField()
+        for ch in "dkssud" { _ = passing.handle(.letter(ch), client: other) }
+        #expect(passing.handle(.cycle, client: other))
+        let shown = other.text
+        #expect(passing.handle(.enter, client: other))
+        #expect(other.text == shown)
+        #expect(other.marked.location == NSNotFound) // confirmed
+        #expect(passing.keys.isEmpty)
     }
 
     /// A reading chosen from the list, by a digit or a click, is where the word stays: ←/→ after it
