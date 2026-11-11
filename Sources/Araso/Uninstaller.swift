@@ -115,9 +115,13 @@ enum Uninstaller {
         let source = "do shell script \"\(shell)\" with prompt \"\(prompt)\" with administrator privileges"
         var error: NSDictionary?
         NSAppleScript(source: source)?.executeAndReturnError(&error)
-        guard let error else { return }
-        if error[NSAppleScript.errorNumber] as? Int == -128 { throw Failure.cancelled }
-        throw Failure.script(error[NSAppleScript.errorMessage] as? String ?? L("Couldn't uninstall Araso"))
+        if let error {
+            if error[NSAppleScript.errorNumber] as? Int == -128 { throw Failure.cancelled }
+            throw Failure.script(error[NSAppleScript.errorMessage] as? String ?? L("Couldn't uninstall Araso"))
+        }
+        // The script ends in `true` for the receipts' sake, so it says nothing of the rm: a copy still
+        // there (or a script that couldn't be made) isn't an uninstall to go on from.
+        if FileManager.default.fileExists(atPath: copy.path) { throw Failure.script(L("Couldn't uninstall Araso")) }
     }
 
     /// What to type with once Araso is gone: ABC or U.S. if enabled, else any other.

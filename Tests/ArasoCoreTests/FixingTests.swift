@@ -790,6 +790,7 @@ import Testing
         type("x") // before the caret move was seen
         #expect(session.fixing == nil)
         #expect(session.engine.correctedOnce("again", app: nil) == .korean)
+        #expect(session.learned?.language == .korean) // and the strip says so, as after any correction
     }
 
     /// → there goes to the app too, which at the line's end leaves the caret where it was: the word is

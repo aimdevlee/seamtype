@@ -52,6 +52,20 @@ import Testing
         #expect(session.takesArrow(.up))
     }
 
+    /// A click with nothing marked tells the session nothing, so the list of the word left behind
+    /// is still held: ↓ from the caret's new place is the app's, not a switch key pressed there.
+    @Test func arrowsAreTheAppsOnceTheCaretLeftTheWord() throws {
+        type("hello world ")
+        _ = session.handle(.cycle, client: field)
+        #expect(session.readings != nil)
+        let shown = field.text
+        field.cursor = 2 // a click inside the first word
+        #expect(!session.handle(.down, client: field))
+        #expect(session.readings == nil)
+        #expect(session.fixing == nil)
+        #expect(field.text == shown)
+    }
+
     /// With live conversion a press can go to taking the kanji back to the kana (`liveSuppressed`), which
     /// isn't a reading of the list: ↑ still lands on the reading before.
     @Test func upFromALiveConversionLandsOnTheReadingBefore() throws {

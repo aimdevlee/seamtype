@@ -597,6 +597,17 @@ import Testing
         #expect(!session.handle(.shiftSpace, client: field)) // the app types the half-width one
     }
 
+    /// That space ends the run as any space does: an @ after it isn't an email's (変換@…), and the
+    /// word after the @ is decided.
+    @Test func fullWidthSpaceEndsTheRun() {
+        session.fullWidthSpace = true
+        type("henkan ")
+        session.handle(.enter, client: field)
+        type(" @dkssud ")
+        #expect(field.text.hasPrefix("変換　"))
+        #expect(field.text.hasSuffix("안녕 "))
+    }
+
     @Test func noFullWidthWhereTheAppSaysNo() {
         let policies = AppPolicies(overrides: ["test.terminal": .init(fullWidth: false)])
         let terminal = InputSession(engine: session.engine, policies: policies, converter: converter, japaneseEnabled: true)
@@ -813,6 +824,17 @@ import Testing
     @Test func koreanShortcutWinsTheDecision() {
         type("wt wnth ")
         #expect(field.text == "ㅈㅅ 주소 ")
+    }
+
+    /// A word the dictionary remembers for this app only comes before the shortcut too.
+    @Test func aWordRememberedForTheAppWinsOverTheShortcut() {
+        session.engine.add(.init(keys: "wnth", language: .english, source: .user, apps: ["test.editor"]))
+        session.activate(app: "test.editor")
+        type("wnth ")
+        #expect(field.text == "wnth ")
+        session.activate(app: "test.other")
+        type("wnth ")
+        #expect(field.text == "wnth 주소 ")
     }
 
     @Test func japaneseShortcutIsTheFirstCandidate() {

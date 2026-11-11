@@ -868,6 +868,22 @@ final class Harness {
         #expect(h.document.composition == nil)
     }
 
+    /// A setting changed while vim is in normal mode: the session that takes over is in it too,
+    /// since vim says nothing until its next mode change.
+    @Test func vimNormalModeOutlivesASettingsChange() throws {
+        let h = try Harness(app: "windowsterminal.exe")
+        var vim = ServiceRequest(op: .vim, app: "WindowsTerminal.exe")
+        vim.vim = "normal"
+        _ = h.runtime.handle(vim)
+        h.send(ServiceRequest(op: .pending, client: h.client))
+        var select = ServiceRequest(op: .menuSelect, client: h.client)
+        select.item = "live"
+        h.send(select)
+        h.type("dd")
+        #expect(h.document.text == "dd")
+        #expect(h.document.composition == nil)
+    }
+
     @Test func settingsWindowChangesWriteTheFiles() throws {
         let h = try Harness()
         var change = SettingsChange()
