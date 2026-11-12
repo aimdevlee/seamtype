@@ -108,8 +108,9 @@ enum Uninstaller {
     /// /Library needs an administrator: macOS's own password prompt, through AppleScript.
     private static func removeAsAdministrator(_ copy: URL) throws {
         let path = copy.path.replacingOccurrences(of: "'", with: "'\\''")
-        let shell = "rm -rf '\(path)'; pkgutil --forget \(packageID) >/dev/null 2>&1; "
-            + Predecessor.all.map { "pkgutil --forget \($0.packageID) >/dev/null 2>&1; " }.joined() + "true"
+        // The receipts only once the copy is gone: a copy left behind keeps them, so the pkg still knows it.
+        let shell = "rm -rf '\(path)' && { pkgutil --forget \(packageID) >/dev/null 2>&1; "
+            + Predecessor.all.map { "pkgutil --forget \($0.packageID) >/dev/null 2>&1; " }.joined() + "true; }"
         let prompt = L("Araso wants to remove itself from /Library/Input Methods.")
             .replacingOccurrences(of: "\"", with: "\\\"")
         let source = "do shell script \"\(shell)\" with prompt \"\(prompt)\" with administrator privileges"
@@ -119,8 +120,7 @@ enum Uninstaller {
             if error[NSAppleScript.errorNumber] as? Int == -128 { throw Failure.cancelled }
             throw Failure.script(error[NSAppleScript.errorMessage] as? String ?? L("Couldn't uninstall Araso"))
         }
-        // The script ends in `true` for the receipts' sake, so it says nothing of the rm: a copy still
-        // there (or a script that couldn't be made) isn't an uninstall to go on from.
+        // A copy still there (or a script that couldn't be made) isn't an uninstall to go on from.
         if FileManager.default.fileExists(atPath: copy.path) { throw Failure.script(L("Couldn't uninstall Araso")) }
     }
 

@@ -1724,7 +1724,7 @@ public final class InputSession {
     private func listApplies(_ client: TextClient) -> Bool {
         if fixing != nil || !keys.isEmpty { return true }
         guard let commit = lastCommit else { return false }
-        if commit.inLine != nil { return true } // switched in the line: the caret may be anywhere in it
+        // A word switched in the line too: `switchInPlace` puts the caret at its end first.
         let caret = client.selectedRange()
         return caret.length == 0 && caret.location == commit.location + utf16(commit.text)
     }
