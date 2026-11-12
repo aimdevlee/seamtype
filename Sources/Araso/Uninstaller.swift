@@ -108,9 +108,9 @@ enum Uninstaller {
     /// /Library needs an administrator: macOS's own password prompt, through AppleScript.
     private static func removeAsAdministrator(_ copy: URL) throws {
         let path = copy.path.replacingOccurrences(of: "'", with: "'\\''")
-        // The receipts only once the copy is gone: a copy left behind keeps them, so the pkg still knows it.
-        let shell = "rm -rf '\(path)' && { pkgutil --forget \(packageID) >/dev/null 2>&1; "
-            + Predecessor.all.map { "pkgutil --forget \($0.packageID) >/dev/null 2>&1; " }.joined() + "true; }"
+        // Its own receipt, and only once the copy is gone: a copy left behind keeps its receipt.
+        let receipt = Predecessor.all.first { $0.appName == copy.lastPathComponent }?.packageID ?? packageID
+        let shell = "rm -rf '\(path)' && { pkgutil --forget \(receipt) >/dev/null 2>&1; true; }"
         let prompt = L("Araso wants to remove itself from /Library/Input Methods.")
             .replacingOccurrences(of: "\"", with: "\\\"")
         let source = "do shell script \"\(shell)\" with prompt \"\(prompt)\" with administrator privileges"
