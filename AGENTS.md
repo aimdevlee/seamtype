@@ -132,6 +132,9 @@ tests use `FakeTextField`). It owns the preview and hysteresis, commits, Esc rea
   candidate window and with live conversion. `AppPolicies.migrateSwitchKey` moves the
   `switchKey` of builds between 0.1.8 and 0.1.9 (settings.json, never released) into `"*"`; an
   entry's `escapeToApp` (0.1.8 and earlier) still applies until the entry names its own `switchKeys`.
+  Keys typed on after a switch changed the word being typed learn that reading at once, for the keys
+  it was picked on (so → 내, then on: so as Korean, `learnSwitchBeforeMore`), and the word they make
+  isn't learned when it ends, unless a switch key changes it again.
 - Words of the line can be fixed later (`Fixing`, `FixingTests`): `finalize` keeps each word that
   went in with a boundary in `recent` (20, cleared by Return and `activate`, kept across clicks and
   arrows, each checked against the field when used; text deleted or typed over drops the words from
