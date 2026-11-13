@@ -332,6 +332,11 @@ public final class InputSession {
     /// Whether `forced` is the user's choice (Esc) rather than "back to kana" after converting
     /// a phrase the engine read as Japanese anyway: only the user's choices are corrections.
     private var forcedByUser = false
+    /// The keys when a switch key last changed the word being typed. More keys after it learn that
+    /// reading for these keys at once (`learnSwitchBeforeMore`), not for the word they make.
+    private var switchedKeys: String?
+    /// The switch was learned as more keys came: the word, ending so, isn't learned again.
+    private var switchLearned = false
     /// The language the engine itself showed last, before any Esc: what a commit compares
     /// against, so a forced reading is never mistaken for the engine's own choice.
     private var enginePreview: Language?
@@ -699,6 +704,8 @@ public final class InputSession {
             }
             if keys.isEmpty { // a new word
                 lastRecorded = nil
+                switchedKeys = nil
+                switchLearned = false
                 liveSuppressed = false
                 liveKept = nil
                 let cursor = client.selectedRange()
@@ -711,6 +718,7 @@ public final class InputSession {
             }
             addedNMarker = false
             pinned = nil
+            learnSwitchBeforeMore()
             keys.append(ch)
             updatePreview(client)
             return true
@@ -777,6 +785,8 @@ public final class InputSession {
             pinned = nil
             forcedByUser = true
             if next != .japanese { dropNMarker() }
+            switchedKeys = keys // after the n marker went: the keys the word goes on from
+            switchLearned = false
             updatePreview(client)
             readings = readings(of: keys, as: next, decided: committedLanguage()) { _, language in self.rendering(as: language) }
             // Numbered, a digit picking one, except on 3-set, whose digit keys are jamo of the word.
@@ -830,6 +840,7 @@ public final class InputSession {
             // A symbol that makes the run a URL or path (ho@, www.) ends the word, half-width.
             let endsInURL = inURLRun || Self.hasURLMarker(run(client) + keys + String(ch))
             if japaneseEnabled, !endsInURL, belongsToJapanesePhrase(ch) {
+                learnSwitchBeforeMore()
                 keys.append(ch)
                 // Digits don't read as anything: the phrase stays Japanese, as it was shown.
                 if ch.isNumber, forced == nil { forced = .japanese; forcedByUser = false }
@@ -837,6 +848,7 @@ public final class InputSession {
                 return true
             }
             if !endsInURL, keepsInWord(ch) {
+                learnSwitchBeforeMore()
                 keys.append(ch) // k8s, utf-8, 안녕1: one word, read piece by piece (`SplittingEngine.decideJoined`)
                 updatePreview(client)
                 return true
@@ -1604,11 +1616,13 @@ public final class InputSession {
                                  boundary: "", typedBoundary: nil, learns: !inURLRun, typed: true)
         fixing = Fixing(start: marked.location, original: original, end: NSMaxRange(marked), markOriginal: original,
                         shown: original, firstEntry: recent.count, pieces: [piece], trailing: "", language: shown)
-        fixing?.chosen = forced != nil && forcedByUser
+        fixing?.chosen = forced != nil && forcedByUser && !switchLearned // learned already, for the keys it was picked on
         fixing?.typedKeys = keys
         keys = ""
         forced = nil
         forcedByUser = false
+        switchedKeys = nil
+        switchLearned = false
         pinned = nil
         syllableStart = nil
         addedNMarker = false
@@ -1764,6 +1778,7 @@ public final class InputSession {
         forced = language
         pinned = nil
         forcedByUser = true
+        switchLearned = false
         if language != .japanese { dropNMarker() }
         updatePreview(client)
         readings = nil
@@ -3427,7 +3442,7 @@ public final class InputSession {
     private func wordEnds(as language: Language, engineChoice: Language) {
         guard !inURLRun else { return }
         if forced != nil, forcedByUser {
-            record(keys, as: language, engineChoice: engineChoice)
+            if !switchLearned { record(keys, as: language, engineChoice: engineChoice) }
         } else {
             engine.used(keys, as: language)
             noteRemembered(as: language)
@@ -3453,6 +3468,8 @@ public final class InputSession {
         keys = ""
         forced = nil
         forcedByUser = false
+        switchedKeys = nil
+        switchLearned = false
         pinned = nil
         syllableStart = nil
         addedNMarker = false
@@ -3530,6 +3547,16 @@ public final class InputSession {
     private func dropNMarker() {
         if addedNMarker, keys.hasSuffix("'") { keys.removeLast() }
         addedNMarker = false
+    }
+
+    /// A reading a switch key picked, then more keys typed onto it: the pick is learned now, for the
+    /// keys it was picked on (so → English, then rk: so, not sork). The word goes on as forced, and
+    /// isn't learned again when it ends, unless a switch key changes it again on the way.
+    private func learnSwitchBeforeMore() {
+        defer { switchedKeys = nil }
+        guard let switched = switchedKeys, switched == keys, let language = forced, forcedByUser, !inURLRun else { return }
+        record(keys, as: language, engineChoice: committedLanguage())
+        switchLearned = true
     }
 
     /// The last correction handed to the learning engine, for the word being typed or just
