@@ -1048,6 +1048,8 @@ void TextService::MenuSelect(const std::string &item) {
     Json request = Json::object();
     request.set("op", "menuSelect");
     request.set("item", item);
+    // An item may open the settings window, which the host starts or brings forward (#113).
+    host_.LendForeground();
     Json response;
     host_.Request(request, response, 1000);
 }

@@ -107,6 +107,11 @@ void HostConnection::Detach() {
     Close();
 }
 
+void HostConnection::LendForeground() {
+    ULONG host = 0;
+    if (Connect() && GetNamedPipeServerProcessId(pipe_, &host) && host) AllowSetForegroundWindow(host);
+}
+
 bool HostConnection::Request(Json request, Json &response, DWORD timeoutMs) {
     for (int attempt = 0; attempt < 2; attempt++) {
         if (!client_ && !AttachNow()) return false;
