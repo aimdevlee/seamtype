@@ -367,6 +367,8 @@ public final class ServiceRuntime {
         client.session.commit(client: field)
         client.session.saveConverter(unless: converter, discarded: discardedConverters)
         fresh.activate(app: client.session.app ?? client.app)
+        // Vim is still in the mode it last reported: it says nothing again until the next change.
+        if let mode = client.session.vimSignal { fresh.vimChanged(to: mode, client: nil) }
         client.session = fresh
         client.generation = generation
         return fresh

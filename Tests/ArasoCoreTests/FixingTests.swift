@@ -790,6 +790,7 @@ import Testing
         type("x") // before the caret move was seen
         #expect(session.fixing == nil)
         #expect(session.engine.correctedOnce("again", app: nil) == .korean)
+        #expect(session.learned?.language == .korean) // and the strip says so, as after any correction
     }
 
     /// → there goes to the app too, which at the line's end leaves the caret where it was: the word is
@@ -1457,5 +1458,23 @@ import Testing
         #expect(session.fixing == nil)
         #expect(field.marked.location == NSNotFound)
         #expect(field.text == "hello \(korean("world")) \(rest)")
+    }
+
+    /// The word switched where it is lists its readings with the caret at its end: ↓ steps them
+    /// there, and once a click took the caret elsewhere ↓ is the app's.
+    @Test func arrowsStepAWordSwitchedInTheLineOnlyWithTheCaretAtItsEnd() throws {
+        type("hello world ")
+        let rest = String(repeating: "x", count: 5000)
+        field.insertText(rest, replacing: nil)
+        caret(at: 8) // inside world
+        session.handle(.cycle, client: field)
+        let list = try #require(session.readings)
+        #expect(field.cursor == 6 + (korean("world") as NSString).length)
+        #expect(session.handle(.up, client: field))
+        #expect(session.readings?.selected == list.selected - 1)
+        #expect(field.text == "hello world \(rest)")
+        caret(at: 2)
+        #expect(!session.handle(.down, client: field))
+        #expect(field.text == "hello world \(rest)")
     }
 }

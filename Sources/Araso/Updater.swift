@@ -83,20 +83,31 @@ final class Updater: ObservableObject {
             // A file (the updateFeed override) has no HTTP status.
             let status = (response as? HTTPURLResponse)?.statusCode ?? 200
             let release = data.flatMap { Release(gitHubJSON: $0) }
+            // GitHub answered, with a release that has no Araso.pkg: nothing to install.
+            let nothing = release == nil && data.map { Release.lacks("Araso.pkg", gitHubJSON: $0) } == true
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
-                    Updater.shared.finishCheck(release, failed: error != nil || status != 200)
+                    Updater.shared.finishCheck(release, nothingToInstall: nothing, failed: error != nil || status != 200)
                 }
             }
         }.resume()
     }
 
-    private func finishCheck(_ release: Release?, failed: Bool) {
+    private func finishCheck(_ release: Release?, nothingToInstall: Bool, failed: Bool) {
+        let defaults = UserDefaults.standard
+        if !failed, nothingToInstall {
+            // As the Windows and Linux check takes it (`ServiceRuntime`): this copy is up to date,
+            // and the check counts, so it isn't made again every hour.
+            defaults.set(Date(), forKey: Key.checked)
+            for key in [Key.version, Key.package, Key.page, Key.notes] { defaults.removeObject(forKey: key) }
+            available = nil
+            state = .upToDate
+            return
+        }
         guard !failed, let release else {
             state = .failed(L("Couldn't reach GitHub. Try again later."))
             return
         }
-        let defaults = UserDefaults.standard
         defaults.set(Date(), forKey: Key.checked)
         defaults.set(release.version, forKey: Key.version)
         defaults.set(release.package.absoluteString, forKey: Key.package)

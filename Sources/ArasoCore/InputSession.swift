@@ -485,6 +485,10 @@ public final class InputSession {
     /// Whether keys currently go straight to vim (normal, visual or command-line mode).
     public var inVimNormalMode: Bool { vimMode == .normal }
 
+    /// The mode vim last reported here, for the session that replaces this one when a setting
+    /// changes: vim says nothing again until its next mode change.
+    public var vimSignal: VimSignal? { vimMode }
+
     /// `handle` for a key typed with Caps Lock on or off. The letter comes in the case Shift alone
     /// gives it (the controller's job), so a word reads the same either way (GKAUS is 하면); what
     /// the word puts in the field goes through `cased`. Caps Lock changing inside a word commits
@@ -531,11 +535,12 @@ public final class InputSession {
         let switched = readings != nil && !keys.isEmpty && conversion == nil
         let listed = readings // what a digit right after a switch picks from
         let arrow = key == .left || key == .right || key == .shiftLeft || key == .shiftRight
-        if let deferred = fixAfterArrow { fixAfterArrow = nil; learnUnmarked(deferred.commit) }
         readings = nil
         learned = nil
         guesses = nil
         fixedSlip = nil
+        // After the clears: what this teaches is `learned`, the strip's note for this key.
+        if let deferred = fixAfterArrow { fixAfterArrow = nil; learnUnmarked(deferred.commit) }
         let inKoreanSymbols = afterKoreanSymbol
         afterKoreanSymbol = false
         guard policy.enabled, !paused else { return false }
@@ -547,7 +552,9 @@ public final class InputSession {
             resetRun()
             return false
         }
-        if key == .up || key == .down, let listed, conversion == nil { return stepReadings(listed, down: key == .down, client) }
+        if key == .up || key == .down, let listed, conversion == nil, listApplies(client) {
+            return stepReadings(listed, down: key == .down, client)
+        }
         if fixing != nil, key == .guess { return true } // guesses are for the word just committed, not a fix
         if fixing != nil { return handleFixing(key, client: client) } // ⇧Space confirms it first, as any key
         if guessing != nil, let handled = handleGuessing(key, client: client) { return handled }
@@ -799,6 +806,7 @@ public final class InputSession {
                 if previousLanguage == .japanese {
                     if ch == " ", fullWidthSpace, japaneseEnabled, policy.fullWidth {
                         client.insertText("　", replacing: nil)
+                        noteRun("　") // a space: the run ends, as after ⇧Space's
                         return true
                     }
                     // A number after Japanese text starts a Japanese word: １２３, ３がつ → ３月.
@@ -1710,6 +1718,17 @@ public final class InputSession {
 
     /// ↓ or ↑ in the readings a switch key listed: the next or the one before, as presses of the
     /// switch key leave it. At the list's end nothing changes and it stays up.
+    /// Whether the readings a switch key listed are still of the word at the caret. A click with
+    /// nothing marked tells the input method nothing, so the list of the word just committed can
+    /// outlive the caret's place: ↑/↓ are then the app's, not presses of the switch key elsewhere.
+    private func listApplies(_ client: TextClient) -> Bool {
+        if fixing != nil || !keys.isEmpty { return true }
+        guard let commit = lastCommit else { return false }
+        // A word switched in the line too: `switchInPlace` puts the caret at its end first.
+        let caret = client.selectedRange()
+        return caret.length == 0 && caret.location == commit.location + utf16(commit.text)
+    }
+
     private func stepReadings(_ listed: Readings, down: Bool, _ client: TextClient) -> Bool {
         let target = listed.selected + (down ? 1 : -1)
         guard listed.texts.indices.contains(target) else {
@@ -2600,7 +2619,7 @@ public final class InputSession {
     /// よろ), unless the user taught Araso otherwise for these keys. English shortcuts are left
     /// to the engine: "go" may be one, and still be ご in a Japanese sentence.
     private func shortcutReading(partial: Bool) -> (language: Language, text: String)? {
-        guard !replacements.isEmpty, !keys.isEmpty, engine.learned[keys] == nil else { return nil }
+        guard !replacements.isEmpty, !keys.isEmpty, engine.rememberedLanguage(keys, app: app) == nil else { return nil }
         if let hangul = hangul(), replacements[hangul] != nil { return (.korean, hangul) }
         if japaneseEnabled {
             let kana = RomajiComposer.compose(keys, partial: partial)

@@ -41,6 +41,8 @@ final class InputController: IMKInputController {
             old.commit(client: client().map { old.cased(IMKClient($0 as IMKTextInput, marks: self)) })
             old.saveConverter(unless: runtime.converter, discarded: runtime.discardedConverters)
             fresh.activate(app: old.app)
+            // Vim is still in the mode it last reported: it says nothing again until the next change.
+            if let mode = old.vimSignal { fresh.vimChanged(to: mode, client: nil) }
         }
         current = (fresh, runtime.generation)
         return fresh
@@ -180,8 +182,11 @@ final class InputController: IMKInputController {
                 // the word just committed marks it there (`caretMoved`).
                 DispatchQueue.main.async { [weak self] in
                     guard let self else { return }
+                    let noted = self.session.learned
                     self.session.caretMoved(client: self.textClient(input))
-                    if self.session.fixing != nil { self.syncStrip(input) }
+                    // A fix it started, or a switch it only learned (the app's → went into the text
+                    // after the word): the strip says so. Not a note the key itself already showed.
+                    if self.session.fixing != nil || self.session.learned != noted { self.syncStrip(input) }
                 }
             }
             // The settings window's typing test shows how each word was decided; only there.
