@@ -104,6 +104,18 @@ import Testing
         #expect(field.text == "henkan ")
     }
 
+    /// Back to kana (henkan'), switched to English, then more keys: the pick is learned for henkan,
+    /// without the n marker the switch took away, not for the word the keys make.
+    @Test func keysAfterASwitchFromKanaLearnThePickWithoutTheMarker() {
+        type("henkan ⎋⎋")
+        #expect(field.text == "henkan")
+        type("s")
+        #expect(learning.pending["henkan"] == .english)
+        type(" ")
+        #expect(learning.pending["henkans"] == nil)
+        #expect(learning.pending["henkan'"] == nil)
+    }
+
     /// Committing a clause and going back to kana for the rest isn't a correction.
     @Test func backToKanaOnTheRestIsNotACorrection() {
         type("kyouhaiitenkidesune ")

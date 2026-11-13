@@ -784,9 +784,9 @@ public final class InputSession {
             forced = next
             pinned = nil
             forcedByUser = true
-            switchedKeys = keys
-            switchLearned = false
             if next != .japanese { dropNMarker() }
+            switchedKeys = keys // after the n marker went: the keys the word goes on from
+            switchLearned = false
             updatePreview(client)
             readings = readings(of: keys, as: next, decided: committedLanguage()) { _, language in self.rendering(as: language) }
             // Numbered, a digit picking one, except on 3-set, whose digit keys are jamo of the word.
