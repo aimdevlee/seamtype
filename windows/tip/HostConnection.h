@@ -22,6 +22,11 @@ public:
     /// (after one reconnect: a host that restarted gives new client ids).
     bool Request(Json request, Json &response, DWORD timeoutMs = 1500);
 
+    /// Lets the host bring a window forward (the settings window): it runs in the background, so
+    /// Windows ignores its SetForegroundWindow unless the app the user is typing in, this process,
+    /// hands its turn over first.
+    void LendForeground();
+
     int client() const { return client_; }
 
 private:
